@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natpudan - AI Clinical Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-stethoscope"></i>
+                    <h1>Natpudan</h1>
+                    <span class="subtitle">AI Clinical Assistant</span>
+                </div>
+                <nav class="nav">
+                    <button class="nav-btn active" data-section="dashboard">Dashboard</button>
+                    <button class="nav-btn" data-section="symptom-checker">Symptom Checker</button>
+                    <button class="nav-btn" data-section="drug-interactions">Drug Interactions</button>
+                    <button class="nav-btn" data-section="medical-reference">Medical Reference</button>
+                    <button class="nav-btn" data-section="patient-notes">Patient Notes</button>
+                </nav>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="section active">
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="fas fa-search-plus"></i>
+                        </div>
+                        <h3>Symptom Analysis</h3>
+                        <p>AI-powered symptom checker to assist in differential diagnosis</p>
+                        <button class="btn-primary" onclick="showSection('symptom-checker')">Start Analysis</button>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="fas fa-pills"></i>
+                        </div>
+                        <h3>Drug Interactions</h3>
+                        <p>Check for potential drug interactions and contraindications</p>
+                        <button class="btn-primary" onclick="showSection('drug-interactions')">Check Interactions</button>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="fas fa-book-medical"></i>
+                        </div>
+                        <h3>Medical Reference</h3>
+                        <p>Quick access to medical guidelines and reference materials</p>
+                        <button class="btn-primary" onclick="showSection('medical-reference')">Browse Reference</button>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="fas fa-user-md"></i>
+                        </div>
+                        <h3>Patient Management</h3>
+                        <p>Organize and manage patient notes and treatment plans</p>
+                        <button class="btn-primary" onclick="showSection('patient-notes')">Manage Patients</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Symptom Checker Section -->
+            <section id="symptom-checker" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-search-plus"></i> AI Symptom Checker</h2>
+                    <p>Enter patient symptoms to get AI-assisted differential diagnosis suggestions</p>
+                </div>
+                
+                <div class="symptom-input">
+                    <div class="input-group">
+                        <label for="symptoms">Patient Symptoms:</label>
+                        <textarea id="symptoms" placeholder="Describe the patient's symptoms in detail..." rows="4"></textarea>
+                    </div>
+                    
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="age">Age:</label>
+                            <input type="number" id="age" min="0" max="120" placeholder="Patient age">
+                        </div>
+                        <div class="input-group">
+                            <label for="gender">Gender:</label>
+                            <select id="gender">
+                                <option value="">Select gender</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-primary" onclick="analyzeSymptoms()">
+                        <i class="fas fa-brain"></i> Analyze Symptoms
+                    </button>
+                </div>
+                
+                <div id="symptom-results" class="results"></div>
+            </section>
+
+            <!-- Drug Interactions Section -->
+            <section id="drug-interactions" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-pills"></i> Drug Interaction Checker</h2>
+                    <p>Check for potential interactions between medications</p>
+                </div>
+                
+                <div class="drug-input">
+                    <div class="input-group">
+                        <label for="medications">Medications (one per line):</label>
+                        <textarea id="medications" placeholder="Enter medication names, one per line...&#10;Example:&#10;Warfarin&#10;Aspirin&#10;Ibuprofen" rows="6"></textarea>
+                    </div>
+                    
+                    <button class="btn-primary" onclick="checkInteractions()">
+                        <i class="fas fa-exclamation-triangle"></i> Check Interactions
+                    </button>
+                </div>
+                
+                <div id="interaction-results" class="results"></div>
+            </section>
+
+            <!-- Medical Reference Section -->
+            <section id="medical-reference" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-book-medical"></i> Medical Reference</h2>
+                    <p>Quick access to medical information and guidelines</p>
+                </div>
+                
+                <div class="reference-search">
+                    <div class="input-group">
+                        <label for="search-term">Search Medical Information:</label>
+                        <input type="text" id="search-term" placeholder="Enter condition, procedure, or medical term...">
+                    </div>
+                    
+                    <button class="btn-primary" onclick="searchMedicalInfo()">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+                
+                <div id="reference-results" class="results"></div>
+            </section>
+
+            <!-- Patient Notes Section -->
+            <section id="patient-notes" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-user-md"></i> Patient Management</h2>
+                    <p>Manage patient notes and treatment plans</p>
+                </div>
+                
+                <div class="patient-input">
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="patient-id">Patient ID:</label>
+                            <input type="text" id="patient-id" placeholder="Enter patient identifier">
+                        </div>
+                        <div class="input-group">
+                            <label for="patient-name">Patient Name:</label>
+                            <input type="text" id="patient-name" placeholder="Enter patient name">
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="notes">Clinical Notes:</label>
+                        <textarea id="notes" placeholder="Enter clinical notes, observations, and treatment plans..." rows="6"></textarea>
+                    </div>
+                    
+                    <div class="button-row">
+                        <button class="btn-primary" onclick="savePatientNote()">
+                            <i class="fas fa-save"></i> Save Notes
+                        </button>
+                        <button class="btn-secondary" onclick="loadPatientNotes()">
+                            <i class="fas fa-folder-open"></i> Load Notes
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="patient-list" class="patient-list"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
