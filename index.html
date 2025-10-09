@@ -29,6 +29,7 @@
         <main class="main">
             <!-- Dashboard Section -->
             <section id="dashboard" class="section active">
+                <div id="backend-status" class="backend-status"></div>
                 <div class="dashboard-grid">
                     <div class="card">
                         <div class="card-icon">
@@ -135,6 +136,16 @@
                 
                 <div class="reference-search">
                     <div class="input-group">
+                        <label for="pdf-upload">Upload Medical PDF (Backend Required):</label>
+                        <input type="file" id="pdf-upload" accept=".pdf">
+                        <button class="btn-secondary" onclick="uploadPDF()" style="margin-top: 0.5rem;">
+                            <i class="fas fa-upload"></i> Upload PDF
+                        </button>
+                    </div>
+                    
+                    <div id="upload-status" style="margin-top: 1rem;"></div>
+                    
+                    <div class="input-group" style="margin-top: 1.5rem;">
                         <label for="search-term">Search Medical Information:</label>
                         <input type="text" id="search-term" placeholder="Enter condition, procedure, or medical term...">
                     </div>
@@ -186,6 +197,7 @@
         </main>
     </div>
 
+    <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

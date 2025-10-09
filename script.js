@@ -1,6 +1,60 @@
 // Natpudan AI Clinical Assistant
 // Main JavaScript functionality
 
+// API Helper Functions
+async function callBackendAPI(endpoint, method = 'GET', data = null) {
+    if (!config.USE_BACKEND) {
+        throw new Error('Backend mode is disabled');
+    }
+    
+    const url = `${config.API_URL}${endpoint}`;
+    const options = {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    };
+    
+    if (data && method !== 'GET') {
+        options.body = JSON.stringify(data);
+    }
+    
+    try {
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('API call failed:', error);
+        throw error;
+    }
+}
+
+async function uploadPDFToBackend(file) {
+    const url = `${config.API_URL}/api/upload-pdf`;
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData,
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Upload failed: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('PDF upload failed:', error);
+        throw error;
+    }
+}
+
 // Medical knowledge base and data
 const medicalKnowledge = {
     symptoms: {
@@ -101,8 +155,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Symptom Analysis Function
-function analyzeSymptoms() {
-    const symptoms = document.getElementById('symptoms').value.toLowerCase().trim();
+async function analyzeSymptoms() {
+    const symptoms = document.getElementById('symptoms').value.trim();
     const age = document.getElementById('age').value;
     const gender = document.getElementById('gender').value;
     
@@ -112,12 +166,31 @@ function analyzeSymptoms() {
     }
     
     const resultsDiv = document.getElementById('symptom-results');
-    resultsDiv.innerHTML = '<div class="loading">Analyzing symptoms...</div>';
+    resultsDiv.innerHTML = '<div class="loading">Analyzing symptoms with AI...</div>';
     resultsDiv.classList.add('show');
     
-    // Simulate AI processing delay
+    // Try to use backend API if enabled
+    if (config.USE_BACKEND) {
+        try {
+            const response = await callBackendAPI('/api/analyze-symptoms', 'POST', {
+                symptoms: symptoms,
+                age: age ? parseInt(age) : null,
+                gender: gender || null
+            });
+            
+            if (response.success) {
+                displayBackendSymptomResults(response.analysis);
+                return;
+            }
+        } catch (error) {
+            console.error('Backend API failed, falling back to local analysis:', error);
+            // Fall through to local analysis
+        }
+    }
+    
+    // Fallback to local analysis
     setTimeout(() => {
-        const analysis = performSymptomAnalysis(symptoms, age, gender);
+        const analysis = performSymptomAnalysis(symptoms.toLowerCase(), age, gender);
         displaySymptomResults(analysis);
     }, 1500);
 }
@@ -213,8 +286,22 @@ function displaySymptomResults(analysis) {
     resultsDiv.innerHTML = html;
 }
 
+function displayBackendSymptomResults(analysis) {
+    const resultsDiv = document.getElementById('symptom-results');
+    
+    let html = '<h3>AI-Powered Differential Diagnosis</h3>';
+    html += '<div class="alert alert-info"><strong>Powered by AI:</strong> This analysis uses advanced AI models and medical knowledge base.</div>';
+    html += '<div class="alert alert-warning"><strong>Note:</strong> This is an AI assistant tool and should not replace clinical judgment or proper medical examination.</div>';
+    
+    html += `<div class="result-item">
+        <div style="white-space: pre-wrap;">${analysis}</div>
+    </div>`;
+    
+    resultsDiv.innerHTML = html;
+}
+
 // Drug Interaction Checker
-function checkInteractions() {
+async function checkInteractions() {
     const medicationsText = document.getElementById('medications').value.trim();
     
     if (!medicationsText) {
@@ -222,7 +309,7 @@ function checkInteractions() {
         return;
     }
     
-    const medications = medicationsText.toLowerCase().split('\n').map(med => med.trim()).filter(med => med);
+    const medications = medicationsText.split('\n').map(med => med.trim()).filter(med => med);
     
     if (medications.length < 2) {
         alert('Please enter at least 2 medications to check for interactions');
@@ -230,11 +317,29 @@ function checkInteractions() {
     }
     
     const resultsDiv = document.getElementById('interaction-results');
-    resultsDiv.innerHTML = '<div class="loading">Checking drug interactions...</div>';
+    resultsDiv.innerHTML = '<div class="loading">Checking drug interactions with AI...</div>';
     resultsDiv.classList.add('show');
     
+    // Try to use backend API if enabled
+    if (config.USE_BACKEND) {
+        try {
+            const response = await callBackendAPI('/api/check-interactions', 'POST', {
+                medications: medications
+            });
+            
+            if (response.success) {
+                displayBackendInteractionResults(response.analysis, medications);
+                return;
+            }
+        } catch (error) {
+            console.error('Backend API failed, falling back to local check:', error);
+            // Fall through to local check
+        }
+    }
+    
+    // Fallback to local check
     setTimeout(() => {
-        const interactions = findDrugInteractions(medications);
+        const interactions = findDrugInteractions(medications.map(m => m.toLowerCase()));
         displayInteractionResults(interactions, medications);
     }, 1000);
 }
@@ -299,6 +404,20 @@ function displayInteractionResults(interactions, medications) {
     resultsDiv.innerHTML = html;
 }
 
+function displayBackendInteractionResults(analysis, medications) {
+    const resultsDiv = document.getElementById('interaction-results');
+    
+    let html = '<h3>AI-Powered Drug Interaction Analysis</h3>';
+    html += `<div class="alert alert-info"><strong>Medications analyzed:</strong> ${medications.join(', ')}</div>`;
+    html += '<div class="alert alert-info"><strong>Powered by AI:</strong> This analysis uses advanced AI models and medical knowledge base.</div>';
+    
+    html += `<div class="result-item">
+        <div style="white-space: pre-wrap;">${analysis}</div>
+    </div>`;
+    
+    resultsDiv.innerHTML = html;
+}
+
 function getInteractionRecommendation(severity) {
     switch (severity) {
         case 'high':
@@ -313,8 +432,8 @@ function getInteractionRecommendation(severity) {
 }
 
 // Medical Reference Search
-function searchMedicalInfo() {
-    const searchTerm = document.getElementById('search-term').value.toLowerCase().trim();
+async function searchMedicalInfo() {
+    const searchTerm = document.getElementById('search-term').value.trim();
     
     if (!searchTerm) {
         alert('Please enter a search term');
@@ -322,11 +441,29 @@ function searchMedicalInfo() {
     }
     
     const resultsDiv = document.getElementById('reference-results');
-    resultsDiv.innerHTML = '<div class="loading">Searching medical database...</div>';
+    resultsDiv.innerHTML = '<div class="loading">Searching medical database with AI...</div>';
     resultsDiv.classList.add('show');
     
+    // Try to use backend API if enabled
+    if (config.USE_BACKEND) {
+        try {
+            const response = await callBackendAPI('/api/search-medical-info', 'POST', {
+                query: searchTerm
+            });
+            
+            if (response.success) {
+                displayBackendMedicalInfo(response.information, searchTerm);
+                return;
+            }
+        } catch (error) {
+            console.error('Backend API failed, falling back to local search:', error);
+            // Fall through to local search
+        }
+    }
+    
+    // Fallback to local search
     setTimeout(() => {
-        const results = searchMedicalDatabase(searchTerm);
+        const results = searchMedicalDatabase(searchTerm.toLowerCase());
         displayMedicalInfo(results, searchTerm);
     }, 800);
 }
@@ -375,6 +512,73 @@ function displayMedicalInfo(results, searchTerm) {
     }
     
     resultsDiv.innerHTML = html;
+}
+
+function displayBackendMedicalInfo(information, searchTerm) {
+    const resultsDiv = document.getElementById('reference-results');
+    
+    let html = `<h3>AI-Powered Medical Reference: "${searchTerm}"</h3>`;
+    html += '<div class="alert alert-info"><strong>Powered by AI:</strong> This information is generated using advanced AI models and medical knowledge base.</div>';
+    
+    html += `<div class="result-item">
+        <div style="white-space: pre-wrap;">${information}</div>
+    </div>`;
+    
+    resultsDiv.innerHTML = html;
+}
+
+// PDF Upload Function
+async function uploadPDF() {
+    const fileInput = document.getElementById('pdf-upload');
+    const statusDiv = document.getElementById('upload-status');
+    
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Please select a PDF file to upload');
+        return;
+    }
+    
+    if (!config.USE_BACKEND) {
+        statusDiv.innerHTML = '<div class="alert alert-warning">Backend mode is disabled. Enable it in config.js to upload PDFs.</div>';
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    
+    if (!file.name.endsWith('.pdf')) {
+        alert('Please select a PDF file');
+        return;
+    }
+    
+    statusDiv.innerHTML = '<div class="loading">Uploading and processing PDF...</div>';
+    
+    try {
+        const response = await uploadPDFToBackend(file);
+        
+        if (response.success) {
+            statusDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h4>PDF Uploaded Successfully!</h4>
+                    <p><strong>File:</strong> ${response.filename}</p>
+                    <p><strong>Text extracted:</strong> ${response.text_length} characters</p>
+                    <p>The medical knowledge has been added to the AI knowledge base and will be used for future queries.</p>
+                </div>
+            `;
+            
+            // Clear the file input
+            fileInput.value = '';
+        } else {
+            throw new Error('Upload failed');
+        }
+    } catch (error) {
+        console.error('PDF upload error:', error);
+        statusDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <h4>Upload Failed</h4>
+                <p>Error: ${error.message}</p>
+                <p>Make sure the backend server is running at ${config.API_URL}</p>
+            </div>
+        `;
+    }
 }
 
 // Patient Management Functions
@@ -450,7 +654,57 @@ function capitalizeFirst(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+// Check backend status
+async function checkBackendStatus() {
+    const statusDiv = document.getElementById('backend-status');
+    
+    if (!config.USE_BACKEND) {
+        statusDiv.innerHTML = `
+            <span class="status-indicator offline"></span>
+            <div>
+                <strong>Demo Mode:</strong> Backend features disabled. Using local demonstration data.
+                <br><small>Enable backend in config.js to use AI-powered features.</small>
+            </div>
+        `;
+        statusDiv.classList.add('offline');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${config.API_URL}/health`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000)
+        });
+        
+        if (response.ok) {
+            statusDiv.innerHTML = `
+                <span class="status-indicator online"></span>
+                <div>
+                    <strong>AI Mode:</strong> Backend connected. AI-powered features available.
+                    <br><small>Using OpenAI GPT models for intelligent analysis.</small>
+                </div>
+            `;
+            statusDiv.classList.add('online');
+        } else {
+            throw new Error('Backend not responding');
+        }
+    } catch (error) {
+        statusDiv.innerHTML = `
+            <span class="status-indicator offline"></span>
+            <div>
+                <strong>Backend Offline:</strong> Cannot connect to backend at ${config.API_URL}
+                <br><small>Start the backend server to enable AI features, or using local demo mode.</small>
+            </div>
+        `;
+        statusDiv.classList.add('offline');
+        console.error('Backend status check failed:', error);
+    }
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Natpudan AI Clinical Assistant initialized');
+    
+    // Check backend status on load
+    checkBackendStatus();
 });

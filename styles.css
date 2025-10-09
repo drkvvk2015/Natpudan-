@@ -397,3 +397,44 @@ body {
     color: #0c5460;
     border: 1px solid #bee5eb;
 }
+
+/* Backend Status */
+.backend-status {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.backend-status.online {
+    border-left: 4px solid #28a745;
+}
+
+.backend-status.offline {
+    border-left: 4px solid #ffc107;
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-indicator.online {
+    background-color: #28a745;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.offline {
+    background-color: #ffc107;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
