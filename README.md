@@ -154,6 +154,23 @@ The medical knowledge base is stored in the `medicalKnowledge` object in `script
 - Update `medicalKnowledge` in `script.js` for medical content
 - Extend functionality by adding new sections to `index.html`
 
+## Documentation
+
+📚 Comprehensive guides are available:
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Get started in 5 minutes ⚡
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Detailed setup with troubleshooting 🛠️
+- **[FEATURES.md](FEATURES.md)** - Complete feature descriptions 🎯
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture 🏗️
+- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Complete project overview 📊
+- **[backend/README.md](backend/README.md)** - Backend API documentation 🔌
+
+## Quick Links
+
+- 🌐 **Interactive API Docs**: http://localhost:8000/docs (when backend running)
+- ❤️ **Health Check**: http://localhost:8000/health
+- 🧪 **Test Script**: `python backend/test_api.py`
+
 ## Contributing
 
 1. Fork the repository
@@ -166,12 +183,16 @@ The medical knowledge base is stored in the `medicalKnowledge` object in `script
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
-## Contact
+## Support
 
-For questions, suggestions, or medical content contributions, please open an issue in the repository.
+For questions or issues:
+1. Check [QUICKSTART.md](QUICKSTART.md) for quick solutions
+2. Review [SETUP_GUIDE.md](SETUP_GUIDE.md) troubleshooting section
+3. Read comprehensive documentation above
+4. Open an issue on GitHub
 
 ---
 
 **Version**: 1.0.0  
-**Last Updated**: 2024  
-**Medical Knowledge Base**: Basic clinical reference (expand for production use)
+**Last Updated**: October 2024  
+**Status**: Production-ready with AI integration ✅
