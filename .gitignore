@@ -91,3 +91,11 @@ pids
 patient_data/
 medical_records/
 *.medical
+
+# Backend specific
+backend/.env
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/knowledge_base.json
+backend/*.pdf

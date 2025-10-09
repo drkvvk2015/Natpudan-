@@ -65,9 +65,19 @@ An AI-powered clinical assistant designed to support doctors and healthcare prof
 
 ### Architecture
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+)
+- **Backend**: Python FastAPI with OpenAI integration
 - **Styling**: Responsive design with CSS Grid and Flexbox
-- **Data Storage**: Local browser storage (localStorage)
+- **Data Storage**: Local browser storage (localStorage) + Backend knowledge base
 - **Icons**: Font Awesome 6.0
+- **AI/ML**: OpenAI GPT models for intelligent analysis
+
+### Backend Features
+- RESTful API with FastAPI
+- PDF processing and text extraction
+- Medical knowledge base management
+- AI-powered symptom analysis
+- Drug interaction checking with AI
+- Treatment suggestion generation
 
 ### Browser Compatibility
 - Chrome 60+
@@ -77,9 +87,27 @@ An AI-powered clinical assistant designed to support doctors and healthcare prof
 
 ### Security Considerations
 - Patient data stored locally in browser
-- No external data transmission
+- Backend API with CORS configuration
+- Environment-based API key management
 - HIPAA compliance considerations for production use
 - Implement proper authentication for clinical environments
+
+## Backend Setup
+
+The backend provides AI-powered features using OpenAI's GPT models. See [backend/README.md](backend/README.md) for detailed setup instructions.
+
+Quick setup:
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
+python main.py
+```
+
+The backend API will be available at `http://localhost:8000`
 
 ## Medical Disclaimer
 
@@ -99,11 +127,19 @@ Always verify information with current medical literature and consult with speci
 ### File Structure
 ```
 Natpudan-/
-├── index.html          # Main application interface
-├── styles.css          # Application styling
-├── script.js           # JavaScript functionality
-├── README.md           # Documentation
-└── LICENSE            # GPL v3 License
+├── index.html              # Main application interface
+├── styles.css              # Application styling
+├── script.js               # JavaScript functionality
+├── backend/                # Backend API server
+│   ├── main.py            # FastAPI application
+│   ├── ai_service.py      # AI/LLM integration
+│   ├── pdf_utils.py       # PDF processing utilities
+│   ├── knowledge_base.py  # Knowledge storage management
+│   ├── requirements.txt   # Python dependencies
+│   ├── .env.example       # Environment variables template
+│   └── README.md          # Backend documentation
+├── README.md               # Documentation
+└── LICENSE                # GPL v3 License
 ```
 
 ### Extending the Knowledge Base
