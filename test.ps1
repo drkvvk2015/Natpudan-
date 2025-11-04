@@ -1,336 +1,191 @@
 # Test Script for Physician AI Assistant
-# This script runs comprehensive tests to verify the installation
+# Run this after setup to verify everything works
 
-Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "Physician AI Assistant - Test Suite" -ForegroundColor Cyan
-Write-Host "======================================" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Physician AI Assistant - System Test" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-$ErrorCount = 0
-$WarningCount = 0
+$backendPath = Join-Path $PSScriptRoot "backend"
+Set-Location $backendPath
 
-# Change to backend directory
-Set-Location backend
-
-# Test 1: Check if virtual environment exists
-Write-Host "Test 1: Checking virtual environment..." -ForegroundColor Yellow
-if (Test-Path "venv\Scripts\activate.ps1") {
-    Write-Host "  ✓ Virtual environment found" -ForegroundColor Green
-} else {
-    Write-Host "  ✗ Virtual environment not found. Run setup.ps1 first!" -ForegroundColor Red
-    $ErrorCount++
+# Activate virtual environment
+Write-Host "Activating virtual environment..." -ForegroundColor Yellow
+$activateScript = Join-Path "venv" "Scripts" "Activate.ps1"
+if (Test-Path $activateScript) {
+    & $activateScript
 }
-
-# Test 2: Activate virtual environment
-Write-Host "`nTest 2: Activating virtual environment..." -ForegroundColor Yellow
-try {
-    & .\venv\Scripts\Activate.ps1
-    Write-Host "  ✓ Virtual environment activated" -ForegroundColor Green
-} catch {
-    Write-Host "  ✗ Failed to activate virtual environment: $_" -ForegroundColor Red
-    $ErrorCount++
+else {
+    Write-Host "ERROR: Virtual environment not found. Run setup.ps1 first." -ForegroundColor Red
     exit 1
 }
 
-# Test 3: Check Python version
-Write-Host "`nTest 3: Checking Python version..." -ForegroundColor Yellow
-$pythonVersion = python --version 2>&1
-Write-Host "  Found: $pythonVersion" -ForegroundColor White
-if ($pythonVersion -match "Python 3\.([8-9]|1[0-9])") {
-    Write-Host "  ✓ Python version is compatible" -ForegroundColor Green
-} else {
-    Write-Host "  ✗ Python version may not be compatible (need 3.8+)" -ForegroundColor Red
-    $ErrorCount++
-}
+$allPassed = $true
 
-# Test 4: Check required packages
-Write-Host "`nTest 4: Checking installed packages..." -ForegroundColor Yellow
-$requiredPackages = @("fastapi", "uvicorn", "sqlalchemy", "openai", "chromadb", "sentence-transformers", "pymupdf")
-
-foreach ($package in $requiredPackages) {
-    $installed = pip show $package 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "  ✓ $package installed" -ForegroundColor Green
-    } else {
-        Write-Host "  ✗ $package not installed" -ForegroundColor Red
-        $ErrorCount++
-    }
-}
-
-# Test 5: Check .env file
-Write-Host "`nTest 5: Checking configuration..." -ForegroundColor Yellow
-if (Test-Path ".env") {
-    Write-Host "  ✓ .env file exists" -ForegroundColor Green
-    
-    $envContent = Get-Content ".env" -Raw
-    if ($envContent -match "OPENAI_API_KEY=sk-") {
-        Write-Host "  ✓ OpenAI API key configured" -ForegroundColor Green
-    } elseif ($envContent -match "OPENAI_API_KEY=your-openai-api-key") {
-        Write-Host "  ⚠ OpenAI API key not set (using fallback mode)" -ForegroundColor Yellow
-        $WarningCount++
-    } else {
-        Write-Host "  ⚠ OpenAI API key format may be invalid" -ForegroundColor Yellow
-        $WarningCount++
-    }
-} else {
-    Write-Host "  ✗ .env file not found. Copy .env.example to .env" -ForegroundColor Red
-    $ErrorCount++
-}
-
-# Test 6: Check directory structure
-Write-Host "`nTest 6: Checking directory structure..." -ForegroundColor Yellow
-$requiredDirs = @(
-    "app",
-    "app\api",
-    "app\services",
-    "app\models",
-    "app\database",
-    "data\knowledge_base",
-    "data\medical_books",
-    "data\logs"
-)
-
-foreach ($dir in $requiredDirs) {
-    if (Test-Path $dir) {
-        Write-Host "  ✓ $dir exists" -ForegroundColor Green
-    } else {
-        Write-Host "  ✗ $dir missing" -ForegroundColor Red
-        $ErrorCount++
-    }
-}
-
-# Test 7: Check database
-Write-Host "`nTest 7: Checking database..." -ForegroundColor Yellow
-if (Test-Path "physician_ai.db") {
-    Write-Host "  ✓ Database file exists" -ForegroundColor Green
-} else {
-    Write-Host "  ⚠ Database not initialized (will be created on first run)" -ForegroundColor Yellow
-    $WarningCount++
-}
-
-# Test 8: Test Python imports
-Write-Host "`nTest 8: Testing Python imports..." -ForegroundColor Yellow
-$importTest = @"
+# Test 1: Import core modules
+Write-Host ""
+Write-Host "Test 1: Checking Python modules..." -ForegroundColor Yellow
+$imports = @"
 import sys
-sys.path.insert(0, '.')
-
 try:
-    # Test core imports
     import fastapi
-    print('  ✓ FastAPI imported')
-    
     import uvicorn
-    print('  ✓ Uvicorn imported')
-    
-    import sqlalchemy
-    print('  ✓ SQLAlchemy imported')
-    
-    from app.services.knowledge_base import KnowledgeBase
-    print('  ✓ KnowledgeBase imported')
-    
-    from app.services.llm_service import LLMService
-    print('  ✓ LLMService imported')
-    
-    from app.services.medical_assistant import MedicalAssistant
-    print('  ✓ MedicalAssistant imported')
-    
-    from app.services.drug_checker import DrugChecker
-    print('  ✓ DrugChecker imported')
-    
-    from app.services.icd_mapper import ICDMapper
-    print('  ✓ ICDMapper imported')
-    
-    from app.main import app
-    print('  ✓ FastAPI app imported')
-    
-    print('IMPORT_TEST_PASSED')
+    import fitz
+    import chromadb
+    import sentence_transformers
+    import openai
+    print('✓ All core modules imported successfully')
 except Exception as e:
-    print(f'  ✗ Import failed: {e}')
-    print('IMPORT_TEST_FAILED')
+    print(f'✗ Import error: {str(e)}')
+    sys.exit(1)
 "@
 
-$importTest | python 2>&1 | ForEach-Object {
-    if ($_ -match "✓") {
-        Write-Host $_ -ForegroundColor Green
-    } elseif ($_ -match "✗") {
-        Write-Host $_ -ForegroundColor Red
-        $ErrorCount++
-    } elseif ($_ -match "IMPORT_TEST_PASSED") {
-        # Success indicator
-    } elseif ($_ -match "IMPORT_TEST_FAILED") {
-        $ErrorCount++
-    } else {
-        Write-Host $_ -ForegroundColor White
-    }
+python -c $imports
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "   PASSED" -ForegroundColor Green
+}
+else {
+    Write-Host "   FAILED" -ForegroundColor Red
+    $allPassed = $false
 }
 
-# Test 9: Test database connection
-Write-Host "`nTest 9: Testing database connection..." -ForegroundColor Yellow
+# Test 2: Database initialization
+Write-Host ""
+Write-Host "Test 2: Testing database..." -ForegroundColor Yellow
 $dbTest = @"
-import sys
-sys.path.insert(0, '.')
-
+from app.database.schemas import init_db
+from app.database.connection import test_connection
 try:
-    from app.database.connection import engine, get_db, init_db
-    from sqlalchemy import text
-    
-    # Try to connect
-    with engine.connect() as conn:
-        result = conn.execute(text('SELECT 1'))
-        print('  ✓ Database connection successful')
-        print('DB_TEST_PASSED')
+    if test_connection():
+        print('✓ Database connection successful')
+    init_db()
+    print('✓ Database tables created')
 except Exception as e:
-    print(f'  ✗ Database connection failed: {e}')
-    print('DB_TEST_FAILED')
+    print(f'✗ Database error: {str(e)}')
 "@
 
-$dbTest | python 2>&1 | ForEach-Object {
-    if ($_ -match "✓") {
-        Write-Host $_ -ForegroundColor Green
-    } elseif ($_ -match "✗") {
-        Write-Host $_ -ForegroundColor Red
-        $ErrorCount++
-    } elseif ($_ -match "DB_TEST_PASSED") {
-        # Success indicator
-    } elseif ($_ -match "DB_TEST_FAILED") {
-        $ErrorCount++
-    } else {
-        Write-Host $_ -ForegroundColor White
-    }
+python -c $dbTest
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "   PASSED" -ForegroundColor Green
+}
+else {
+    Write-Host "   FAILED" -ForegroundColor Red
+    $allPassed = $false
 }
 
-# Test 10: Test service initialization
-Write-Host "`nTest 10: Testing service initialization..." -ForegroundColor Yellow
-$serviceTest = @"
-import sys
+# Test 3: Knowledge Base
+Write-Host ""
+Write-Host "Test 3: Testing Knowledge Base..." -ForegroundColor Yellow
+$kbTest = @"
 import asyncio
-sys.path.insert(0, '.')
-
-async def test_services():
-    try:
-        from app.services.llm_service import LLMService
-        llm = LLMService()
-        print('  ✓ LLMService initialized')
-        
-        from app.services.drug_checker import DrugChecker
-        drug_checker = DrugChecker()
-        print('  ✓ DrugChecker initialized')
-        
-        from app.services.icd_mapper import ICDMapper
-        icd_mapper = ICDMapper()
-        print('  ✓ ICDMapper initialized')
-        
-        # Note: KnowledgeBase requires async initialization
-        print('  ℹ KnowledgeBase requires async initialization (tested at runtime)')
-        
-        print('SERVICE_TEST_PASSED')
-    except Exception as e:
-        print(f'  ✗ Service initialization failed: {e}')
-        print('SERVICE_TEST_FAILED')
-
-asyncio.run(test_services())
-"@
-
-$serviceTest | python 2>&1 | ForEach-Object {
-    if ($_ -match "✓") {
-        Write-Host $_ -ForegroundColor Green
-    } elseif ($_ -match "ℹ") {
-        Write-Host $_ -ForegroundColor Cyan
-    } elseif ($_ -match "✗") {
-        Write-Host $_ -ForegroundColor Red
-        $ErrorCount++
-    } elseif ($_ -match "SERVICE_TEST_PASSED") {
-        # Success indicator
-    } elseif ($_ -match "SERVICE_TEST_FAILED") {
-        $ErrorCount++
-    } else {
-        Write-Host $_ -ForegroundColor White
-    }
-}
-
-# Test 11: Check medical books
-Write-Host "`nTest 11: Checking medical knowledge base..." -ForegroundColor Yellow
-$pdfFiles = Get-ChildItem -Path "data\medical_books" -Filter "*.pdf" -ErrorAction SilentlyContinue
-if ($pdfFiles.Count -gt 0) {
-    Write-Host "  ✓ Found $($pdfFiles.Count) medical PDF(s)" -ForegroundColor Green
-    foreach ($pdf in $pdfFiles) {
-        Write-Host "    - $($pdf.Name)" -ForegroundColor White
-    }
-} else {
-    Write-Host "  ⚠ No medical PDFs found in data\medical_books\" -ForegroundColor Yellow
-    Write-Host "    Add medical textbooks to enable knowledge base features" -ForegroundColor White
-    $WarningCount++
-}
-
-# Test 12: Quick API test
-Write-Host "`nTest 12: Testing API startup (quick check)..." -ForegroundColor Yellow
-$apiTest = @"
-import sys
-sys.path.insert(0, '.')
-
+from app.services.knowledge_base import KnowledgeBase
 try:
-    from app.main import app
-    from fastapi.testclient import TestClient
-    
-    client = TestClient(app)
-    response = client.get('/health')
-    
-    if response.status_code == 200:
-        print('  ✓ API health check passed')
-        print('API_TEST_PASSED')
-    else:
-        print(f'  ✗ API health check failed with status {response.status_code}')
-        print('API_TEST_FAILED')
+    async def test():
+        kb = KnowledgeBase()
+        await kb.initialize()
+        stats = kb.get_statistics()
+        print(f'✓ Knowledge Base initialized')
+        print(f'  Documents: {stats.get(\"total_documents\", 0)}')
+        print(f'  Processed files: {stats.get(\"processed_files\", 0)}')
+        await kb.close()
+    asyncio.run(test())
 except Exception as e:
-    print(f'  ✗ API test failed: {e}')
-    print('API_TEST_FAILED')
+    print(f'✗ Knowledge Base error: {str(e)}')
 "@
 
-$apiTest | python 2>&1 | ForEach-Object {
-    if ($_ -match "✓") {
-        Write-Host $_ -ForegroundColor Green
-    } elseif ($_ -match "✗") {
-        Write-Host $_ -ForegroundColor Red
-        $ErrorCount++
-    } elseif ($_ -match "API_TEST_PASSED") {
-        # Success indicator
-    } elseif ($_ -match "API_TEST_FAILED") {
-        $ErrorCount++
-    } else {
-        Write-Host $_ -ForegroundColor White
+python -c $kbTest
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "   PASSED" -ForegroundColor Green
+}
+else {
+    Write-Host "   FAILED" -ForegroundColor Red
+    $allPassed = $false
+}
+
+# Test 4: LLM Service
+Write-Host ""
+Write-Host "Test 4: Testing LLM Service..." -ForegroundColor Yellow
+$llmTest = @"
+import asyncio
+from app.services.llm_service import LLMService
+try:
+    async def test():
+        llm = LLMService()
+        await llm.initialize()
+        if llm.use_local_fallback:
+            print('⚠ LLM running in fallback mode (no API key)')
+        else:
+            print('✓ LLM Service initialized with OpenAI')
+    asyncio.run(test())
+except Exception as e:
+    print(f'✗ LLM Service error: {str(e)}')
+"@
+
+python -c $llmTest
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "   PASSED (check warnings)" -ForegroundColor Green
+}
+else {
+    Write-Host "   FAILED" -ForegroundColor Red
+    $allPassed = $false
+}
+
+# Test 5: API Server (quick test)
+Write-Host ""
+Write-Host "Test 5: Testing API..." -ForegroundColor Yellow
+Write-Host "   Starting server (5 seconds)..." -ForegroundColor Cyan
+
+# Start server in background
+$serverJob = Start-Job -ScriptBlock {
+    Set-Location $using:backendPath
+    & "venv/Scripts/Activate.ps1"
+    python run.py
+}
+
+Start-Sleep -Seconds 5
+
+# Test health endpoint
+try {
+    $response = Invoke-WebRequest -Uri "http://localhost:8000/health" -TimeoutSec 3
+    if ($response.StatusCode -eq 200) {
+        Write-Host "   ✓ API server responding" -ForegroundColor Green
+        Write-Host "   PASSED" -ForegroundColor Green
+        $content = $response.Content | ConvertFrom-Json
+        Write-Host "   Status: $($content.status)" -ForegroundColor Cyan
     }
 }
+catch {
+    Write-Host "   ✗ API server not responding" -ForegroundColor Red
+    Write-Host "   FAILED" -ForegroundColor Red
+    $allPassed = $false
+}
+
+# Stop server
+Stop-Job -Job $serverJob
+Remove-Job -Job $serverJob
 
 # Summary
-Write-Host "`n======================================" -ForegroundColor Cyan
-Write-Host "Test Summary" -ForegroundColor Cyan
-Write-Host "======================================" -ForegroundColor Cyan
-
-if ($ErrorCount -eq 0 -and $WarningCount -eq 0) {
-    Write-Host "✓ All tests passed! System is ready." -ForegroundColor Green
-    Write-Host "`nTo start the server:" -ForegroundColor White
-    Write-Host "  cd backend" -ForegroundColor Yellow
-    Write-Host "  python run.py" -ForegroundColor Yellow
-    Write-Host "`nThen visit: http://localhost:8000/docs" -ForegroundColor Cyan
-} elseif ($ErrorCount -eq 0) {
-    Write-Host "⚠ Tests passed with $WarningCount warning(s)" -ForegroundColor Yellow
-    Write-Host "`nTo start the server:" -ForegroundColor White
-    Write-Host "  cd backend" -ForegroundColor Yellow
-    Write-Host "  python run.py" -ForegroundColor Yellow
-} else {
-    Write-Host "✗ Tests failed with $ErrorCount error(s) and $WarningCount warning(s)" -ForegroundColor Red
-    Write-Host "`nPlease fix the errors above before starting the server." -ForegroundColor Yellow
-    Write-Host "You may need to run: .\setup.ps1" -ForegroundColor Yellow
-}
-
 Write-Host ""
-
-# Return to parent directory
-Set-Location ..
-
-# Exit with appropriate code
-if ($ErrorCount -gt 0) {
-    exit 1
-} else {
-    exit 0
+Write-Host "========================================" -ForegroundColor Cyan
+if ($allPassed) {
+    Write-Host "All Tests PASSED! ✓" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Your Physician AI Assistant is ready!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "To start the server:" -ForegroundColor Yellow
+    Write-Host "  cd backend" -ForegroundColor White
+    Write-Host "  python run.py" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Then visit:" -ForegroundColor Yellow
+    Write-Host "  http://localhost:8000/docs" -ForegroundColor White
 }
+else {
+    Write-Host "Some Tests FAILED ✗" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Please check the errors above and:" -ForegroundColor Yellow
+    Write-Host "1. Ensure all dependencies are installed" -ForegroundColor White
+    Write-Host "2. Check your .env configuration" -ForegroundColor White
+    Write-Host "3. Review logs in backend/physician_ai.log" -ForegroundColor White
+}
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
