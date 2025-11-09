@@ -1,0 +1,19 @@
+/* Minimal base styles to ensure readable defaults */
+:root {
+  --bg: #0b0c10;
+  --fg: #e6e6e6;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+a { color: #61dafb; text-decoration: none; }
+a:hover { text-decoration: underline; }
