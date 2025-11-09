@@ -1,0 +1,23 @@
+Medical Guidelines - Community-Acquired Pneumonia
+
+Introduction:
+Community-acquired pneumonia (CAP) is a common infection requiring prompt treatment.
+
+Treatment Recommendations:
+1. Outpatient mild CAP: Amoxicillin 1g TID for 5-7 days OR Azithromycin 500mg daily for 3 days
+2. Inpatient CAP: Beta-lactam + macrolide combination
+3. Severe CAP: ICU admission, IV antibiotics
+
+Risk Factors:
+- Age >65 years
+- Chronic lung disease
+- Immunosuppression
+- Smoking history
+
+Diagnostic Criteria:
+- Clinical symptoms: Cough, fever, dyspnea
+- Chest X-ray confirmation
+- Lab findings: Elevated WBC, CRP
+
+Follow-up:
+Clinical improvement expected in 48-72 hours.
