@@ -32,8 +32,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-            'mui-vendor': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
-            'axios-vendor': ['axios'],
+            'mui-vendor': ['@mui/material', '@emotion/react', '@emotion/styled'],
           },
         },
       },
