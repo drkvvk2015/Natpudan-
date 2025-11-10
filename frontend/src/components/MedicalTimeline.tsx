@@ -14,15 +14,7 @@ import {
   CircularProgress,
   Grid
 } from '@mui/material'
-import {
-  Timeline,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineConnector,
-  TimelineContent,
-  TimelineDot,
-  TimelineOppositeContent
-} from '@mui/lab'
+// Removed dependency on @mui/lab Timeline components to avoid extra peer version requirements.
 import {
   PersonAdd as PersonAddIcon,
   Flight as FlightIcon,
@@ -288,29 +280,42 @@ const MedicalTimeline: React.FC<MedicalTimelineProps> = ({ patientIntakeId }) =>
       </Collapse>
 
       {/* Timeline */}
-      {events.length === 0 ? (
+      {events.length === 0 && (
         <Alert severity="info">No events found for the selected filters.</Alert>
-      ) : (
-        <Timeline position="right">
+      )}
+      {events.length > 0 && (
+        <Box>
           {events.map((event, index) => (
-            <TimelineItem key={event.id}>
-              <TimelineOppositeContent color="text.secondary" sx={{ flex: 0.3 }}>
+            <Box key={event.id} sx={{ display: 'flex', alignItems: 'stretch' }}>
+              {/* Date column */}
+              <Box sx={{ width: 140, pr: 2, textAlign: 'right' }}>
                 <Typography variant="body2" fontWeight="bold">
                   {formatDate(event.date)}
                 </Typography>
                 <Typography variant="caption">{formatTime(event.date)}</Typography>
-              </TimelineOppositeContent>
-
-              <TimelineSeparator>
-                <TimelineDot color={getEventColor(event.event_type)} variant="outlined">
+              </Box>
+              {/* Marker */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mr: 2 }}>
+                <Box sx={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: (theme) => theme.palette[getEventColor(event.event_type)].light,
+                  color: (theme) => theme.palette[getEventColor(event.event_type)].main,
+                  border: (theme) => `2px solid ${theme.palette[getEventColor(event.event_type)].main}`
+                }}>
                   {getEventIcon(event.event_type)}
-                </TimelineDot>
-                {index < events.length - 1 && <TimelineConnector />}
-              </TimelineSeparator>
-
-              <TimelineContent>
+                </Box>
+                {index < events.length - 1 && (
+                  <Box sx={{ flex: 1, width: 2, bgcolor: 'divider', mt: 0.5 }} />
+                )}
+              </Box>
+              {/* Content */}
+              <Box sx={{ flex: 1 }}>
                 <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-                  {/* Event Header */}
                   <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
                     <Box flex={1}>
                       <Typography variant="subtitle1" fontWeight="bold">
@@ -336,8 +341,6 @@ const MedicalTimeline: React.FC<MedicalTimelineProps> = ({ patientIntakeId }) =>
                       </IconButton>
                     </Box>
                   </Box>
-
-                  {/* Event Details (Expanded) */}
                   <Collapse in={expandedEvents.has(event.id)}>
                     <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
                       <Typography variant="caption" fontWeight="bold" display="block" mb={1}>
@@ -364,10 +367,10 @@ const MedicalTimeline: React.FC<MedicalTimelineProps> = ({ patientIntakeId }) =>
                     </Box>
                   </Collapse>
                 </Paper>
-              </TimelineContent>
-            </TimelineItem>
+              </Box>
+            </Box>
           ))}
-        </Timeline>
+        </Box>
       )}
     </Paper>
   )
