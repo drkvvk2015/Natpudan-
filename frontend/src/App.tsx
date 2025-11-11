@@ -14,6 +14,10 @@ import TreatmentPlan from './pages/TreatmentPlan'
 import AnalyticsDashboard from './pages/AnalyticsDashboard'
 import FHIRExplorer from './pages/FHIRExplorer'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import OAuthCallback from './pages/OAuthCallback'
+import ChatPage from './pages/ChatPage'
+import DischargeSummaryPage from './pages/DischargeSummaryPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
 
@@ -27,11 +31,15 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/auth/callback" element={<OAuthCallback />} />
             <Route path="/*" element={
               <ProtectedRoute>
                 <Layout>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
+                    <Route path="/chat" element={<ChatPage />} />
+                    <Route path="/discharge-summary" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><DischargeSummaryPage /></ProtectedRoute>} />
                     <Route path="/diagnosis" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Diagnosis /></ProtectedRoute>} />
                     <Route path="/drugs" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><DrugChecker /></ProtectedRoute>} />
                     <Route path="/knowledge" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><KnowledgeBase /></ProtectedRoute>} />

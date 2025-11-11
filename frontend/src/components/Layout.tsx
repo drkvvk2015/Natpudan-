@@ -67,6 +67,7 @@ export default function Layout({ children }: LayoutProps) {
   ];
   const doctorItems: MenuItem[] = [
     { text: 'Patient List', icon: <PersonAdd />, path: '/patients' },
+    { text: 'Discharge Summary', icon: <AssessmentIcon />, path: '/discharge-summary' },
     { text: 'Diagnosis', icon: <DiagnosisIcon />, path: '/diagnosis' },
     { text: 'Analytics', icon: <AssessmentIcon />, path: '/analytics' },
     { text: 'FHIR API', icon: <ApiIcon />, path: '/fhir' },

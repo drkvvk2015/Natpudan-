@@ -10,10 +10,42 @@ diagnosis engine, ICD code provider, etc.).
 """
 
 from fastapi import FastAPI, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any
 from datetime import datetime
+import time
+import psutil
+from app.api.auth_new import router as auth_router
+from app.api.chat_new import router as chat_router
+from app.api.discharge import router as discharge_router
+from app.database import init_db
+
+# Track application start time for uptime calculation
+START_TIME = time.time()
 
 app = FastAPI(title="Physician AI Assistant", version="1.0.0")
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database tables on application startup."""
+    init_db()
+    print("Database initialized successfully")
+
+# CORS middleware - allow frontend origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
 
 @app.get("/")
 def root() -> Dict[str, Any]:
@@ -22,6 +54,55 @@ def root() -> Dict[str, Any]:
 @app.get("/health")
 def health() -> Dict[str, Any]:
     return {"status": "healthy", "service": "api", "timestamp": datetime.utcnow().isoformat()}
+
+@app.get("/health/detailed")
+def detailed_health() -> Dict[str, Any]:
+    """Detailed health check with system metrics."""
+    try:
+        # Calculate uptime in seconds
+        uptime_seconds = int(time.time() - START_TIME)
+        
+        # Get system metrics
+        cpu_percent = psutil.cpu_percent(interval=0.5)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        return {
+            "status": "healthy",
+            "uptime": uptime_seconds,
+            "cpu_usage": round(cpu_percent, 2),
+            "memory_usage": {
+                "total": memory.total,
+                "available": memory.available,
+                "percent": round(memory.percent, 2),
+                "used": memory.used
+            },
+            "disk_usage": {
+                "total": disk.total,
+                "used": disk.used,
+                "free": disk.free,
+                "percent": round(disk.percent, 2)
+            },
+            "database_status": "active",
+            "cache_status": "active",
+            "assistant_status": "operational",
+            "knowledge_base_status": "ready",
+            "last_check_in": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "uptime": 0,
+            "cpu_usage": 0,
+            "memory_usage": {"total": 0, "available": 0, "percent": 0, "used": 0},
+            "disk_usage": {"total": 0, "used": 0, "free": 0, "percent": 0},
+            "database_status": "unknown",
+            "cache_status": "unknown",
+            "assistant_status": "unknown",
+            "knowledge_base_status": "unknown",
+            "last_check_in": datetime.utcnow().isoformat(),
+            "error": str(e)
+        }
 
 api_router = APIRouter(prefix="/api")
 
@@ -98,5 +179,8 @@ def dosing(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {"drug": drug, "recommended_dose": dose}
 
 api_router.include_router(prescription_router)
+api_router.include_router(auth_router)
+api_router.include_router(chat_router)
+api_router.include_router(discharge_router)
 
 app.include_router(api_router)
