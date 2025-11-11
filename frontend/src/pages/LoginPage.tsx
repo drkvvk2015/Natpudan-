@@ -18,7 +18,7 @@ const LoginPage: React.FC = () => {
     try {
       const { access_token, user } = await apiLogin({ email, password });
       login(access_token, user);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: any) {
       console.error('Login error:', err);
       let errorMsg = 'Failed to login. Please check your credentials.';

@@ -31,7 +31,7 @@ const OAuthCallback: React.FC = () => {
 
         const { access_token, user } = response.data;
         login(access_token, user);
-        navigate('/');
+        navigate('/dashboard');
       } catch (err: any) {
         const errorMsg = err?.response?.data?.detail || 'Failed to complete social login';
         setError(errorMsg);

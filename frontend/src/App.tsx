@@ -20,6 +20,7 @@ import ChatPage from './pages/ChatPage'
 import DischargeSummaryPage from './pages/DischargeSummaryPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
+import FloatingChatBot from './components/FloatingChatBot'
 
 const theme = createTheme({})
 
@@ -29,30 +30,24 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <Router>
+          <FloatingChatBot />
           <Routes>
+            <Route path="/" element={<LoginPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/auth/callback" element={<OAuthCallback />} />
-            <Route path="/*" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/chat" element={<ChatPage />} />
-                    <Route path="/discharge-summary" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><DischargeSummaryPage /></ProtectedRoute>} />
-                    <Route path="/diagnosis" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Diagnosis /></ProtectedRoute>} />
-                    <Route path="/drugs" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><DrugChecker /></ProtectedRoute>} />
-                    <Route path="/knowledge" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><KnowledgeBase /></ProtectedRoute>} />
-                    <Route path="/report-parser" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><MedicalReportParser /></ProtectedRoute>} />
-                    <Route path="/patient-intake/*" element={<ProtectedRoute allowedRoles={["staff","doctor","admin"]}><PatientIntake /></ProtectedRoute>} />
-                    <Route path="/patients" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><PatientList /></ProtectedRoute>} />
-                    <Route path="/treatment-plan/:patientId/*" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><TreatmentPlan /></ProtectedRoute>} />
-                    <Route path="/analytics" element={<ProtectedRoute allowedRoles={["admin"]}><AnalyticsDashboard /></ProtectedRoute>} />
-                    <Route path="/fhir" element={<ProtectedRoute allowedRoles={["admin"]}><FHIRExplorer /></ProtectedRoute>} />
-                  </Routes>
-                </Layout>
-              </ProtectedRoute>
-            } />
+            <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+            <Route path="/chat" element={<ProtectedRoute><Layout><ChatPage /></Layout></ProtectedRoute>} />
+            <Route path="/discharge-summary" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><DischargeSummaryPage /></Layout></ProtectedRoute>} />
+            <Route path="/diagnosis" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><Diagnosis /></Layout></ProtectedRoute>} />
+            <Route path="/drugs" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><DrugChecker /></Layout></ProtectedRoute>} />
+            <Route path="/knowledge" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><KnowledgeBase /></Layout></ProtectedRoute>} />
+            <Route path="/report-parser" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><MedicalReportParser /></Layout></ProtectedRoute>} />
+            <Route path="/patient-intake/*" element={<ProtectedRoute allowedRoles={["staff","doctor","admin"]}><Layout><PatientIntake /></Layout></ProtectedRoute>} />
+            <Route path="/patients" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><PatientList /></Layout></ProtectedRoute>} />
+            <Route path="/treatment-plan/:patientId/*" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><TreatmentPlan /></Layout></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute allowedRoles={["admin"]}><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
+            <Route path="/fhir" element={<ProtectedRoute allowedRoles={["admin"]}><Layout><FHIRExplorer /></Layout></ProtectedRoute>} />
           </Routes>
         </Router>
       </AuthProvider>

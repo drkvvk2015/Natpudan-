@@ -195,7 +195,7 @@ Format the response as a complete discharge summary.
       `;
 
       const response = await sendChatMessage(context);
-      setAiSuggestion(response.message);
+      setAiSuggestion(response.message.content);
       setShowAiSuggestion(true);
     } catch (error: any) {
       setErrorMessage(error.response?.data?.detail || 'Failed to generate AI summary');

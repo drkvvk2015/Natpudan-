@@ -14,13 +14,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   const location = useLocation()
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/" state={{ from: location }} replace />
   }
 
   if (allowedRoles && allowedRoles.length > 0) {
     const role: Role | undefined = user?.role
     if (!role || !allowedRoles.includes(role)) {
-      return <Navigate to="/" replace />
+      return <Navigate to="/dashboard" replace />
     }
   }
 
