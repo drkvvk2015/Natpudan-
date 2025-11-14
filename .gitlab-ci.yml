@@ -43,7 +43,36 @@ build:web:
 build:android:
   stage: build
   image: 319312831725.dkr.ecr.us-west-2.amazonaws.com/appflow-runners/linux:2025.06
+  variables:
+    # Set Android SDK paths for the Ionic Appflow runner
+    ANDROID_HOME: "/usr/local/android-sdk"
+    ANDROID_SDK_ROOT: "/usr/local/android-sdk"
+    # Alternative paths if using different Android SDK installation
+    # ANDROID_HOME: "/opt/android-sdk"
+    # ANDROID_SDK_ROOT: "/opt/android-sdk"
   script:
+    - echo "Setting up Android environment..."
+    - echo "ANDROID_HOME=${ANDROID_HOME}"
+    - echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
+    # Verify Android SDK is available
+    - |
+      if [ -d "$ANDROID_HOME" ]; then
+        echo "✓ Android SDK found at $ANDROID_HOME"
+        export PATH=$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin
+      else
+        echo "⚠ Android SDK not found at $ANDROID_HOME"
+        echo "Checking common Android SDK locations..."
+        for dir in /usr/local/android-sdk /opt/android-sdk /android-sdk ~/Android/Sdk; do
+          if [ -d "$dir" ]; then
+            echo "✓ Found Android SDK at $dir"
+            export ANDROID_HOME=$dir
+            export ANDROID_SDK_ROOT=$dir
+            export PATH=$PATH:$dir/tools:$dir/platform-tools:$dir/cmdline-tools/latest/bin
+            break
+          fi
+        done
+      fi
+    - echo "PATH=$PATH"
     - echo "Installing dependencies..."
     - npm ci --cache .npm --prefer-offline
     - echo "Building web assets..."
@@ -55,15 +84,18 @@ build:android:
     - echo "Syncing web assets to Android..."
     - npx cap sync android
     - echo "Building Android APK..."
-    - cd android && ./gradlew assembleRelease || echo "Android build requires signing configuration"
+    - cd android
+    - chmod +x ./gradlew
+    - ./gradlew assembleRelease || echo "Android build requires signing configuration"
   artifacts:
     paths:
       - ${FRONTEND_DIR}/android/app/build/outputs/apk/
+      - ${FRONTEND_DIR}/android/app/build/outputs/bundle/
     expire_in: 1 week
   only:
     - clean-main2
     - main
-  allow_failure: true  # Allow to fail if Android SDK not configured
+  allow_failure: true # Allow to fail if Android SDK not configured or signing missing
 
 # Build Windows Desktop App
 build:windows:
@@ -83,7 +115,7 @@ build:windows:
   only:
     - clean-main2
     - main
-  allow_failure: true  # Allow to fail if not on Windows runner
+  allow_failure: true # Allow to fail if not on Windows runner
 
 # Lint and Type Check
 lint:
