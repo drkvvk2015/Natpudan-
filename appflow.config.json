@@ -1,0 +1,16 @@
+{
+  "name": "Natpudan AI Medical Assistant",
+  "id": "com.natpudan.medical",
+  "web": {
+    "dir": "frontend/dist"
+  },
+  "build": {
+    "beforeBuild": [
+      "cd frontend && npm ci"
+    ],
+    "buildCommand": "cd frontend && npm run build:web"
+  },
+  "capacitor": {
+    "dir": "frontend"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "natpudan-ai-workspace",
+  "version": "1.0.0",
+  "description": "Natpudan AI Medical Assistant - Workspace Root",
+  "private": true,
+  "scripts": {
+    "install": "cd frontend && npm install",
+    "build": "cd frontend && npm run build:web",
+    "build:web": "cd frontend && npm run build:web",
+    "build:android": "cd frontend && npm run build:android",
+    "build:ios": "cd frontend && npm run build:ios",
+    "build:windows": "cd frontend && npm run build:windows",
+    "build:linux": "cd frontend && npm run build:linux",
+    "start": "cd frontend && npm run dev",
+    "dev": "cd frontend && npm run dev",
+    "lint": "cd frontend && npm run lint",
+    "test": "cd frontend && npm test"
+  },
+  "workspaces": [
+    "frontend"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drkvvk2015/Natpudan-.git"
+  },
+  "keywords": [
+    "medical",
+    "ai",
+    "healthcare",
+    "assistant",
+    "capacitor",
+    "electron",
+    "pwa"
+  ],
+  "author": "Natpudan Team",
+  "license": "MIT"
+}
