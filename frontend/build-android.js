@@ -4,9 +4,12 @@
  * Automatically uses gradlew.bat on Windows or ./gradlew on Unix
  */
 
-const { exec } = require('child_process');
-const path = require('path');
-const os = require('os');
+import { exec } from 'child_process';
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const isWindows = os.platform() === 'win32';
 const gradleCommand = isWindows ? 'gradlew.bat' : './gradlew';
@@ -20,17 +23,17 @@ const steps = [
   {
     name: 'Build web assets',
     command: 'npm run build:web',
-    cwd: process.cwd()
+    cwd: __dirname
   },
   {
     name: 'Sync Capacitor',
     command: 'npx cap sync android',
-    cwd: process.cwd()
+    cwd: __dirname
   },
   {
     name: 'Build Android APK',
     command: `${gradleCommand} assembleRelease`,
-    cwd: path.join(process.cwd(), 'android')
+    cwd: path.join(__dirname, 'android')
   }
 ];
 
