@@ -98,6 +98,12 @@ backend/physician_ai.db
 *.db
 *.db.bak
 
+# Android/Mobile
+frontend/android/local.properties
+android/local.properties
+*.apk
+*.aab
+
 # Misc
 .python-version
 *.bak
