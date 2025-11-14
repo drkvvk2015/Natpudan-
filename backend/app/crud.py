@@ -57,6 +57,16 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     return user
 
 
+def update_user_password(db: Session, user_id: int, new_password: str) -> Optional[User]:
+    """Update user password."""
+    user = get_user_by_id(db, user_id)
+    if user:
+        user.hashed_password = hash_password(new_password)
+        db.commit()
+        db.refresh(user)
+    return user
+
+
 # Conversation CRUD operations
 def create_conversation(db: Session, user_id: int, title: Optional[str] = None) -> Conversation:
     """Create new conversation."""

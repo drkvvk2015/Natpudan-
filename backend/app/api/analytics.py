@@ -7,7 +7,7 @@ from pydantic import BaseModel
 import logging
 
 from app.database import get_db
-from app.database.models import PatientIntake, TravelHistory, FamilyHistory, TreatmentPlan, Medication, FollowUp, TreatmentStatus
+from app.models import PatientIntake, TravelHistory, FamilyHistory, TreatmentPlan, Medication, FollowUp, TreatmentStatus
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

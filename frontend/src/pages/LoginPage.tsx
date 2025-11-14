@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { login as apiLogin } from '../services/api';
 import { TextField, Button, Container, Typography, Box, Divider, Alert } from '@mui/material';
 import { Google as GoogleIcon, GitHub as GitHubIcon, Microsoft as MicrosoftIcon } from '@mui/icons-material';
@@ -45,17 +45,25 @@ const LoginPage: React.FC = () => {
     try {
       const redirectUri = `${window.location.origin}/auth/callback`;
       const baseURL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8001';
+      console.log(`Requesting ${provider} OAuth URL from:`, `${baseURL}/api/auth/oauth/${provider}/url`);
+      
       const response = await fetch(`${baseURL}/api/auth/oauth/${provider}/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
       const data = await response.json();
       
+      console.log(`${provider} OAuth response:`, data);
+      
       if (data.auth_url) {
+        console.log(`Redirecting to ${provider} auth:`, data.auth_url);
         window.location.href = data.auth_url;
       } else {
-        setError(`Failed to initiate ${provider} login`);
+        const errorMsg = data.detail || data.error || `Failed to initiate ${provider} login. No auth URL returned.`;
+        console.error(`${provider} login failed:`, data);
+        setError(errorMsg);
       }
-    } catch (err) {
-      setError(`Failed to connect to ${provider}`);
+    } catch (err: any) {
+      const errorMsg = err?.message || `Failed to connect to ${provider}`;
       console.error(`${provider} login error:`, err);
+      setError(errorMsg);
     }
   };
 
@@ -95,10 +103,27 @@ const LoginPage: React.FC = () => {
             type="submit"
             fullWidth
             variant="contained"
-            sx={{ mt: 3, mb: 2 }}
+            sx={{ mt: 3, mb: 1 }}
           >
             Sign In
           </Button>
+          
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Typography
+              component={Link}
+              to="/forgot-password"
+              variant="body2"
+              sx={{
+                color: 'primary.main',
+                textDecoration: 'none',
+                '&:hover': {
+                  textDecoration: 'underline',
+                },
+              }}
+            >
+              Forgot password?
+            </Typography>
+          </Box>
           
           <Divider sx={{ my: 2 }}>
             <Typography variant="body2" color="text.secondary">OR</Typography>

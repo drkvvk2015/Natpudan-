@@ -142,8 +142,8 @@ class TreatmentPlanResponse(BaseModel):
 
 # ==================== API Endpoints ====================
 
-from ..database.connection import SessionLocal
-from ..database.models import TreatmentPlan, Medication, FollowUp, PatientIntake, MonitoringRecord
+from app.database import get_db
+from app.models import TreatmentPlan, Medication, FollowUp, PatientIntake, MonitoringRecord, TreatmentStatus, MedicationFrequency, MedicationRoute, FollowUpStatus
 
 def get_db():
     db = SessionLocal()

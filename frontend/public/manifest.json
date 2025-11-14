@@ -1,0 +1,106 @@
+{
+  "name": "Natpudan AI - Medical Assistant",
+  "short_name": "Natpudan AI",
+  "description": "AI-Powered Physician Assistant with Advanced Medical Knowledge Base",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1976d2",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["medical", "health", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Patient Chat",
+      "short_name": "Chat",
+      "description": "Start a new medical consultation",
+      "url": "/chat",
+      "icons": [{ "src": "/icon-chat-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Knowledge Base",
+      "short_name": "KB",
+      "description": "Search medical knowledge base",
+      "url": "/knowledge",
+      "icons": [{ "src": "/icon-kb-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Diagnosis Tools",
+      "short_name": "Diagnose",
+      "description": "AI-powered diagnosis assistant",
+      "url": "/diagnosis",
+      "icons": [{ "src": "/icon-diagnosis-96x96.png", "sizes": "96x96" }]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.natpudan.medical",
+      "id": "com.natpudan.medical"
+    }
+  ],
+  "prefer_related_applications": false
+}

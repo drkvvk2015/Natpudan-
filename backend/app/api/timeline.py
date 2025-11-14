@@ -5,8 +5,8 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 import logging
 
-from ..database.connection import get_db
-from ..database.models import PatientIntake, TravelHistory, FamilyHistory, TreatmentPlan, Medication, FollowUp, MonitoringRecord
+from app.database import get_db
+from app.models import PatientIntake, TravelHistory, FamilyHistory, TreatmentPlan, Medication, FollowUp, MonitoringRecord
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

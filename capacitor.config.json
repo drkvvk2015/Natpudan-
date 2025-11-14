@@ -1,0 +1,83 @@
+{
+  "appId": "com.natpudan.medical",
+  "appName": "Natpudan AI",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "https",
+    "hostname": "app.natpudan.com",
+    "allowNavigation": [
+      "app.natpudan.com",
+      "*.natpudan.com",
+      "localhost"
+    ]
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": "android/keystore.jks",
+      "keystoreAlias": "natpudan-key"
+    },
+    "backgroundColor": "#ffffff",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#ffffff",
+    "allowsLinkPreview": true,
+    "scrollEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#1976d2",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": true,
+      "androidSpinnerStyle": "large",
+      "iosSpinnerStyle": "small",
+      "spinnerColor": "#ffffff"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "light",
+      "resizeOnFullScreen": true
+    },
+    "StatusBar": {
+      "style": "light",
+      "backgroundColor": "#1976d2"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#1976d2"
+    },
+    "Camera": {
+      "photo": true,
+      "video": false
+    },
+    "Geolocation": {
+      "enableHighAccuracy": true
+    },
+    "Haptics": {
+      "enabled": true
+    },
+    "Device": {
+      "enabled": true
+    },
+    "Network": {
+      "enabled": true
+    },
+    "Storage": {
+      "enabled": true
+    },
+    "Share": {
+      "enabled": true
+    },
+    "Toast": {
+      "duration": "short"
+    }
+  }
+}

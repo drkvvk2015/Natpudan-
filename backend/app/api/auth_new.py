@@ -208,7 +208,7 @@ async def get_oauth_url(provider: str, redirect_uri: str):
     url = f"{config['auth_url']}?"
     url += "&".join([f"{k}={v}" for k, v in params.items()])
     
-    return {"url": url}
+    return {"auth_url": url}
 
 
 @router.post("/oauth/callback", response_model=TokenResponse)
@@ -319,4 +319,97 @@ async def oauth_callback(request: SocialLoginRequest, db: Session = Depends(get_
         return TokenResponse(
             access_token=access_token,
             user=user_to_dict(user)
+        )
+
+
+# Password Reset Models
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+# Password Reset Endpoints
+@router.post("/forgot-password")
+async def request_password_reset(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """Request a password reset token. In production, this would send an email."""
+    user = get_user_by_email(db, request.email)
+    
+    if not user:
+        # Don't reveal if user exists for security
+        return {"message": "If the email exists, a password reset link will be sent."}
+    
+    # Generate password reset token (valid for 1 hour)
+    reset_token_data = {
+        "sub": user.id,
+        "type": "password_reset",
+        "exp": datetime.utcnow() + timedelta(hours=1)
+    }
+    reset_token = jwt.encode(reset_token_data, SECRET_KEY, algorithm=ALGORITHM)
+    
+    # In production, send this token via email
+    # For now, return it directly (development only)
+    reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+    
+    print(f"Password Reset Link for {user.email}: {reset_link}")
+    
+    return {
+        "message": "Password reset instructions sent to email.",
+        "reset_token": reset_token,  # Remove this in production
+        "reset_link": reset_link  # Remove this in production
+    }
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """Reset password using the reset token."""
+    try:
+        # Verify and decode the reset token
+        payload = jwt.decode(request.token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        if payload.get("type") != "password_reset":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid reset token"
+            )
+        
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid reset token"
+            )
+        
+        # Get user from database
+        user = get_user_by_id(db, user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Update password
+        from app.crud import update_user_password
+        update_user_password(db, user.id, request.new_password)
+        
+        return {"message": "Password successfully reset. You can now login with your new password."}
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired. Please request a new one."
+        )
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reset token"
         )
