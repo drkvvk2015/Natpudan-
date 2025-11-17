@@ -100,9 +100,19 @@ backend/physician_ai.db
 
 # Android/Mobile
 frontend/android/local.properties
+frontend/android/app/build/
 android/local.properties
 *.apk
 *.aab
+
+# Desktop/Electron builds (too large for GitHub)
+frontend/release/
+release/
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
 
 # Misc
 .python-version
