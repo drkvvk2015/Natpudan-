@@ -158,7 +158,7 @@ const FHIRExplorer: React.FC = () => {
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
+          {typeof error === 'string' ? error : JSON.stringify(error, null, 2)}
         </Alert>
       )}
 

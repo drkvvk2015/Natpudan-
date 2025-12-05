@@ -238,7 +238,7 @@ export default function TreatmentPlan() {
       {/* Alerts */}
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
-          {error}
+          {typeof error === 'string' ? error : JSON.stringify(error, null, 2)}
         </Alert>
       )}
       {success && (

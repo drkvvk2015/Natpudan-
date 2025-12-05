@@ -130,11 +130,11 @@ const FloatingChatBot: React.FC = () => {
       if (error?.response?.status === 401) {
         errorMsg = '🔒 Please log in to use the AI assistant.';
       } else if (error?.response?.status === 500) {
-        errorMsg = '⚠️ Server error. Please check if OpenAI API key is configured.';
+        errorMsg = '[WARNING] Server error. Please check if OpenAI API key is configured.';
       } else if (error?.response?.data?.detail) {
-        errorMsg = `❌ ${error.response.data.detail}`;
+        errorMsg = `[ERROR] ${error.response.data.detail}`;
       } else if (error?.message) {
-        errorMsg = `❌ ${error.message}`;
+        errorMsg = `[ERROR] ${error.message}`;
       }
       
       const errorMessage: Message = {
@@ -573,7 +573,7 @@ const FloatingChatBot: React.FC = () => {
             {/* Quick Actions */}
             <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
               <Chip
-                label="💊 Medications"
+                label="[PILL] Medications"
                 size="small"
                 onClick={() => !isLoading && setInputMessage('Tell me about common medications')}
                 sx={{
@@ -590,7 +590,7 @@ const FloatingChatBot: React.FC = () => {
                 }}
               />
               <Chip
-                label="🩺 Symptoms"
+                label="[STETHOSCOPE] Symptoms"
                 size="small"
                 onClick={() => !isLoading && setInputMessage('Help me understand symptoms')}
                 sx={{
@@ -607,7 +607,7 @@ const FloatingChatBot: React.FC = () => {
                 }}
               />
               <Chip
-                label="📋 Procedures"
+                label="[LIST] Procedures"
                 size="small"
                 onClick={() => !isLoading && setInputMessage('Explain medical procedures')}
                 sx={{

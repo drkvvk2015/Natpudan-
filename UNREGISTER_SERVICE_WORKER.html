@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Unregister Service Worker</title>
+</head>
+<body>
+    <h1>Unregistering Service Worker...</h1>
+    <div id="status">Checking...</div>
+    
+    <script>
+        async function unregisterAllServiceWorkers() {
+            const statusDiv = document.getElementById('status');
+            
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    
+                    if (registrations.length === 0) {
+                        statusDiv.innerHTML = '<p style="color: green;">✅ No service workers found!</p>';
+                        return;
+                    }
+                    
+                    statusDiv.innerHTML = `<p>Found ${registrations.length} service worker(s). Unregistering...</p>`;
+                    
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                        console.log('Unregistered:', registration);
+                    }
+                    
+                    // Clear all caches
+                    const cacheNames = await caches.keys();
+                    for (const cacheName of cacheNames) {
+                        await caches.delete(cacheName);
+                        console.log('Deleted cache:', cacheName);
+                    }
+                    
+                    statusDiv.innerHTML = `
+                        <p style="color: green;">✅ Success!</p>
+                        <p>Unregistered ${registrations.length} service worker(s)</p>
+                        <p>Deleted ${cacheNames.length} cache(s)</p>
+                        <p><strong>Now reload the page or go back to your app!</strong></p>
+                    `;
+                    
+                } catch (error) {
+                    statusDiv.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+                    console.error('Error:', error);
+                }
+            } else {
+                statusDiv.innerHTML = '<p style="color: orange;">⚠️ Service Workers not supported</p>';
+            }
+        }
+        
+        unregisterAllServiceWorkers();
+    </script>
+</body>
+</html>

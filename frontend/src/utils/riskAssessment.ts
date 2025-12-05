@@ -291,15 +291,15 @@ export function assessRisk(factors: RiskFactors): RiskScore {
     recommendations.push('Consider emergency department referral')
     recommendations.push('Close monitoring of vital signs')
   } else if (level === 'high') {
-    recommendations.push('⚠️ Schedule urgent medical consultation')
+    recommendations.push('[WARNING] Schedule urgent medical consultation')
     recommendations.push('Comprehensive diagnostic testing recommended')
     recommendations.push('Monitor symptoms daily')
   } else if (level === 'medium') {
-    recommendations.push('📋 Schedule routine medical check-up')
+    recommendations.push('[LIST] Schedule routine medical check-up')
     recommendations.push('Review family history with physician')
     recommendations.push('Monitor for symptom development')
   } else {
-    recommendations.push('✅ Continue routine preventive care')
+    recommendations.push('[OK] Continue routine preventive care')
     recommendations.push('Maintain healthy lifestyle')
     recommendations.push('Annual check-ups as recommended')
   }
@@ -327,19 +327,19 @@ export function getRiskDisplay(level: 'low' | 'medium' | 'high' | 'critical') {
     low: {
       color: '#4caf50',
       bgColor: '#e8f5e9',
-      icon: '✓',
+      icon: '[OK]',
       label: 'Low Risk',
     },
     medium: {
       color: '#ff9800',
       bgColor: '#fff3e0',
-      icon: '⚠',
+      icon: '[WARN]',
       label: 'Medium Risk',
     },
     high: {
       color: '#f44336',
       bgColor: '#ffebee',
-      icon: '⚠',
+      icon: '[WARN]',
       label: 'High Risk',
     },
     critical: {

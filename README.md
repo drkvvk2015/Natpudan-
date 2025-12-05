@@ -2,19 +2,19 @@
 
 A production-ready FastAPI + React application for medical professionals with AI-powered features, role-based access control (RBAC), and comprehensive patient management capabilities.
 
-## ✨ Features
+## [EMOJI] Features
 
-- 🤖 **AI Chat Assistant** - OpenAI GPT-4 integration for medical consultations
-- 📋 **Discharge Summary** - AI-powered generation with voice typing support
-- 👥 **Role-Based Access Control** - Staff, Doctor, and Admin roles
-- 🔐 **Secure Authentication** - JWT + OAuth2 (Google, GitHub, Microsoft)
-- 💾 **Database Persistence** - SQLAlchemy with SQLite/PostgreSQL
-- 📊 **Patient Management** - Intake forms, medical history, treatment plans
-- 📈 **Analytics Dashboard** - Demographics, disease trends, treatment outcomes
-- 🏥 **FHIR Integration** - Healthcare data interoperability
-- 🗓️ **Medical Timeline** - Comprehensive patient event tracking
+-  **AI Chat Assistant** - OpenAI GPT-4 integration for medical consultations
+- [EMOJI] **Discharge Summary** - AI-powered generation with voice typing support
+- [EMOJI] **Role-Based Access Control** - Staff, Doctor, and Admin roles
+-  **Secure Authentication** - JWT + OAuth2 (Google, GitHub, Microsoft)
+-  **Database Persistence** - SQLAlchemy with SQLite/PostgreSQL
+- [EMOJI] **Patient Management** - Intake forms, medical history, treatment plans
+- [EMOJI] **Analytics Dashboard** - Demographics, disease trends, treatment outcomes
+-  **FHIR Integration** - Healthcare data interoperability
+-  **Medical Timeline** - Comprehensive patient event tracking
 
-## 🚀 Quick Start
+## [EMOJI] Quick Start
 
 ### Prerequisites
 
@@ -42,10 +42,10 @@ pip install -r requirements-db.txt
 # Or create manually with required environment variables (see below)
 
 # 5. Run backend server
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Backend will be available at: `http://127.0.0.1:8001`
+Backend will be available at: `http://localhost:8000`
 
 ### Frontend Setup (React + Vite)
 
@@ -68,7 +68,7 @@ Frontend will be available at: `http://localhost:5173`
 - Doctor: chat, diagnosis, knowledge base, analytics, FHIR.
 - Admin: full access.
 
-## ⚙️ Environment Variables
+##  Environment Variables
 
 Create a `backend/.env` file with the following variables:
 
@@ -89,7 +89,7 @@ OPENAI_MODEL=gpt-4-turbo-preview
 
 # Application URLs
 FRONTEND_URL=http://localhost:5173
-BACKEND_URL=http://localhost:8001
+BACKEND_URL=http://localhost:8000
 ```
 
 ### Optional (OAuth Providers)
@@ -116,12 +116,12 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 ### Get OpenAI API Key
 
-1. Visit https://platform.openai.com/api-keys
+1. Visit <https://platform.openai.com/api-keys>
 2. Create a new API key
 3. Add to `.env` file
-4. Monitor usage at https://platform.openai.com/usage
+4. Monitor usage at <https://platform.openai.com/usage>
 
-## 🔐 Security Features
+##  Security Features
 
 - **Password Security**: Bcrypt hashing for secure password storage
 - **JWT Authentication**: Secure token-based authentication
@@ -139,7 +139,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 - Enable HTTPS in production
 - Review GitHub Security tab for vulnerabilities
 
-## 🏗️ Architecture
+##  Architecture
 
 ### Backend (FastAPI)
 
@@ -171,14 +171,16 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
   - OAuth social login
   - Professional medical forms
 
-## 📱 User Roles
+##  User Roles
 
 ### Staff Role
+
 - Patient data entry
 - Basic chat access
 - View patient records
 
 ### Doctor Role
+
 - Full chat access with AI
 - Diagnosis assistance
 - Discharge summary generation
@@ -187,12 +189,13 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 - Analytics viewing
 
 ### Admin Role
+
 - All doctor permissions
 - User management
 - System configuration
 - Full analytics access
 
-## 🧪 API Testing
+##  API Testing
 
 ### Using curl
 
@@ -214,7 +217,7 @@ curl -X POST http://127.0.0.1:8001/api/chat/message `
   -d '{\"message\":\"What are the symptoms of pneumonia?\"}'
 ```
 
-## 📊 Database
+## [EMOJI] Database
 
 ### SQLite (Development)
 
@@ -239,7 +242,7 @@ alembic revision --autogenerate -m "Initial schema"
 alembic upgrade head
 ```
 
-## 🎨 Logo Usage
+##  Logo Usage
 
 Professional logo system with medical cross + AI circuit design:
 
@@ -249,7 +252,7 @@ Professional logo system with medical cross + AI circuit design:
 
 See `LOGO_USAGE.md` for detailed branding guidelines.
 
-## 🐛 Troubleshooting
+## [EMOJI] Troubleshooting
 
 ### Backend won't start
 
@@ -293,13 +296,13 @@ Remove-Item natpudan.db
 - Check API quota at <https://platform.openai.com/usage>
 - Ensure proper billing setup
 
-## 📚 Documentation
+##  Documentation
 
 - API Docs: <http://127.0.0.1:8001/docs> (Swagger UI)
 - ReDoc: <http://127.0.0.1:8001/redoc>
 - Logo Guidelines: `LOGO_USAGE.md`
 
-## 🤝 Contributing
+##  Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -307,20 +310,21 @@ Remove-Item natpudan.db
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## [EMOJI] License
 
 See `LICENSE` file for details.
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - OpenAI GPT-4 for AI capabilities
 - FastAPI framework
 - React and Material-UI teams
 - Medical professionals for domain expertise
 
-## 📞 Support
+##  Support
 
 For issues and questions:
+
 - GitHub Issues: <https://github.com/drkvvk2015/Natpudan-/issues>
 - Check existing documentation and troubleshooting guide first
 

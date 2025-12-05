@@ -16,10 +16,10 @@ def run_migration():
     try:
         logger.info("Creating treatment plan tables...")
         Base.metadata.create_all(bind=engine)
-        logger.info("✅ Treatment plan tables created successfully!")
+        logger.info("[OK] Treatment plan tables created successfully!")
         logger.info("Tables created: treatment_plans, medications, follow_ups, monitoring_records")
     except Exception as e:
-        logger.error(f"❌ Migration failed: {e}")
+        logger.error(f"[ERROR] Migration failed: {e}")
         raise
 
 if __name__ == "__main__":

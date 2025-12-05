@@ -400,7 +400,7 @@ class PDFReportGenerator:
             factors = risk_assessment.get('factors', {})
             for factor, score in factors.items():
                 if score > 0:
-                    page.insert_text((self.margin + 20, y), f"• {factor.replace('_', ' ').title()}: {score} points", 
+                    page.insert_text((self.margin + 20, y), f"- {factor.replace('_', ' ').title()}: {score} points", 
                                    fontsize=8, fontname="helv", color=(0.3, 0.3, 0.3))
                     y += 15
             
@@ -429,7 +429,7 @@ class PDFReportGenerator:
             recommendations = ["Follow up with healthcare provider", "Continue monitoring symptoms", "Maintain healthy lifestyle"]
         
         for rec in recommendations[:5]:
-            page.insert_text((self.margin + 10, y), f"• {rec}", fontsize=9, fontname="helv", color=(0.2, 0.2, 0.2))
+            page.insert_text((self.margin + 10, y), f"- {rec}", fontsize=9, fontname="helv", color=(0.2, 0.2, 0.2))
             y += 18
         
         # Add footers

@@ -1,52 +1,14 @@
 import apiClient from './apiClient'
-import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios'
+import { AxiosError, AxiosResponse } from 'axios'
 
-// API Configuration
-// Prefer explicit backend URL; fallback to 8001 (current dev default)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-const API_TIMEOUT = 30000 // 30 seconds
+// Note: apiClient is imported from ./apiClient and already has:
+// - Configured baseURL, timeout, headers
+// - Request interceptor that adds Authorization header from localStorage
+// - Response interceptor with retry logic
+// DO NOT create a duplicate apiClient here!
 
-// Create axios instance with default config
-const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: API_TIMEOUT,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// Request interceptor for adding auth tokens, logging, etc.
-apiClient.interceptors.request.use(
-  (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error: AxiosError) => {
-    return Promise.reject(error)
-  }
-)
-
-// Response interceptor for error handling
-apiClient.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  (error: AxiosError) => {
-    if (error.response) {
-      // Server responded with error status
-      console.error('API Error:', error.response.status, error.response.data)
-    } else if (error.request) {
-      // Request made but no response received
-      console.error('Network Error: No response received')
-    } else {
-      // Error in request configuration
-      console.error('Request Error:', error.message)
-    }
-    return Promise.reject(error)
-  }
-)
+// API Base URL for fetch calls (not using apiClient)
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 // API Service Types
 export interface HealthStatus {
@@ -338,6 +300,35 @@ export interface PatientIntakeData {
   bloodType: string
   travelHistory: TravelHistoryItem[]
   familyHistory: FamilyHistoryItem[]
+  // Extended Anthropometry
+  heightCm?: number
+  weightKg?: number
+  bmi?: number
+  waistCm?: number
+  hipCm?: number
+  whr?: number
+  muacCm?: number
+  headCircumferenceCm?: number
+  chestExpansionCm?: number
+  sittingHeightCm?: number
+  standingHeightCm?: number
+  armSpanCm?: number
+  bodyFatPercent?: number
+  bpSystolic?: number
+  bpDiastolic?: number
+  pulsePerMin?: number
+  respRatePerMin?: number
+  temperatureC?: number
+  // Complaints
+  chiefComplaints?: Array<{ complaint: string; duration: string }>
+  presentHistory?: Array<{
+    id: string
+    title: string
+    duration: string
+    associationFactors: string[]
+    relievingFactors: string[]
+    aggravatingFactors: string[]
+  }>
 }
 
 export interface PatientIntakeResponse extends PatientIntakeData {

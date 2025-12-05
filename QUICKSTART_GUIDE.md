@@ -1,4 +1,4 @@
-# 🚀 Quick Start Guide - Physician AI Assistant
+# [EMOJI] Quick Start Guide - Physician AI Assistant
 
 ## For Developers (Local Development)
 
@@ -196,20 +196,20 @@ npm install --force
 
 ```
 Natpudan-/
-├── backend/
-│   ├── app/
-│   │   ├── api/          # API endpoints
-│   │   ├── models/       # Database models
-│   │   ├── services/     # Business logic
-│   │   └── middleware/   # Security, rate limiting
-│   ├── data/             # Medical documents
-│   ├── .env              # Environment variables
-│   └── run.py            # Application entry
-├── frontend/
-│   ├── src/              # React components
-│   └── package.json      # Dependencies
-├── docker-compose.yml    # Docker orchestration
-└── deploy-production.ps1 # Deployment script
+ backend/
+    app/
+       api/          # API endpoints
+       models/       # Database models
+       services/     # Business logic
+       middleware/   # Security, rate limiting
+    data/             # Medical documents
+    .env              # Environment variables
+    run.py            # Application entry
+ frontend/
+    src/              # React components
+    package.json      # Dependencies
+ docker-compose.yml    # Docker orchestration
+ deploy-production.ps1 # Deployment script
 ```
 
 ---
@@ -245,21 +245,21 @@ Natpudan-/
 
 ## Quick Tips
 
-💡 **Development**: Use SQLite database for faster local development
-💡 **Production**: Always use PostgreSQL for production deployments
-💡 **Security**: Never commit `.env` files with real credentials
-💡 **Testing**: Run tests before deploying: `pytest tests/`
-💡 **Logs**: Check logs if something doesn't work: `docker-compose logs`
-💡 **Backup**: Always backup database before major changes
-💡 **SSL**: Use Let's Encrypt for free SSL certificates in production
+ **Development**: Use SQLite database for faster local development
+ **Production**: Always use PostgreSQL for production deployments
+ **Security**: Never commit `.env` files with real credentials
+ **Testing**: Run tests before deploying: `pytest tests/`
+ **Logs**: Check logs if something doesn't work: `docker-compose logs`
+ **Backup**: Always backup database before major changes
+ **SSL**: Use Let's Encrypt for free SSL certificates in production
 
 ---
 
 ## Support
 
-🐛 **Issues**: [GitHub Issues](https://github.com/drkvvk2015/Natpudan-/issues)
-📖 **Documentation**: See the guides in the root directory
-🔍 **API Docs**: http://localhost:8000/docs (when server is running)
+[EMOJI] **Issues**: [GitHub Issues](https://github.com/drkvvk2015/Natpudan-/issues)
+ **Documentation**: See the guides in the root directory
+[EMOJI] **API Docs**: http://localhost:8000/docs (when server is running)
 
 ---
 

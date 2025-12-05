@@ -43,7 +43,8 @@ def format_date(dt) -> datetime:
     elif isinstance(dt, str):
         try:
             return datetime.fromisoformat(dt.replace('Z', '+00:00'))
-        except:
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"Failed to parse date '{dt}': {e}")
             return datetime.now()
     return datetime.now()
 

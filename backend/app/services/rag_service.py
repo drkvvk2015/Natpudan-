@@ -26,7 +26,7 @@ class RAGService:
     
     def __init__(
         self,
-        model: str = "gpt-4-turbo-preview",
+        model: str = "gpt-4o",
         max_context_chunks: int = 5
     ):
         """

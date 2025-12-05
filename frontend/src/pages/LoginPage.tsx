@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { login as apiLogin } from '../services/api';
@@ -9,16 +9,30 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  // Navigate to dashboard after successful login (once auth state updates)
+  useEffect(() => {
+    if (loginSuccess && isAuthenticated) {
+      console.log('LoginPage: Auth state confirmed, navigating to dashboard');
+      navigate('/dashboard');
+    }
+  }, [loginSuccess, isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     try {
+      console.log('LoginPage: Submitting login...');
       const { access_token, user } = await apiLogin({ email, password });
+      console.log('LoginPage: API login successful, calling context login()');
       login(access_token, user);
-      navigate('/dashboard');
+      setLoginSuccess(true); // This will trigger navigation via useEffect
+      console.log('LoginPage: Login context updated, waiting for auth state...');
     } catch (err: any) {
       console.error('Login error:', err);
       let errorMsg = 'Failed to login. Please check your credentials.';
@@ -38,32 +52,57 @@ const LoginPage: React.FC = () => {
       }
       
       setError(errorMsg);
+      setLoading(false);
     }
   };
 
   const handleSocialLogin = async (provider: 'google' | 'github' | 'microsoft') => {
     try {
-      const redirectUri = `${window.location.origin}/auth/callback`;
-      const baseURL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8001';
-      console.log(`Requesting ${provider} OAuth URL from:`, `${baseURL}/api/auth/oauth/${provider}/url`);
+      setError(''); // Clear previous errors
+      setLoading(true);
+      
+      const frontendURL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+      const redirectUri = `${frontendURL}/auth/callback`;
+      const baseURL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      
+      console.log(`Initiating ${provider} OAuth flow...`);
+      console.log(`Using API Base URL: ${baseURL}`);
+      console.log(`OAuth redirect URI: ${redirectUri}`);
       
       const response = await fetch(`${baseURL}/api/auth/oauth/${provider}/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
+      
+      // Check if response is ok
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        const errorMsg = errorData.detail || errorData.error || `${provider} login is not available`;
+        setError(errorMsg);
+        console.error(`OAuth error for ${provider}:`, errorData);
+        setLoading(false);
+        return;
+      }
+      
       const data = await response.json();
       
-      console.log(`${provider} OAuth response:`, data);
-      
       if (data.auth_url) {
-        console.log(`Redirecting to ${provider} auth:`, data.auth_url);
+        // Store provider and state for callback verification
+        localStorage.setItem('oauth_provider', provider);
+        if (data.state) {
+          localStorage.setItem('oauth_state', data.state);
+        }
+        
+        console.log(`Redirecting to ${provider} OAuth authorization page...`);
+        // Redirect to OAuth provider
         window.location.href = data.auth_url;
       } else {
         const errorMsg = data.detail || data.error || `Failed to initiate ${provider} login. No auth URL returned.`;
-        console.error(`${provider} login failed:`, data);
         setError(errorMsg);
+        setLoading(false);
       }
     } catch (err: any) {
-      const errorMsg = err?.message || `Failed to connect to ${provider}`;
-      console.error(`${provider} login error:`, err);
+      console.error(`Social login error for ${provider}:`, err);
+      const errorMsg = err?.message || `Failed to connect to ${provider}. Please check your internet connection and try again.`;
       setError(errorMsg);
+      setLoading(false);
     }
   };
 
@@ -98,7 +137,7 @@ const LoginPage: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mt: 2 }}>{typeof error === 'string' ? error : JSON.stringify(error, null, 2)}</Alert>}
           <Button
             type="submit"
             fullWidth

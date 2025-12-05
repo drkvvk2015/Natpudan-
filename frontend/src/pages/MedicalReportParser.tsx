@@ -135,7 +135,7 @@ const MedicalReportParser: React.FC = () => {
             mb: 1,
           }}
         >
-          📋 Medical Report Parser
+          [LIST] Medical Report Parser
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 800 }}>
           Upload a PDF medical report to automatically extract structured data including vital signs,
@@ -189,7 +189,7 @@ const MedicalReportParser: React.FC = () => {
 
           {error && (
             <Alert severity="error" sx={{ mt: 2 }}>
-              {error}
+              {typeof error === 'string' ? error : JSON.stringify(error, null, 2)}
             </Alert>
           )}
         </Box>
@@ -199,7 +199,7 @@ const MedicalReportParser: React.FC = () => {
       {parsedData && (
         <Box>
           <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 600 }}>
-            📊 Parsed Results
+            [STATS] Parsed Results
           </Typography>
 
           {/* Vital Signs */}

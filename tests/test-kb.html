@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Knowledge Base API</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        .result { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Knowledge Base API Tester</h1>
+    
+    <div>
+        <button onclick="testHealth()">Test Health</button>
+        <button onclick="testStatistics()">Test Statistics</button>
+        <button onclick="testSearch()">Test Search (fever)</button>
+    </div>
+    
+    <div class="result" id="result"></div>
+
+    <script>
+        const baseURL = 'http://127.0.0.1:8000';
+        
+        async function testHealth() {
+            try {
+                const response = await fetch(`${baseURL}/health`);
+                const data = await response.json();
+                showResult('Health Check', data);
+            } catch (error) {
+                showError('Health Check', error);
+            }
+        }
+        
+        async function testStatistics() {
+            try {
+                const response = await fetch(`${baseURL}/api/medical/knowledge/statistics`);
+                const data = await response.json();
+                showResult('Knowledge Statistics', data);
+            } catch (error) {
+                showError('Knowledge Statistics', error);
+            }
+        }
+        
+        async function testSearch() {
+            try {
+                const response = await fetch(`${baseURL}/api/medical/knowledge/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: 'fever',
+                        top_k: 5
+                    })
+                });
+                const data = await response.json();
+                showResult('Search Results', data);
+            } catch (error) {
+                showError('Search Results', error);
+            }
+        }
+        
+        function showResult(title, data) {
+            document.getElementById('result').innerHTML = `
+                <h2>${title}</h2>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+        }
+        
+        function showError(title, error) {
+            document.getElementById('result').innerHTML = `
+                <h2>${title} - ERROR</h2>
+                <pre style="color: red;">${error.message || error}</pre>
+            `;
+        }
+    </script>
+</body>
+</html>

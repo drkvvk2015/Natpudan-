@@ -1,5 +1,7 @@
 """
 Vector Knowledge Base Service - Semantic search using FAISS and OpenAI embeddings
+
+Added fallback: if FAISS or OpenAI client unavailable, perform simple keyword search over stored chunk texts.
 """
 
 import logging
@@ -9,6 +11,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 import numpy as np
 from datetime import datetime
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +146,42 @@ class VectorKnowledgeBase:
             logger.error(f"Error getting embedding: {e}")
             return None
     
+    def _get_embeddings_batch(self, texts: List[str], batch_size: int = 100) -> List[np.ndarray]:
+        """
+        Get embeddings for multiple texts in batches (10-20x faster than one-by-one).
+        
+        Args:
+            texts: List of texts to embed
+            batch_size: Number of texts per API call (max 2048 for OpenAI)
+            
+        Returns:
+            List of embedding vectors
+        """
+        if not self.openai_client:
+            logger.warning("OpenAI client not available")
+            return []
+        
+        embeddings = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            try:
+                response = self.openai_client.embeddings.create(
+                    model=self.embedding_model,
+                    input=batch
+                )
+                batch_embeddings = [np.array(item.embedding, dtype='float32') for item in response.data]
+                embeddings.extend(batch_embeddings)
+                logger.info(f"Generated {len(batch_embeddings)} embeddings (batch {i//batch_size + 1})")
+            except Exception as e:
+                logger.error(f"Error getting batch embeddings: {e}")
+                # Fallback to individual embeddings for this batch
+                for text in batch:
+                    emb = self._get_embedding(text)
+                    if emb is not None:
+                        embeddings.append(emb)
+        
+        return embeddings
+    
     def add_document(
         self,
         content: str,
@@ -169,16 +208,17 @@ class VectorKnowledgeBase:
         # Split content into chunks
         chunks = self._chunk_text(content, chunk_size, chunk_overlap)
         
+        # PERFORMANCE: Generate embeddings in batch (10-20x faster)
+        logger.info(f"Generating embeddings for {len(chunks)} chunks in batch...")
+        embeddings_batch = self._get_embeddings_batch(chunks, batch_size=100)
+        
+        if len(embeddings_batch) != len(chunks):
+            logger.warning(f"Only got {len(embeddings_batch)}/{len(chunks)} embeddings")
+        
         chunks_added = 0
-        embeddings_batch = []
         documents_batch = []
         
-        for i, chunk in enumerate(chunks):
-            # Get embedding
-            embedding = self._get_embedding(chunk)
-            if embedding is None:
-                continue
-            
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings_batch)):
             # Store chunk with metadata
             chunk_metadata = metadata.copy()
             chunk_metadata.update({
@@ -187,7 +227,6 @@ class VectorKnowledgeBase:
                 'added_at': datetime.utcnow().isoformat()
             })
             
-            embeddings_batch.append(embedding)
             documents_batch.append(chunk_metadata)
             chunks_added += 1
         
@@ -258,14 +297,40 @@ class VectorKnowledgeBase:
             query: Search query
             top_k: Number of results to return
             filter_metadata: Optional metadata filters
-            
+        
         Returns:
             List of relevant document chunks with metadata and scores
         """
+        # If vector stack not available, fallback to simple keyword search
         if not FAISS_AVAILABLE or not self.openai_client or not self.index:
-            logger.warning("Search not available, returning empty results")
-            return []
-        
+            logger.warning("FAISS/OpenAI not available - using keyword fallback search")
+            results = []
+            q = query.lower()
+            for doc in self.documents:
+                text = (doc.get('chunk_text') or '').lower()
+                if not text:
+                    continue
+                score = 0
+                # simple scoring: count occurrences
+                occurrences = len(re.findall(re.escape(q), text))
+                if occurrences > 0:
+                    score = occurrences
+                else:
+                    # partial match on words
+                    for token in q.split():
+                        if token and token in text:
+                            score += 0.5
+                if score > 0:
+                    results.append({
+                        'content': doc.get('chunk_text', ''),
+                        'metadata': {k: v for k, v in doc.items() if k != 'chunk_text'},
+                        'similarity_score': float(min(1.0, score / 10.0)),
+                        'distance': 1.0 - float(min(1.0, score / 10.0))
+                    })
+            # sort by score desc
+            results.sort(key=lambda r: r.get('similarity_score', 0), reverse=True)
+            return results[:top_k]
+
         if len(self.documents) == 0:
             logger.warning("No documents in knowledge base")
             return []

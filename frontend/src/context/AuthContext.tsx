@@ -1,35 +1,58 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { Box, CircularProgress } from '@mui/material';
 import apiClient from '../services/apiClient';
 
 interface AuthContextType {
   user: any;
   token: string | null;
   isAuthenticated: boolean;
+  loading: boolean;
   login: (token: string, user: any) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export { AuthContext };
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<any>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Initialize auth state on mount and listen for storage events
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
-    console.log('AuthContext: Initial token check on mount...', storedToken ? 'Token exists' : 'No token');
+    const storedUser = localStorage.getItem('user');
+    console.log('AuthContext: Initial auth check on mount...', storedToken ? 'Token exists' : 'No token');
     
-    if (storedToken && storedToken !== token) {
+    if (storedToken) {
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
       setToken(storedToken);
       setIsAuthenticated(true);
+      
+      // Restore user data from localStorage
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          console.log('AuthContext: User restored from localStorage:', userData.email);
+        } catch (e) {
+          console.error('AuthContext: Failed to parse stored user data', e);
+          // If user data is corrupt, clear everything
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setToken(null);
+          setIsAuthenticated(false);
+        }
+      }
       console.log('AuthContext: User authenticated on mount');
-    } else if (!storedToken && isAuthenticated) {
-      setIsAuthenticated(false);
-      console.log('AuthContext: User not authenticated');
+    } else {
+      console.log('AuthContext: No stored token, user not authenticated');
     }
+    
+    setLoading(false);
 
     // Listen for storage changes (useful for multi-tab scenarios)
     const handleStorageChange = (e: StorageEvent) => {
@@ -40,9 +63,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           apiClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
           setToken(newToken);
           setIsAuthenticated(true);
+          
+          // Also check for updated user data
+          const storedUser = localStorage.getItem('user');
+          if (storedUser) {
+            try {
+              setUser(JSON.parse(storedUser));
+            } catch (e) {
+              console.error('Failed to parse user data from storage event');
+            }
+          }
         } else {
           delete apiClient.defaults.headers.common['Authorization'];
           setToken(null);
+          setUser(null);
           setIsAuthenticated(false);
         }
       }
@@ -50,11 +84,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  }, []); // Empty dependency array - only run once on mount
 
   const login = (newToken: string, userData: any) => {
-    console.log('AuthContext: Login called with token and user data');
+    console.log('AuthContext: Login called with token and user data', userData);
     localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(userData)); // Persist user data
     setToken(newToken);
     setUser(userData);
     setIsAuthenticated(true);
@@ -64,12 +99,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.dispatchEvent(new CustomEvent('authStateChanged', { 
       detail: { isAuthenticated: true, user: userData } 
     }));
-    console.log('AuthContext: User logged in successfully');
+    console.log('AuthContext: User logged in successfully:', userData.email);
   };
 
   const logout = () => {
     console.log('AuthContext: Logout called');
     localStorage.removeItem('token');
+    localStorage.removeItem('user'); // Also remove user data
     setToken(null);
     setUser(null);
     setIsAuthenticated(false);
@@ -83,8 +119,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout }}>
-      {children}
+    <AuthContext.Provider value={{ user, token, isAuthenticated, loading, login, logout }}>
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+          <CircularProgress />
+        </Box>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };

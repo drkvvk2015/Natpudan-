@@ -40,7 +40,7 @@ function Build-Web {
     Write-Host "Building web application..." -ForegroundColor Yellow
     npm run build:web
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✓ Web build completed successfully" -ForegroundColor Green
+        Write-Host "[OK] Web build completed successfully" -ForegroundColor Green
     }
     else {
         Write-Host "✗ Web build failed" -ForegroundColor Red
@@ -60,7 +60,7 @@ function Build-Android {
     
     npm run build:android
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✓ Android build completed successfully" -ForegroundColor Green
+        Write-Host "[OK] Android build completed successfully" -ForegroundColor Green
         Write-Host "APK location: android/app/build/outputs/apk/release/" -ForegroundColor Cyan
     }
     else {
@@ -76,7 +76,7 @@ function Build-iOS {
     if ($IsMacOS -or $IsLinux) {
         npm run build:ios
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "✓ iOS build completed successfully" -ForegroundColor Green
+            Write-Host "[OK] iOS build completed successfully" -ForegroundColor Green
         }
         else {
             Write-Host "✗ iOS build failed" -ForegroundColor Red
@@ -92,7 +92,7 @@ function Build-Windows {
     Write-Host "Building Windows installer..." -ForegroundColor Yellow
     npm run build:windows
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✓ Windows build completed successfully" -ForegroundColor Green
+        Write-Host "[OK] Windows build completed successfully" -ForegroundColor Green
         Write-Host "Installer location: release/" -ForegroundColor Cyan
     }
     else {
@@ -105,7 +105,7 @@ function Build-Linux {
     Write-Host "Building Linux packages..." -ForegroundColor Yellow
     npm run build:linux
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✓ Linux build completed successfully" -ForegroundColor Green
+        Write-Host "[OK] Linux build completed successfully" -ForegroundColor Green
         Write-Host "Packages location: release/" -ForegroundColor Cyan
     }
     else {

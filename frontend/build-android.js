@@ -40,7 +40,7 @@ const steps = [
 // Execute steps sequentially
 async function runSteps() {
   for (const step of steps) {
-    console.log(`\n📦 ${step.name}...`);
+    console.log(`\n[PACKAGE] ${step.name}...`);
     
     try {
       await new Promise((resolve, reject) => {

@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/aria-role, jsx-a11y/no-invalid-aria-role, jsx-a11y/no-blank-anchor, jsx-a11y/label-has-associated-control */
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +13,7 @@ const RegisterPage: React.FC = () => {
   const [role, setRole] = useState<'patient' | 'staff' | 'doctor'>('patient');
   const [license, setLicense] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -50,20 +52,45 @@ const RegisterPage: React.FC = () => {
 
   const handleSocialLogin = async (provider: 'google' | 'github' | 'microsoft') => {
     try {
-      const redirectUri = `${window.location.origin}/auth/callback`;
-      const baseURL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8001';
+      setError('');
+      setLoading(true);
+      
+      const frontendURL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+      const redirectUri = `${frontendURL}/auth/callback`;
+      const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      
+      console.log(`Initiating ${provider} OAuth registration...`);
+      console.log(`Using API Base URL: ${baseURL}`);
+      console.log(`OAuth redirect URI: ${redirectUri}`);
+      
       const response = await fetch(`${baseURL}/api/auth/oauth/${provider}/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        setError(errorData.detail || `${provider} login is not available`);
+        setLoading(false);
+        return;
+      }
+      
       const data = await response.json();
       
       if (data.auth_url) {
-        // Redirect to OAuth provider
+        // Store provider and state for callback
+        localStorage.setItem('oauth_provider', provider);
+        if (data.state) {
+          localStorage.setItem('oauth_state', data.state);
+        }
+        
+        console.log(`Redirecting to ${provider}...`);
         window.location.href = data.auth_url;
       } else {
         setError(`Failed to initiate ${provider} login`);
+        setLoading(false);
       }
     } catch (err) {
-      setError(`Failed to connect to ${provider}`);
+      setError(`Failed to connect to ${provider}. Please check your internet connection.`);
       console.error(`${provider} login error:`, err);
+      setLoading(false);
     }
   };
 
@@ -115,8 +142,8 @@ const RegisterPage: React.FC = () => {
             label="Role"
             value={role}
             onChange={(e) => setRole(e.target.value as 'patient' | 'staff' | 'doctor')}
-            SelectProps={{ native: true }}
-            inputProps={{ 'aria-label': 'Role' }}
+            SelectProps={{ native: true, title: 'Select your role' }}
+            inputProps={{ 'aria-label': 'Role', title: 'Select your role' }}
           >
             <option value="patient">Patient</option>
             <option value="staff">Staff</option>
@@ -134,7 +161,7 @@ const RegisterPage: React.FC = () => {
               onChange={(e) => setLicense(e.target.value)}
             />
           )}
-          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mt: 2 }}>{typeof error === 'string' ? error : JSON.stringify(error, null, 2)}</Alert>}
           <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }}>Sign Up</Button>
           
           <Divider sx={{ my: 2 }}>

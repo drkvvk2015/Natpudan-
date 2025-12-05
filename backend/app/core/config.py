@@ -50,7 +50,7 @@ class Settings:
     
     # OpenAI Configuration
     OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', '')
-    OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-4-turbo-preview')
+    OPENAI_MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-4o')
     OPENAI_EMBEDDING_MODEL: str = os.getenv(
         'OPENAI_EMBEDDING_MODEL', 
         'text-embedding-3-small'
@@ -123,17 +123,17 @@ class Settings:
         
         # Print validation results
         if warnings:
-            print("\n⚠️  Configuration Warnings:")
+            print("\n[WARNING]  Configuration Warnings:")
             for warning in warnings:
                 print(f"  - {warning}")
         
         if errors:
-            print("\n❌ Configuration Errors:")
+            print("\n[ERROR] Configuration Errors:")
             for error in errors:
                 print(f"  - {error}")
             raise ValueError("Configuration validation failed. Please fix the errors above.")
         
-        print("\n✅ Configuration validated successfully")
+        print("\n[OK] Configuration validated successfully")
         return True
     
     @classmethod

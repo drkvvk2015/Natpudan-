@@ -9,16 +9,41 @@ TODO: Replace stub logic with real service integrations (knowledge base,
 diagnosis engine, ICD code provider, etc.).
 """
 
-from fastapi import FastAPI, APIRouter, File, UploadFile, HTTPException
+from fastapi import FastAPI, APIRouter, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any
 from datetime import datetime
+from contextlib import asynccontextmanager
 import time
 import psutil
 import logging
+import logging.handlers
+import traceback
+import asyncio
+import sys
+
+# Configure logging with UTF-8 encoding for Windows compatibility
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+# Force UTF-8 for stdout/stderr on Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 logger = logging.getLogger(__name__)
+
+# Import error correction system
+from app.services.error_corrector import get_error_corrector
+
+error_corrector = get_error_corrector()
+
 from app.api.auth_new import router as auth_router
 from app.api.chat_new import router as chat_router
 from app.api.discharge import router as discharge_router
@@ -27,19 +52,131 @@ from app.api.timeline import router as timeline_router
 from app.api.analytics import router as analytics_router
 from app.api.fhir import router as fhir_router
 from app.api.health import router as health_router
+from app.api.knowledge_base import router as knowledge_router
 from app.database import init_db
 
 # Track application start time for uptime calculation
 START_TIME = time.time()
 
-app = FastAPI(title="Physician AI Assistant", version="1.0.0")
+# Service health status
+service_health = {
+    "database": False,
+    "openai": False,
+    "knowledge_base": False
+}
 
-# Initialize database on startup
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database tables on application startup."""
-    init_db()
-    print("Database initialized successfully")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan with graceful startup/shutdown"""
+    logger.info("[STARTING] Natpudan AI Medical Assistant...")
+    
+    # Startup: Initialize services with error handling
+    try:
+        # Initialize database
+        init_db()
+        service_health["database"] = True
+        logger.info("[OK] Database initialized successfully")
+    except Exception as e:
+        logger.error(f"[ERROR] Database initialization failed: {e}")
+        error_corrector.log_error(e, {"operation": "database_init"})
+    
+    # Check OpenAI API
+    try:
+        import os
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key and not api_key.startswith("sk-your"):
+            service_health["openai"] = True
+            logger.info("[OK] OpenAI API configured")
+        else:
+            logger.warning("[WARNING] OpenAI API key not configured - AI features will be limited")
+    except Exception as e:
+        logger.error(f"[ERROR] OpenAI check failed: {e}")
+    
+    # Pre-load knowledge base (optional)
+    try:
+        from app.services.vector_knowledge_base import get_vector_knowledge_base
+        kb = get_vector_knowledge_base()
+        service_health["knowledge_base"] = True
+        logger.info(f"[OK] Knowledge base loaded ({kb.document_count} documents)")
+    except Exception as e:
+        logger.warning(f"[WARNING] Knowledge base not available: {e}")
+    
+    # Initialize upload queue processor
+    try:
+        from app.services.upload_queue_processor import get_queue_processor
+        processor = get_queue_processor()
+        processor.start()
+        logger.info("[OK] PDF upload queue processor started")
+    except Exception as e:
+        logger.error(f"[ERROR] Queue processor initialization failed: {e}")
+    
+    logger.info(f"[STARTED] Application started - Services: DB={service_health['database']}, OpenAI={service_health['openai']}, KB={service_health['knowledge_base']}")
+    
+    yield  # Application runs
+    
+    # Shutdown: Cleanup
+    logger.info("[STOPPING] Natpudan AI Medical Assistant...")
+    try:
+        # Stop queue processor
+        from app.services.upload_queue_processor import get_queue_processor
+        processor = get_queue_processor()
+        processor.stop()
+        logger.info("[OK] Queue processor stopped")
+    except Exception as e:
+        logger.warning(f"Warning stopping queue processor: {e}")
+    
+    try:
+        # Close database connections
+        from app.database import engine
+        engine.dispose()
+        logger.info("[OK] Database connections closed")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
+
+app = FastAPI(
+    title="Physician AI Assistant",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Add global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch all unhandled exceptions and provide graceful error responses"""
+    error_id = f"error_{int(time.time())}"
+    logger.error(
+        f"[{error_id}] Unhandled exception at {request.method} {request.url.path}:",
+        exc_info=True
+    )
+    
+    # Log to error corrector
+    error_corrector.log_error(exc, {
+        "operation": "api_request",
+        "method": request.method,
+        "path": str(request.url.path),
+        "error_id": error_id
+    })
+    
+    # Determine user-friendly error message
+    error_msg = "An unexpected error occurred. Please try again."
+    status_code = 500
+    
+    if "openai" in str(exc).lower():
+        error_msg = "AI service temporarily unavailable. Please try again or use knowledge base search."
+    elif "database" in str(exc).lower():
+        error_msg = "Database connection issue. Please try again in a moment."
+    elif "timeout" in str(exc).lower():
+        error_msg = "Request timeout. Please try again with a simpler query."
+        status_code = 504
+    
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": error_msg,
+            "error_id": error_id,
+            "detail": str(exc)[:200] if logger.level == logging.DEBUG else None
+        }
+    )
 
 # CORS middleware - allow frontend origins
 app.add_middleware(
@@ -62,7 +199,12 @@ def root() -> Dict[str, Any]:
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
-    return {"status": "healthy", "service": "api", "timestamp": datetime.utcnow().isoformat()}
+    return {
+        "status": "healthy" if service_health["database"] else "degraded",
+        "service": "api",
+        "services": service_health,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 @app.get("/health/detailed")
 def detailed_health() -> Dict[str, Any]:
@@ -119,6 +261,7 @@ api_router = APIRouter(prefix="/api")
 from app.services.icd10_service import get_icd10_service
 from app.services.vector_knowledge_base import get_vector_knowledge_base
 from app.services.document_manager import get_document_manager
+from app.services.local_vector_kb import get_local_knowledge_base
 # Futuristic services
 from app.services.hybrid_search import get_hybrid_search
 from app.services.rag_service import get_rag_service
@@ -127,52 +270,6 @@ from app.services.pubmed_integration import get_pubmed_integration
 from app.services.knowledge_graph import get_knowledge_graph
 
 medical_router = APIRouter(prefix="/medical")
-
-@medical_router.get("/knowledge/statistics")
-def knowledge_statistics() -> Dict[str, Any]:
-    """Get knowledge base statistics"""
-    try:
-        kb = get_vector_knowledge_base()
-        doc_manager = get_document_manager()
-        
-        kb_stats = kb.get_statistics()
-        doc_stats = doc_manager.get_statistics()
-        
-        return {
-            "total_documents": kb_stats.get("total_documents", 0),
-            "total_chunks": kb_stats.get("total_chunks", 0),
-            "uploaded_documents": doc_stats.get("total_documents", 0),
-            "total_size_mb": doc_stats.get("total_size_mb", 0),
-            "embedding_model": kb_stats.get("embedding_model", "unknown"),
-            "faiss_available": kb_stats.get("faiss_available", False),
-            "openai_available": kb_stats.get("openai_available", False)
-        }
-    except Exception as e:
-        logger.error(f"Error getting knowledge statistics: {e}")
-        return {"error": str(e), "total_documents": 0, "total_chunks": 0}
-
-@medical_router.post("/knowledge/search")
-def knowledge_search(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Search knowledge base using semantic similarity"""
-    try:
-        query = payload.get("query", "")
-        top_k = payload.get("top_k", 5)
-        
-        if not query:
-            return {"error": "Query is required", "query": "", "results": []}
-        
-        kb = get_vector_knowledge_base()
-        results = kb.search(query, top_k=top_k)
-        
-        return {
-            "query": query,
-            "results": results,
-            "top_k": top_k,
-            "count": len(results)
-        }
-    except Exception as e:
-        logger.error(f"Error searching knowledge base: {e}")
-        return {"error": str(e), "query": query, "results": []}
 
 @medical_router.post("/diagnosis")
 def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -292,7 +389,7 @@ def icd_categories() -> List[str]:
 @medical_router.post("/knowledge/hybrid-search")
 def hybrid_search(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    🚀 HYBRID SEARCH: Combines vector similarity + BM25 keyword matching
+    [STARTING] HYBRID SEARCH: Combines vector similarity + BM25 keyword matching
     Uses Reciprocal Rank Fusion for optimal results
     """
     try:
@@ -327,7 +424,7 @@ def hybrid_search(payload: Dict[str, Any]) -> Dict[str, Any]:
 @medical_router.post("/knowledge/rag-query")
 def rag_query(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    🚀 RAG: Retrieval-Augmented Generation with GPT-4
+    [STARTING] RAG: Retrieval-Augmented Generation with GPT-4
     Retrieves relevant documents and generates cited responses
     """
     try:
@@ -354,7 +451,7 @@ def rag_query(payload: Dict[str, Any]) -> Dict[str, Any]:
 @medical_router.post("/knowledge/extract-entities")
 def extract_medical_entities(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    🚀 ENTITY EXTRACTION: Automatically extract diseases, medications, procedures
+    [STARTING] ENTITY EXTRACTION: Automatically extract diseases, medications, procedures
     Uses advanced NLP pattern matching
     """
     try:
@@ -394,7 +491,7 @@ def pubmed_latest_research(
     days_back: int = 30
 ) -> Dict[str, Any]:
     """
-    🚀 PUBMED INTEGRATION: Fetch latest medical research
+    [STARTING] PUBMED INTEGRATION: Fetch latest medical research
     Real-time access to latest published papers
     """
     try:
@@ -419,7 +516,7 @@ def pubmed_latest_research(
 @medical_router.post("/knowledge/pubmed-auto-update")
 def pubmed_auto_update(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    🚀 AUTO-UPDATE: Automatically index latest PubMed research
+    [STARTING] AUTO-UPDATE: Automatically index latest PubMed research
     Keeps knowledge base current with newest findings
     """
     try:
@@ -449,7 +546,7 @@ def visualize_knowledge_graph(
     max_distance: int = 1
 ) -> Dict[str, Any]:
     """
-    🚀 KNOWLEDGE GRAPH: Visualize medical concept relationships
+    [STARTING] KNOWLEDGE GRAPH: Visualize medical concept relationships
     Shows connections between diseases, symptoms, medications
     """
     try:
@@ -482,7 +579,7 @@ def visualize_knowledge_graph(
 @medical_router.post("/knowledge/graph/build-from-text")
 def build_graph_from_text(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    🚀 GRAPH BUILDER: Build knowledge graph from medical text
+    [STARTING] GRAPH BUILDER: Build knowledge graph from medical text
     Automatically extracts entities and creates relationships
     """
     try:
@@ -515,7 +612,7 @@ def build_graph_from_text(payload: Dict[str, Any]) -> Dict[str, Any]:
 @medical_router.get("/knowledge/graph/export")
 def export_knowledge_graph() -> Dict[str, Any]:
     """
-    🚀 GRAPH EXPORT: Export entire knowledge graph as JSON
+    [STARTING] GRAPH EXPORT: Export entire knowledge graph as JSON
     For analysis, visualization, or backup
     """
     try:
@@ -668,16 +765,40 @@ def generate_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 @prescription_router.post("/check-interactions")
 def check_interactions(payload: Dict[str, Any]) -> Dict[str, Any]:
-    medications: List[str] = payload.get("medications", [])
-    # Simple heuristic: if both warfarin and aspirin present -> high risk
-    high_risk = "warfarin" in medications and "aspirin" in medications
-    total_interactions = 2 if high_risk else 0
-    severity_breakdown = {"high": 2 if high_risk else 0, "moderate": 0, "low": 0}
-    return {
-        "total_interactions": total_interactions,
-        "high_risk_warning": high_risk,
-        "severity_breakdown": severity_breakdown,
-    }
+    """Check for drug interactions among multiple medications"""
+    try:
+        from app.services.drug_interactions import get_drug_checker
+        
+        medications: List[str] = payload.get("medications", [])
+        include_severity: Optional[List[str]] = payload.get("include_severity")
+        
+        if not medications or len(medications) < 2:
+            return {
+                "total_interactions": 0,
+                "high_risk_warning": False,
+                "severity_breakdown": {"high": 0, "moderate": 0, "low": 0},
+                "interactions": []
+            }
+        
+        checker = get_drug_checker()
+        results = checker.check_multiple_drugs(medications, include_severity)
+        
+        # Format response
+        return {
+            "total_interactions": results.get("total_interactions", 0),
+            "high_risk_warning": results.get("high_risk_warning", False),
+            "severity_breakdown": results.get("severity_breakdown", {"high": 0, "moderate": 0, "low": 0}),
+            "interactions": results.get("interactions", [])
+        }
+    except Exception as e:
+        logger.error(f"Error checking drug interactions: {e}")
+        return {
+            "total_interactions": 0,
+            "high_risk_warning": False,
+            "severity_breakdown": {"high": 0, "moderate": 0, "low": 0},
+            "interactions": [],
+            "error": str(e)
+        }
 
 @prescription_router.post("/dosing")
 def dosing(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -696,5 +817,58 @@ api_router.include_router(timeline_router, prefix="/timeline", tags=["timeline"]
 api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(fhir_router, prefix="/fhir", tags=["fhir"])
 api_router.include_router(health_router, tags=["health"])
+api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
+# Background task for processing upload queue
+_last_queue_process = 0
+_queue_process_interval = 10  # Process queue every 10 seconds
 
+@app.get("/api/queue/process")
+def trigger_queue_processing() -> Dict[str, Any]:
+    """
+    Trigger PDF upload queue processing
+    Can be called by an external scheduler (e.g., APScheduler, cron, Lambda)
+    """
+    try:
+        from app.services.upload_queue_processor import process_upload_queue
+        result = process_upload_queue()
+        return {
+            "status": "success",
+            "result": result,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"[QUEUE] Error triggering processing: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+# Middleware to periodically check queue (on every request)
+@app.middleware("http")
+async def background_queue_processor(request: Request, call_next):
+    """
+    Periodically process upload queue on every API request
+    This is a simple approach - in production, use a real task scheduler
+    """
+    global _last_queue_process
+    
+    try:
+        # Check if it's time to process (every 10 seconds)
+        current_time = time.time()
+        if current_time - _last_queue_process >= _queue_process_interval:
+            _last_queue_process = current_time
+            
+            # Don't block the request - fire and forget
+            from app.services.upload_queue_processor import process_upload_queue
+            try:
+                process_upload_queue()
+            except Exception as e:
+                logger.warning(f"[QUEUE] Background processing error: {e}")
+    except Exception as e:
+        logger.warning(f"[MIDDLEWARE] Error in background processor: {e}")
+    
+    # Continue with the request
+    response = await call_next(request)
+    return response
 app.include_router(api_router)

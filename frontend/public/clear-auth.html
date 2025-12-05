@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Auth</title>
+</head>
+<body>
+    <h1>Clearing Authentication...</h1>
+    <script>
+        // Clear all localStorage
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Clear specific auth items
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('authToken');
+        
+        document.body.innerHTML = '<h1 style="color: green;">✅ Auth Cleared!</h1><p>Close this window and refresh your app.</p>';
+        
+        console.log('All auth data cleared');
+    </script>
+</body>
+</html>

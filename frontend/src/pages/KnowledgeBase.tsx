@@ -18,6 +18,12 @@ import {
   CardContent,
   Switch,
   FormControlLabel,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Slider,
+  Stack,
   ImageList,
   ImageListItem,
   ImageListItemBar,
@@ -38,12 +44,34 @@ import apiClient from '../services/apiClient'
 import { ImageViewer } from '../components/ImageViewer'
 
 interface SearchResult {
-  content: string
-  metadata: {
-    source: string
+  content?: string
+  chunk_text?: string
+  text?: string
+  metadata?: {
+    source?: string
+    filename?: string
     page?: number
+    page_number?: number
+    section?: string
+    category?: string
+    year?: number
   }
-  relevance: number
+  citation?: {
+    document_id?: string
+    filename?: string
+    page?: number
+    chunk_index?: number
+    section?: string
+    category?: string
+    year?: number
+  }
+  source?: string
+  filename?: string
+  page?: number
+  page_number?: number
+  relevance?: number
+  score?: number
+  similarity_score?: number
 }
 
 interface ImageResult {
@@ -70,6 +98,17 @@ interface KnowledgeStats {
   search_mode: string
   pdf_sources: Array<{name: string, size_mb: number, status: string}>
   knowledge_level: string
+  processing_queue?: {
+    queued: number
+    processing: number
+    completed: number
+    total: number
+    status_url: string
+  }
+  uploaded_files?: number
+  total_upload_size_mb?: number
+  medical_books_dir?: string
+  medical_books_count?: number
 }
 
 export default function KnowledgeBase() {
@@ -80,7 +119,13 @@ export default function KnowledgeBase() {
   const [verification, setVerification] = useState<VerificationResult | null>(null)
   const [knowledgeStats, setKnowledgeStats] = useState<KnowledgeStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
-  const [includeImages, setIncludeImages] = useState(true)
+  const [searchMode, setSearchMode] = useState<'local' | 'hybrid' | 'openai'>('hybrid')
+  const [alpha, setAlpha] = useState<number>(0.6)
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [sectionFilter, setSectionFilter] = useState('')
+  const [minYear, setMinYear] = useState('')
+  const [allowOutdated, setAllowOutdated] = useState(true)
+  const [includeImages, setIncludeImages] = useState(false)
   const [verifyOnline, setVerifyOnline] = useState(false)
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerImageIndex, setViewerImageIndex] = useState(0)
@@ -98,23 +143,38 @@ export default function KnowledgeBase() {
       }
     }
     fetchKnowledgeStats()
-  }, []) // Load stats on mount
+    
+    // Refresh stats every 5 seconds if there's a processing queue
+    const interval = setInterval(() => {
+      fetchKnowledgeStats()
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, []) // Load stats on mount and set up polling
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
 
     setSearching(true)
     try {
-      const response = await apiClient.post('/api/medical/knowledge/search/enhanced', {
+      const response = await apiClient.post('/api/medical/knowledge/search', {
         query: searchQuery,
-        top_k: 5,
-        include_images: includeImages,
-        verify_online: verifyOnline,
+        top_k: 8,
+        min_score: 0,
+        search_mode: searchMode,
+        alpha,
+        allow_fallback: true,
+        filters: {
+          category: categoryFilter || undefined,
+          section: sectionFilter || undefined,
+          min_year: minYear ? Number(minYear) : undefined,
+          allow_outdated: allowOutdated,
+        },
       })
 
-      setResults(response.data.text_results || [])
-      setImageResults(response.data.image_results || [])
-      setVerification(response.data.verification || null)
+      setResults(response.data.results || [])
+      setImageResults([])
+      setVerification(null)
     } catch (error) {
       console.error('Search failed:', error)
     } finally {
@@ -188,23 +248,77 @@ export default function KnowledgeBase() {
               </CardContent>
             </Card>
           </Grid>
-          {/* Categories Card */}
-          <Grid item xs={12} md={4}>
-            <Card elevation={2}>
-              <CardContent>
-                <Box display="flex" alignItems="center" gap={1} mb={1}>
-                  <AssessmentIcon color="warning" />
-                  <Typography variant="h6">Categories</Typography>
-                </Box>
-                <Typography variant="h3" color="warning.main">
-                  {knowledgeStats.categories_count || 0}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Document categories
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
+          
+          {/* Processing Queue Status */}
+          {knowledgeStats.processing_queue && knowledgeStats.processing_queue.total > 0 && (
+            <Grid item xs={12} md={6}>
+              <Card elevation={2} sx={{ backgroundColor: '#f5f5f5' }}>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={2}>
+                    <StorageIcon color="warning" />
+                    <Typography variant="h6">Processing Queue</Typography>
+                  </Box>
+                  <Box display="flex" gap={2} mb={2}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Queued
+                      </Typography>
+                      <Typography variant="h5" color="info.main">
+                        {knowledgeStats.processing_queue.queued}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Processing
+                      </Typography>
+                      <Typography variant="h5" color="warning.main">
+                        {knowledgeStats.processing_queue.processing}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Completed
+                      </Typography>
+                      <Typography variant="h5" color="success.main">
+                        {knowledgeStats.processing_queue.completed}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Documents are being indexed in background. <strong>Search is immediately available</strong> with growing accuracy as processing completes.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
+
+          {/* Upload Location */}
+          {knowledgeStats.uploaded_files !== undefined && (
+            <Grid item xs={12} md={6}>
+              <Card elevation={2} sx={{ backgroundColor: '#fafafa' }}>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={2}>
+                    <UploadIcon color="primary" />
+                    <Typography variant="h6">Uploaded Files</Typography>
+                  </Box>
+                  <Box mb={1}>
+                    <Typography variant="body2">
+                      <strong>Count:</strong> {knowledgeStats.uploaded_files || 0} files
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Size:</strong> {knowledgeStats.total_upload_size_mb?.toFixed(2) || '0'} MB
+                    </Typography>
+                  </Box>
+                  {knowledgeStats.medical_books_dir && (
+                    <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 1 }}>
+                      {/* eslint-disable-next-line */}
+                      Location: <code style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{knowledgeStats.medical_books_dir}</code>
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
         </Grid>
       )}
 
@@ -258,26 +372,68 @@ export default function KnowledgeBase() {
           </Button>
         </Box>
 
-        <Box display="flex" gap={2} mb={3}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={includeImages}
-                onChange={(e) => setIncludeImages(e.target.checked)}
+        <Stack spacing={2} mb={3}>
+          <Box display="flex" gap={2} flexWrap="wrap">
+            <FormControl sx={{ minWidth: 180 }} size="small">
+              <InputLabel id="search-mode">Search mode</InputLabel>
+              <Select
+                labelId="search-mode"
+                value={searchMode}
+                label="Search mode"
+                onChange={(e) => setSearchMode(e.target.value as 'local' | 'hybrid' | 'openai')}
+              >
+                <MenuItem value="hybrid">Hybrid (dense + BM25)</MenuItem>
+                <MenuItem value="local">Local only</MenuItem>
+                <MenuItem value="openai">OpenAI fallback</MenuItem>
+              </Select>
+            </FormControl>
+            <Box flex={1} minWidth={220} px={1}>
+              <Typography variant="caption" color="text.secondary">
+                Hybrid weight (dense vs keyword)
+              </Typography>
+              <Slider
+                size="small"
+                value={alpha * 100}
+                step={5}
+                min={0}
+                max={100}
+                valueLabelDisplay="auto"
+                onChange={(_, val) => setAlpha((val as number) / 100)}
               />
-            }
-            label="Include images"
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={verifyOnline}
-                onChange={(e) => setVerifyOnline(e.target.checked)}
-              />
-            }
-            label="Verify online"
-          />
-        </Box>
+            </Box>
+          </Box>
+          <Box display="flex" gap={2} flexWrap="wrap">
+            <TextField
+              label="Category filter"
+              size="small"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            />
+            <TextField
+              label="Section filter"
+              size="small"
+              value={sectionFilter}
+              onChange={(e) => setSectionFilter(e.target.value)}
+            />
+            <TextField
+              label="Min publication year"
+              size="small"
+              type="number"
+              value={minYear}
+              onChange={(e) => setMinYear(e.target.value)}
+              inputProps={{ min: 1950, max: new Date().getFullYear() + 1 }}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={allowOutdated}
+                  onChange={(e) => setAllowOutdated(e.target.checked)}
+                />
+              }
+              label="Include outdated"
+            />
+          </Box>
+        </Stack>
 
         {searching && <LinearProgress />}
 
@@ -297,11 +453,11 @@ export default function KnowledgeBase() {
             {verification.concerns && verification.concerns.length > 0 && (
               <Box mt={1}>
                 <Typography variant="caption" fontWeight={600}>Concerns:</Typography>
-                <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
+                <Box component="ul" sx={{ margin: '4px 0', paddingLeft: '20px' }}>
                   {verification.concerns.map((concern, idx) => (
-                    <li key={idx}><Typography variant="caption">{concern}</Typography></li>
+                    <Box component="li" key={idx}><Typography variant="caption">{concern}</Typography></Box>
                   ))}
-                </ul>
+                </Box>
               </Box>
             )}
             {verification.pubmed_searches && verification.pubmed_searches.length > 0 && (
@@ -332,11 +488,12 @@ export default function KnowledgeBase() {
             <ImageList cols={3} gap={8}>
               {imageResults.map((img, idx) => (
                 <ImageListItem key={idx} onClick={() => openImageViewer(idx)} sx={{ cursor: 'pointer' }}>
-                  <img
+                  <Box
+                    component="img"
                     src={img.path}
                     alt={img.caption || `Image ${idx + 1}`}
                     loading="lazy"
-                    style={{ height: '200px', objectFit: 'cover' }}
+                    sx={{ height: '200px', objectFit: 'cover' }}
                   />
                   <ImageListItemBar
                     title={img.caption || `Image ${idx + 1}`}
@@ -357,10 +514,14 @@ export default function KnowledgeBase() {
               {results.map((result, index) => {
                 // Handle different response formats
                 const metadata = result.metadata || {};
-                const source = result.source || metadata.source || result.filename || metadata.filename || 'Unknown Source';
-                const page = result.page_number || result.page || metadata.page || metadata.page_number;
-                const relevance = result.score || result.similarity_score || result.relevance || 0;
-                const text = result.chunk_text || result.content || result.text || '';
+                const citation = (result as any).citation || {};
+                const source = (result.source || metadata?.source || result.filename || metadata?.filename || 'Unknown Source') as string;
+                const page = citation.page || result.page_number || result.page || metadata?.page || metadata?.page_number;
+                const relevance = (result.score || result.similarity_score || result.relevance || 0) as number;
+                const text = (result.chunk_text || result.content || result.text || '') as string;
+                const section = citation.section || metadata.section;
+                const category = citation.category || metadata.category;
+                const year = citation.year || metadata.year;
                 
                 return (
                   <Box key={index}>
@@ -368,15 +529,24 @@ export default function KnowledgeBase() {
                       <DocIcon sx={{ mr: 2, mt: 1, color: 'primary.main' }} />
                       <ListItemText
                         primary={
-                          <Box display="flex" alignItems="center" gap={1}>
+                          <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
                             <Typography variant="subtitle2">
                               {source}
                             </Typography>
                             {page && (
                               <Chip label={`Page ${page}`} size="small" />
                             )}
+                            {section && (
+                              <Chip label={`Section: ${section}`} size="small" variant="outlined" />
+                            )}
+                            {category && (
+                              <Chip label={`Category: ${category}`} size="small" variant="outlined" />
+                            )}
+                            {year && (
+                              <Chip label={`Year: ${year}`} size="small" variant="outlined" />
+                            )}
                             <Chip
-                              label={`${Math.round(relevance * 100)}% relevant`}
+                              label={`${Math.round((relevance || 0) * 100)}% relevant`}
                               size="small"
                               color="primary"
                             />
@@ -384,7 +554,7 @@ export default function KnowledgeBase() {
                         }
                         secondary={
                           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            {text}
+                            {text || 'No preview available'}
                           </Typography>
                         }
                       />

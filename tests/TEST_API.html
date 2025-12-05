@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .test-box { border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .pending { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔧 API Connection Diagnostic Tool</h1>
+    
+    <div class="test-box pending" id="status">
+        <h3>🔄 Status: Ready to test</h3>
+        <p>Click the buttons below to test the API connection</p>
+    </div>
+
+    <button onclick="testBackendHealth()">1. Test Backend Health</button>
+    <button onclick="testLogin()">2. Test Login</button>
+    <button onclick="testOAuth()">3. Test OAuth URL</button>
+    <button onclick="clearCache()">🗑️ Clear Browser Cache</button>
+
+    <div id="results"></div>
+
+    <script>
+        const BACKEND_URL = 'http://127.0.0.1:8001';
+        
+        function updateStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'test-box ' + (isError ? 'error' : 'success');
+            statusDiv.innerHTML = `<h3>${isError ? '❌' : '✅'} ${message}</h3>`;
+        }
+
+        function addResult(title, content, isError = false) {
+            const resultsDiv = document.getElementById('results');
+            const resultBox = document.createElement('div');
+            resultBox.className = 'test-box ' + (isError ? 'error' : 'success');
+            resultBox.innerHTML = `
+                <h3>${title}</h3>
+                <pre>${typeof content === 'object' ? JSON.stringify(content, null, 2) : content}</pre>
+            `;
+            resultsDiv.appendChild(resultBox);
+        }
+
+        async function testBackendHealth() {
+            updateStatus('Testing backend health...');
+            try {
+                const response = await fetch(`${BACKEND_URL}/health`);
+                const data = await response.json();
+                updateStatus('Backend is healthy!');
+                addResult('✅ Health Check Success', data);
+            } catch (error) {
+                updateStatus('Backend health check failed!', true);
+                addResult('❌ Health Check Failed', error.message, true);
+            }
+        }
+
+        async function testLogin() {
+            updateStatus('Testing login endpoint...');
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'doctor@example.com',
+                        password: 'doctor123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus('Login successful!');
+                    addResult('✅ Login Success', {
+                        user: data.user.email,
+                        role: data.user.role,
+                        token: data.access_token.substring(0, 30) + '...'
+                    });
+                } else {
+                    updateStatus('Login failed!', true);
+                    addResult('❌ Login Failed', data, true);
+                }
+            } catch (error) {
+                updateStatus('Login request failed!', true);
+                addResult('❌ Login Request Failed', {
+                    error: error.message,
+                    type: error.name,
+                    note: 'This might be a CORS or network error. Check browser console for details.'
+                }, true);
+            }
+        }
+
+        async function testOAuth() {
+            updateStatus('Testing OAuth endpoint...');
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/auth/oauth/google/url?redirect_uri=http://localhost:5173/auth/callback`);
+                const data = await response.json();
+                
+                if (response.ok && data.auth_url) {
+                    updateStatus('OAuth endpoint working!');
+                    addResult('✅ OAuth URL Success', {
+                        provider: 'google',
+                        auth_url: data.auth_url.substring(0, 100) + '...',
+                        state: data.state
+                    });
+                } else {
+                    updateStatus('OAuth endpoint failed!', true);
+                    addResult('❌ OAuth Failed', data, true);
+                }
+            } catch (error) {
+                updateStatus('OAuth request failed!', true);
+                addResult('❌ OAuth Request Failed', error.message, true);
+            }
+        }
+
+        function clearCache() {
+            if (confirm('This will reload the page and clear the cache. Continue?')) {
+                // Clear localStorage
+                localStorage.clear();
+                sessionStorage.clear();
+                
+                // Hard reload
+                window.location.reload(true);
+            }
+        }
+
+        // Auto-run health check on load
+        window.onload = () => {
+            setTimeout(testBackendHealth, 500);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+#!/usr/bin/env pwsh
+<#
+.SYNOPSIS
+    Start Natpudan AI application with stable terminal windows
+#>
+
+Write-Host "`n╔════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║   NATPUDAN AI - STARTING APPLICATION  ║" -ForegroundColor Cyan
+Write-Host "╚════════════════════════════════════════╝`n" -ForegroundColor Cyan
+
+$repoRoot = $PSScriptRoot
+
+# Start Backend in new window
+Write-Host "Starting Backend..." -ForegroundColor Green
+$backendCmd = "cd '$repoRoot\backend'; & '$repoRoot\.venv\Scripts\python.exe' -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd
+
+Start-Sleep -Seconds 3
+
+# Start Frontend in new window
+Write-Host "Starting Frontend..." -ForegroundColor Green
+$frontendCmd = "cd '$repoRoot\frontend'; npm run dev"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd
+
+Start-Sleep -Seconds 5
+
+# Verify services
+Write-Host "`nVerifying services..." -ForegroundColor Yellow
+Start-Sleep -Seconds 3
+
+try {
+    $backend = Invoke-RestMethod "http://127.0.0.1:8000/health" -TimeoutSec 5
+    Write-Host "✅ Backend: RUNNING ($($backend.status))" -ForegroundColor Green
+} catch {
+    Write-Host "⚠️  Backend: Starting (wait 30 seconds)" -ForegroundColor Yellow
+}
+
+try {
+    $frontend = Invoke-WebRequest "http://localhost:5173" -UseBasicParsing -TimeoutSec 5
+    Write-Host "✅ Frontend: RUNNING (HTTP $($frontend.StatusCode))" -ForegroundColor Green
+} catch {
+    Write-Host "⚠️  Frontend: Starting (wait 30 seconds)" -ForegroundColor Yellow
+}
+
+Write-Host "`n╔════════════════════════════════════════╗" -ForegroundColor Green
+Write-Host "║         APPLICATION STARTED            ║" -ForegroundColor Green
+Write-Host "╚════════════════════════════════════════╝" -ForegroundColor Green
+
+Write-Host "`n🌐 Frontend: http://localhost:5173" -ForegroundColor Cyan
+Write-Host "📚 API Docs: http://127.0.0.1:8000/docs" -ForegroundColor Cyan
+Write-Host "`n⚠️  Keep the PowerShell windows open!" -ForegroundColor Yellow
+Write-Host ""

@@ -39,7 +39,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Description as ReportIcon,
 } from '@mui/icons-material'
-import axios from 'axios'
+import apiClient from '../services/apiClient'
 import { assessRisk } from '../utils/riskAssessment'
 import { RiskBadge } from '../components/RiskAssessment'
 import { generatePatientIntakeReport, downloadPDF } from '../services/api'
@@ -102,7 +102,7 @@ export default function PatientList() {
     setLoading(true)
     setError(null)
     try {
-      const response = await axios.get('http://localhost:8001/api/medical/patient-intake')
+      const response = await apiClient.get('/api/medical/patient-intake')
       const patientsData = response.data.patients || []
       
       // Calculate risk levels (basic algorithm)
@@ -336,7 +336,7 @@ export default function PatientList() {
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
+          {typeof error === 'string' ? error : JSON.stringify(error, null, 2)}
         </Alert>
       )}
 
@@ -410,10 +410,10 @@ export default function PatientList() {
                 onChange={(e) => setRiskFilter(e.target.value)}
               >
                 <MenuItem value="all">All Levels</MenuItem>
-                <MenuItem value="low">✓ Low Risk</MenuItem>
-                <MenuItem value="medium">⚠ Medium Risk</MenuItem>
-                <MenuItem value="high">⚠ High Risk</MenuItem>
-                <MenuItem value="critical">🚨 Critical</MenuItem>
+                <MenuItem value="low">[OK] Low Risk</MenuItem>
+                <MenuItem value="medium">[WARN] Medium Risk</MenuItem>
+                <MenuItem value="high">[WARN] High Risk</MenuItem>
+                <MenuItem value="critical">[!] Critical</MenuItem>
               </Select>
             </FormControl>
           </Grid>

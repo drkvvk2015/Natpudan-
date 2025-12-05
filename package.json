@@ -4,7 +4,6 @@
   "description": "Natpudan AI Medical Assistant - Workspace Root",
   "private": true,
   "scripts": {
-    "install": "cd frontend && npm install",
     "build": "cd frontend && npm run build:web",
     "build:web": "cd frontend && npm run build:web",
     "build:android": "cd frontend && npm run build:android",

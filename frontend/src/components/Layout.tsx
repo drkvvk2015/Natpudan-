@@ -31,6 +31,8 @@ import {
   PersonAdd,
   Assessment as AssessmentIcon,
   Api as ApiIcon,
+  Logout as LogoutIcon,
+  CloudUpload,
 } from '@mui/icons-material'
 
 const DRAWER_WIDTH = 260
@@ -55,12 +57,16 @@ export default function Layout({ children }: LayoutProps) {
     setMobileOpen(!mobileOpen)
   }
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   // Define role visibility matrix
   const baseItems: MenuItem[] = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'AI Chat', icon: <ChatIcon />, path: '/chat' },
   ];
   const staffExtra: MenuItem[] = [
     { text: 'Patient Intake', icon: <PersonAdd />, path: '/patient-intake' },
@@ -68,11 +74,12 @@ export default function Layout({ children }: LayoutProps) {
   const doctorItems: MenuItem[] = [
     { text: 'Patient List', icon: <PersonAdd />, path: '/patients' },
     { text: 'Discharge Summary', icon: <AssessmentIcon />, path: '/discharge-summary' },
-    { text: 'Diagnosis', icon: <DiagnosisIcon />, path: '/diagnosis' },
+    { text: 'Clinical Case Sheet', icon: <DiagnosisIcon />, path: '/diagnosis' },
     { text: 'Analytics', icon: <AssessmentIcon />, path: '/analytics' },
     { text: 'FHIR API', icon: <ApiIcon />, path: '/fhir' },
     { text: 'Drug Checker', icon: <DrugIcon />, path: '/drugs' },
     { text: 'Knowledge Base', icon: <KnowledgeIcon />, path: '/knowledge' },
+    { text: 'Upload PDFs', icon: <CloudUpload />, path: '/knowledge-upload' },
     { text: 'Report Parser', icon: <LocalHospital />, path: '/report-parser' },
   ];
 
@@ -130,7 +137,7 @@ export default function Layout({ children }: LayoutProps) {
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             }}
           >
-            🤖
+            [AI]
           </Box>
           <Box>
             <Typography
@@ -345,6 +352,19 @@ export default function Layout({ children }: LayoutProps) {
                 {(user?.role || 'user').toUpperCase()}
               </Typography>
             </Box>
+            <IconButton
+              onClick={handleLogout}
+              sx={{
+                color: 'white',
+                ml: 1,
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                },
+              }}
+              title="Logout"
+            >
+              <LogoutIcon />
+            </IconButton>
           </Box>
         </Toolbar>
       </AppBar>

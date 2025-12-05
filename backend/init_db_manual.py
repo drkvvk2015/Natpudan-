@@ -27,4 +27,4 @@ for row in rows:
     print(f"  {row[1]:25} {row[2]:15}")
 
 conn.close()
-print("\n✓ Database initialization complete!")
+print("\n[OK] Database initialization complete!")

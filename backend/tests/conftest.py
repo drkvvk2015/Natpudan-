@@ -4,6 +4,9 @@ Test configuration and fixtures
 import pytest
 import os
 
+# Configure pytest-asyncio
+pytest_plugins = ('pytest_asyncio',)
+
 # Test configuration
 TEST_BASE_URL = os.getenv("TEST_BASE_URL", "http://127.0.0.1:8000")
 

@@ -1,0 +1,12 @@
+{
+  "extends": "markdownlint/style/relaxed",
+  "no-bare-urls": false,
+  "no-multiple-spaces": false,
+  "no-hard-tabs": false,
+  "line-length": false,
+  "MD032": false,
+  "MD031": false,
+  "MD022": false,
+  "MD040": false,
+  "MD056": false
+}

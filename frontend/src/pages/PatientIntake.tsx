@@ -44,9 +44,51 @@ import {
   Assessment as AssessmentIcon,
   Description as ReportIcon,
 } from '@mui/icons-material'
+import { motion, AnimatePresence } from 'framer-motion'
 import { savePatientIntake, getPatientIntake, updatePatientIntake, generatePatientIntakeReport, downloadPDF } from '../services/api'
 import RiskAssessment from '../components/RiskAssessment'
 import MedicalTimeline from '../components/MedicalTimeline'
+
+// Animation variants
+const sectionVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.4, ease: 'easeOut' }
+  }
+}
+
+const chipVariants = {
+  hidden: { scale: 0, opacity: 0 },
+  visible: { 
+    scale: 1, 
+    opacity: 1,
+    transition: { type: 'spring', stiffness: 500, damping: 30 }
+  },
+  exit: { 
+    scale: 0, 
+    opacity: 0,
+    transition: { duration: 0.2 }
+  }
+}
+
+const cardVariants = {
+  hidden: { opacity: 0, x: 20 },
+  visible: { 
+    opacity: 1, 
+    x: 0,
+    transition: { duration: 0.3 }
+  },
+  exit: { 
+    opacity: 0, 
+    x: -20,
+    transition: { duration: 0.2 }
+  }
+}
+
+// Motion Paper wrapper
+const MotionPaper = motion.create(Paper)
 
 interface TravelHistory {
   id: string
@@ -75,6 +117,35 @@ interface PatientDetails {
   bloodType: string
   travelHistory: TravelHistory[]
   familyHistory: FamilyHistory[]
+  // Extended Anthropometry
+  heightCm?: number
+  weightKg?: number
+  bmi?: number
+  waistCm?: number
+  hipCm?: number
+  whr?: number
+  muacCm?: number
+  headCircumferenceCm?: number
+  chestExpansionCm?: number
+  sittingHeightCm?: number
+  standingHeightCm?: number
+  armSpanCm?: number
+  bodyFatPercent?: number
+  bpSystolic?: number
+  bpDiastolic?: number
+  pulsePerMin?: number
+  respRatePerMin?: number
+  temperatureC?: number
+  // Complaints and histories
+  chiefComplaints?: { complaint: string; duration: string }[]
+  presentHistory?: Array<{
+    id: string
+    title: string
+    duration: string
+    associationFactors: string[]
+    relievingFactors: string[]
+    aggravatingFactors: string[]
+  }>
 }
 
 const PatientIntake: React.FC = () => {
@@ -92,6 +163,26 @@ const PatientIntake: React.FC = () => {
     bloodType: '',
     travelHistory: [],
     familyHistory: [],
+    heightCm: undefined,
+    weightKg: undefined,
+    bmi: undefined,
+    waistCm: undefined,
+    hipCm: undefined,
+    whr: undefined,
+    muacCm: undefined,
+    headCircumferenceCm: undefined,
+    chestExpansionCm: undefined,
+    sittingHeightCm: undefined,
+    standingHeightCm: undefined,
+    armSpanCm: undefined,
+    bodyFatPercent: undefined,
+    bpSystolic: undefined,
+    bpDiastolic: undefined,
+    pulsePerMin: undefined,
+    respRatePerMin: undefined,
+    temperatureC: undefined,
+    chiefComplaints: [],
+    presentHistory: [],
   })
 
   const [showTravelDialog, setShowTravelDialog] = useState(false)
@@ -323,7 +414,6 @@ const PatientIntake: React.FC = () => {
       if (intakeId) {
         // Update existing patient
         await updatePatientIntake(intakeId, patientDetails)
-        console.log('Patient intake updated:', intakeId)
         setSnackbar({
           open: true,
           message: `Patient ${intakeId} updated successfully!`,
@@ -332,7 +422,6 @@ const PatientIntake: React.FC = () => {
       } else {
         // Create new patient
         const response = await savePatientIntake(patientDetails)
-        console.log('Patient intake created:', response)
         setSnackbar({
           open: true,
           message: `Patient intake saved successfully! ID: ${response.intake_id}`,
@@ -345,7 +434,6 @@ const PatientIntake: React.FC = () => {
         navigate('/patients')
       }, 2000)
     } catch (error) {
-      console.error('Error saving patient intake:', error)
       setSnackbar({
         open: true,
         message: `Failed to ${intakeId ? 'update' : 'save'} patient intake. Please try again.`,
@@ -368,6 +456,26 @@ const PatientIntake: React.FC = () => {
       bloodType: '',
       travelHistory: [],
       familyHistory: [],
+      heightCm: undefined,
+      weightKg: undefined,
+      bmi: undefined,
+      waistCm: undefined,
+      hipCm: undefined,
+      whr: undefined,
+      muacCm: undefined,
+      headCircumferenceCm: undefined,
+      chestExpansionCm: undefined,
+      sittingHeightCm: undefined,
+      standingHeightCm: undefined,
+      armSpanCm: undefined,
+      bodyFatPercent: undefined,
+      bpSystolic: undefined,
+      bpDiastolic: undefined,
+      pulsePerMin: undefined,
+      respRatePerMin: undefined,
+      temperatureC: undefined,
+      chiefComplaints: [],
+      presentHistory: [],
     })
   }
 
@@ -400,7 +508,7 @@ const PatientIntake: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            👤 {intakeId ? (isViewMode ? 'View Patient' : 'Edit Patient') : 'Patient Intake Form'}
+            [P] {intakeId ? (isViewMode ? 'View Patient' : 'Edit Patient') : 'Patient Intake Form'}
           </Typography>
         </Box>
         <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 800 }}>
@@ -627,6 +735,311 @@ const PatientIntake: React.FC = () => {
           </Grid>
         )}
       </Paper>
+
+      {/* Extended Anthropometry */}
+      <MotionPaper 
+        sx={{ p: 4, mb: 3 }}
+        initial="hidden"
+        animate="visible"
+        variants={sectionVariants}
+      >
+        <Typography variant="h5" gutterBottom>
+          [RULER] Extended Anthropometry
+        </Typography>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={3}>
+            <TextField label="Height (cm)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.heightCm ?? ''}
+              onChange={(e) => {
+                const height = parseFloat(e.target.value)
+                const bmi = patientDetails.weightKg && height ? +(patientDetails.weightKg / Math.pow(height/100,2)).toFixed(2) : undefined
+                setPatientDetails({ ...patientDetails, heightCm: isNaN(height)? undefined: height, bmi })
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Weight (kg)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.weightKg ?? ''}
+              onChange={(e) => {
+                const weight = parseFloat(e.target.value)
+                const bmi = patientDetails.heightCm && weight ? +(weight / Math.pow(patientDetails.heightCm/100,2)).toFixed(2) : undefined
+                setPatientDetails({ ...patientDetails, weightKg: isNaN(weight)? undefined: weight, bmi })
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="BMI" type="number" fullWidth value={patientDetails.bmi ?? ''} disabled />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Body Fat %" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.bodyFatPercent ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, bodyFatPercent: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Waist (cm)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.waistCm ?? ''}
+              onChange={(e) => {
+                const waist = parseFloat(e.target.value)
+                const whr = patientDetails.hipCm && waist ? +(waist / patientDetails.hipCm).toFixed(2) : undefined
+                setPatientDetails({ ...patientDetails, waistCm: isNaN(waist)? undefined: waist, whr })
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Hip (cm)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.hipCm ?? ''}
+              onChange={(e) => {
+                const hip = parseFloat(e.target.value)
+                const whr = patientDetails.waistCm && hip ? +(patientDetails.waistCm / hip).toFixed(2) : undefined
+                setPatientDetails({ ...patientDetails, hipCm: isNaN(hip)? undefined: hip, whr })
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="WHR" type="number" fullWidth value={patientDetails.whr ?? ''} disabled />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="MUAC (cm)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.muacCm ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, muacCm: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Head Circumference (cm)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.headCircumferenceCm ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, headCircumferenceCm: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Chest Expansion (cm)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.chestExpansionCm ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, chestExpansionCm: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Sitting Height (cm)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.sittingHeightCm ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, sittingHeightCm: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Standing Height (cm)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.standingHeightCm ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, standingHeightCm: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Arm Span (cm)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.armSpanCm ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, armSpanCm: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="BP Systolic (mmHg)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.bpSystolic ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, bpSystolic: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="BP Diastolic (mmHg)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.bpDiastolic ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, bpDiastolic: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Pulse (/min)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.pulsePerMin ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, pulsePerMin: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Resp Rate (/min)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.respRatePerMin ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, respRatePerMin: parseFloat(e.target.value) })}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField label="Temperature (°C)" type="number" fullWidth disabled={isViewMode}
+              value={patientDetails.temperatureC ?? ''}
+              onChange={(e) => setPatientDetails({ ...patientDetails, temperatureC: parseFloat(e.target.value) })}
+            />
+          </Grid>
+        </Grid>
+      </MotionPaper>
+
+      {/* Complaints */}
+      <MotionPaper 
+        sx={{ p: 4, mb: 3 }}
+        initial="hidden"
+        animate="visible"
+        variants={sectionVariants}
+      >
+        <Typography variant="h5" gutterBottom>
+          [SICK] Chief Complaints (C/o) - Duration Only
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <TextField fullWidth label="Complaint" disabled={isViewMode}
+              value={''}
+              onChange={() => {}}
+              placeholder="e.g., Fever"
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField fullWidth label="Duration" disabled={isViewMode} placeholder="e.g., 3 days" />
+          </Grid>
+          {!isViewMode && (
+            <Grid item xs={12} md={2}>
+              <Button variant="contained" onClick={() => {
+                const complaintInput = (document.querySelector('input[placeholder="e.g., Fever"]') as HTMLInputElement)?.value || ''
+                const durationInput = (document.querySelector('input[placeholder="e.g., 3 days"]') as HTMLInputElement)?.value || ''
+                if (!complaintInput || !durationInput) return
+                setPatientDetails({
+                  ...patientDetails,
+                  chiefComplaints: [...(patientDetails.chiefComplaints||[]), { complaint: complaintInput, duration: durationInput }]
+                })
+              }}>Add</Button>
+            </Grid>
+          )}
+        </Grid>
+        <Box sx={{ mt: 2 }}>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+            <AnimatePresence>
+              {(patientDetails.chiefComplaints||[]).map((c, idx) => (
+                <motion.div
+                  key={idx}
+                  variants={chipVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  layout
+                >
+                  <Chip label={`${c.complaint} - ${c.duration}`} onDelete={isViewMode? undefined: () => {
+                    const next = [...(patientDetails.chiefComplaints||[])]
+                    next.splice(idx,1)
+                    setPatientDetails({ ...patientDetails, chiefComplaints: next })
+                  }} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </Stack>
+        </Box>
+      </MotionPaper>
+
+      {/* Present History */}
+      <MotionPaper 
+        sx={{ p: 4, mb: 3 }}
+        initial="hidden"
+        animate="visible"
+        variants={sectionVariants}
+      >
+        <Typography variant="h5" gutterBottom>
+          [LIST] Present History - Structured Complaints
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Add complaints with association, relieving, aggravating factors and duration. Items are maintained in chronological order.
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <TextField fullWidth label="Complaint Title" disabled={isViewMode} placeholder="e.g., Cough" id="ph-title" />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField fullWidth label="Duration" disabled={isViewMode} placeholder="e.g., 2 weeks" id="ph-duration" />
+          </Grid>
+          <Grid item xs={12}>
+            <Autocomplete multiple freeSolo disabled={isViewMode}
+              options={['Fever','Chest pain','Shortness of breath','Palpitations','Nausea']}
+              onChange={(_, v) => (document.getElementById('ph-assoc') as HTMLInputElement).value = JSON.stringify(v)}
+              renderInput={(params) => <TextField {...params} label="Association Factors" placeholder="Select or type" />}
+            />
+            <input id="ph-assoc" type="hidden" />
+          </Grid>
+          <Grid item xs={12}>
+            <Autocomplete multiple freeSolo disabled={isViewMode}
+              options={['Rest','Hydration','Analgesics','Antipyretics']}
+              onChange={(_, v) => (document.getElementById('ph-relieve') as HTMLInputElement).value = JSON.stringify(v)}
+              renderInput={(params) => <TextField {...params} label="Relieving Factors" placeholder="Select or type" />}
+            />
+            <input id="ph-relieve" type="hidden" />
+          </Grid>
+          <Grid item xs={12}>
+            <Autocomplete multiple freeSolo disabled={isViewMode}
+              options={['Exercise','Cold air','Dust','Spicy food']}
+              onChange={(_, v) => (document.getElementById('ph-aggravate') as HTMLInputElement).value = JSON.stringify(v)}
+              renderInput={(params) => <TextField {...params} label="Aggravating Factors" placeholder="Select or type" />}
+            />
+            <input id="ph-aggravate" type="hidden" />
+          </Grid>
+          {!isViewMode && (
+            <Grid item xs={12}>
+              <Button variant="contained" onClick={() => {
+                const title = (document.getElementById('ph-title') as HTMLInputElement)?.value || ''
+                const duration = (document.getElementById('ph-duration') as HTMLInputElement)?.value || ''
+                const assoc = JSON.parse((document.getElementById('ph-assoc') as HTMLInputElement)?.value || '[]')
+                const relieve = JSON.parse((document.getElementById('ph-relieve') as HTMLInputElement)?.value || '[]')
+                const aggravate = JSON.parse((document.getElementById('ph-aggravate') as HTMLInputElement)?.value || '[]')
+                if (!title) return
+                const newItem = { id: Date.now().toString(), title, duration, associationFactors: assoc, relievingFactors: relieve, aggravatingFactors: aggravate }
+                const next = [...(patientDetails.presentHistory||[]), newItem]
+                setPatientDetails({ ...patientDetails, presentHistory: next })
+              }}>Add Complaint</Button>
+            </Grid>
+          )}
+        </Grid>
+        <Divider sx={{ my: 2 }} />
+        <Grid container spacing={2}>
+          <AnimatePresence>
+            {(patientDetails.presentHistory||[]).map((item) => (
+              <Grid item xs={12} key={item.id}>
+                <motion.div
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  layout
+                >
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="h6">{item.title} <Typography component="span" variant="body2" color="text.secondary">({item.duration})</Typography></Typography>
+                          <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
+                            <AnimatePresence>
+                              {item.associationFactors.map((f, i) => (
+                                <motion.div key={`a-${i}`} variants={chipVariants} initial="hidden" animate="visible" exit="exit">
+                                  <Chip label={`Assoc: ${f}`} size="small" />
+                                </motion.div>
+                              ))}
+                              {item.relievingFactors.map((f, i) => (
+                                <motion.div key={`r-${i}`} variants={chipVariants} initial="hidden" animate="visible" exit="exit">
+                                  <Chip label={`Relieve: ${f}`} size="small" color="success" />
+                                </motion.div>
+                              ))}
+                              {item.aggravatingFactors.map((f, i) => (
+                                <motion.div key={`g-${i}`} variants={chipVariants} initial="hidden" animate="visible" exit="exit">
+                                  <Chip label={`Aggravate: ${f}`} size="small" color="warning" />
+                                </motion.div>
+                              ))}
+                            </AnimatePresence>
+                          </Stack>
+                        </Box>
+                        {!isViewMode && (
+                          <IconButton color="error" onClick={() => {
+                            setPatientDetails({ ...patientDetails, presentHistory: (patientDetails.presentHistory||[]).filter(ph => ph.id !== item.id) })
+                          }}>
+                            <DeleteIcon />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </Grid>
+            ))}
+          </AnimatePresence>
+        </Grid>
+      </MotionPaper>
 
       {/* Risk Assessment */}
       {(patientDetails.name || patientDetails.age) && (

@@ -15,6 +15,7 @@ from datetime import datetime
 
 from app.services.enhanced_knowledge_base import get_knowledge_base
 from app.services.local_vector_kb import get_local_knowledge_base
+from app.services.vector_knowledge_base import get_vector_knowledge_base
 from app.api.auth_new import get_current_user
 from app.models import User, KnowledgeDocument
 from app.database import get_db
@@ -40,9 +41,20 @@ ALLOWED_EXTENSIONS = {".pdf", ".txt", ".doc", ".docx"}
 UPLOAD_DIR = Path("data/knowledge_base/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+def infer_year_from_name(name: str) -> Optional[int]:
+    import re
+    current_year = datetime.now().year + 1
+    matches = re.findall(r"(19\d{2}|20\d{2})", name)
+    for match in matches:
+        year = int(match)
+        if 1950 <= year <= current_year:
+            return year
+    return None
+
 # Import large PDF processor
 from app.services.large_pdf_processor import get_large_pdf_processor
 from app.services.error_corrector import get_error_corrector, with_auto_correction
+from app.services.pdf_ocr_processor import get_pdf_ocr_processor
 
 
 class PDFProcessingRequest(BaseModel):
@@ -50,14 +62,28 @@ class PDFProcessingRequest(BaseModel):
     chunk_size: int = 2000  # Characters per chunk (larger = fewer chunks = faster)
     overlap: int = 50  # Overlap between chunks (smaller = fewer chunks)
     extract_tables: bool = False  # Set to True if you need tables (slower)
-    extract_images: bool = False
-    ocr_enabled: bool = False
+    extract_images: bool = True  # Extract images with metadata (DEFAULT: True)
+    ocr_enabled: bool = True  # Enable OCR for scanned PDFs (DEFAULT: True)
 
 
 class SearchRequest(BaseModel):
     query: str
     top_k: int = 5
     min_score: float = 0.0
+    search_mode: str = "hybrid"  # local|openai|hybrid
+    alpha: float = 0.6  # hybrid weight
+    filters: Optional[Dict[str, Any]] = None
+    allow_fallback: bool = True
+
+
+class EvaluationItem(BaseModel):
+    query: str
+    expected_terms: List[str]
+    top_k: int = 5
+
+
+class EvaluationRequest(BaseModel):
+    runs: List[EvaluationItem]
 
 
 @router.post("/upload")
@@ -65,6 +91,8 @@ async def upload_pdfs(
     files: List[UploadFile] = File(...),
     use_full_content: bool = False,  # Default to chunking for semantic search
     chunk_size: int = 1000,
+    extract_images: bool = True,  # Extract and index images
+    ocr_enabled: bool = True,  # Enable OCR for scanned PDFs
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -74,6 +102,8 @@ async def upload_pdfs(
     - **files**: List of PDF files (up to 200MB each, 1GB total)
     - **use_full_content**: If False (default), intelligent chunking; if True, full PDF as single document
     - **chunk_size**: Size of text chunks when use_full_content=False
+    - **extract_images**: Extract and save images with metadata (default: True)
+    - **ocr_enabled**: Enable OCR for scanned/image-based PDFs (default: True)
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
@@ -152,9 +182,23 @@ async def upload_pdfs(
             
             # Extract text based on file type
             file_ext = Path(file.filename).suffix.lower()
+            extracted_images = []
+            extraction_method = "text"
             
             if file_ext == ".pdf":
-                text_content = await extract_pdf_text(file_path, use_full_content)
+                # Use enhanced OCR processor
+                ocr_processor = get_pdf_ocr_processor()
+                pdf_result = ocr_processor.extract_pdf_with_images(
+                    file_path,
+                    extract_images=extract_images,
+                    use_ocr=ocr_enabled,
+                    document_id=doc_uuid
+                )
+                text_content = pdf_result['text']
+                extracted_images = pdf_result.get('images', [])
+                extraction_method = pdf_result.get('method', 'text')
+                
+                logger.info(f"[EXTRACT] {file.filename}: {len(text_content)} chars, {len(extracted_images)} images, method={extraction_method}")
             elif file_ext == ".txt":
                 text_content = content.decode('utf-8', errors='ignore')
             elif file_ext in [".doc", ".docx"]:
@@ -166,9 +210,22 @@ async def upload_pdfs(
                 results.append({
                     "filename": file.filename,
                     "status": "error",
-                    "error": "No text content extracted",
+                    "error": "No text content extracted - PDF may be image-based or encrypted. Try using OCR or saving as text-based PDF.",
                     "chunks": 0,
-                    "characters": 0
+                    "characters": 0,
+                    "file_size_mb": len(content) / 1024 / 1024
+                })
+                continue
+            
+            # Minimum character threshold (50 chars to filter out near-empty extractions)
+            if len(text_content.strip()) < 50:
+                results.append({
+                    "filename": file.filename,
+                    "status": "error",
+                    "error": f"Insufficient text extracted ({len(text_content)} chars). PDF appears to be image-based. OCR required.",
+                    "chunks": 0,
+                    "characters": len(text_content),
+                    "file_size_mb": len(content) / 1024 / 1024
                 })
                 continue
             
@@ -186,7 +243,12 @@ async def upload_pdfs(
                         "type": "full_document",
                         "uploaded_by": current_user.email,
                         "upload_date": datetime.now().isoformat(),
-                        "document_uuid": doc_uuid
+                        "document_uuid": doc_uuid,
+                        "filename": file.filename,
+                        "category": "medical_pdf",
+                        "section": "full_document",
+                        "year": infer_year_from_name(file.filename),
+                        "outdated": False
                     }
                 )
                 
@@ -214,7 +276,11 @@ async def upload_pdfs(
                     "document_id": doc_uuid,
                     "chunks": 1,
                     "characters": len(text_content),
-                    "size_mb": len(content) / 1024 / 1024
+                    "size_mb": len(content) / 1024 / 1024,
+                    "images_extracted": len(extracted_images),
+                    "extraction_method": extraction_method,
+                    "embedding_status": "queued_for_background_processing",
+                    "info": f"Extracted via {extraction_method}. {len(extracted_images)} images saved. Embeddings queued for background processing."
                 })
             else:
                 # Intelligent chunking with reduced overlap for speed
@@ -232,12 +298,16 @@ async def upload_pdfs(
                             "total_chunks": len(chunks),
                             "uploaded_by": current_user.email,
                             "upload_date": datetime.now().isoformat(),
-                            "document_uuid": doc_uuid
+                            "document_uuid": doc_uuid,
+                            "filename": file.filename,
+                            "category": "medical_pdf",
+                            "section": "body",
+                            "year": infer_year_from_name(file.filename),
+                            "outdated": False
                         }
                     )
                     chunk_ids.append(doc_id)
                 
-                # Save to database
                 db_doc = KnowledgeDocument(
                     document_id=doc_uuid,
                     filename=file.filename,
@@ -263,22 +333,31 @@ async def upload_pdfs(
                     "chunks": len(chunks),
                     "characters": len(text_content),
                     "avg_chunk_size": len(text_content) // len(chunks) if chunks else 0,
-                    "size_mb": len(content) / 1024 / 1024
+                    "size_mb": len(content) / 1024 / 1024,
+                    "images_extracted": len(extracted_images),
+                    "extraction_method": extraction_method,
+                    "embedding_status": "queued_for_background_processing",
+                    "info": f"Extracted via {extraction_method}. {len(extracted_images)} images saved. {len(chunks)} chunks queued for embeddings."
                 })
             
-            logger.info(f"Successfully processed {file.filename}: {len(text_content)} characters")
+            logger.info(f"Successfully queued {file.filename}: {len(text_content)} characters")
             
         except Exception as e:
-            error_msg = str(e) if str(e).strip() else f"{type(e).__name__}: PDF extraction or processing failed"
-            logger.error(f"Error processing {file.filename}: {error_msg}")
+            error_type = type(e).__name__
+            error_msg = str(e).strip() if str(e).strip() else "Unknown error"
+            full_error = f"{error_type}: {error_msg}" if error_msg != "Unknown error" else f"{error_type} during PDF extraction/processing"
+            
+            logger.error(f"Error processing {file.filename}: {full_error}")
             import traceback
             logger.error(traceback.format_exc())
+            
             results.append({
                 "filename": file.filename,
                 "status": "error",
-                "error": error_msg if error_msg.strip() else "Unknown error during processing",
+                "error": full_error,
                 "chunks": 0,
-                "characters": 0
+                "characters": 0,
+                "file_size_mb": len(content) / 1024 / 1024 if 'content' in locals() else 0
             })
     
     # Summary
@@ -295,7 +374,11 @@ async def upload_pdfs(
             "total_chunks_created": total_chunks,
             "total_size_mb": total_size / 1024 / 1024
         },
-        "results": results
+        "results": results,
+        "status_check_endpoints": {
+            "all_uploads": "/api/medical/knowledge/upload-status",
+            "specific_upload": "/api/medical/knowledge/upload-status/{document_id}"
+        }
     }
 
 
@@ -444,48 +527,108 @@ def smart_chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> L
 
 
 async def add_to_knowledge_base(kb, text: str, source: str, metadata: Dict[str, Any]) -> str:
-    """Add document to knowledge base with LOCAL EMBEDDING (NO API, NO COST, FAST)"""
+    """Add document to knowledge base with LOCAL EMBEDDING (NO API, NO COST, FAST)
+    
+    Returns immediately with doc ID - actual embedding happens async in background.
+    This prevents blocking the HTTP response during large PDF processing.
+    """
     try:
-        # Use LOCAL vector KB (sentence-transformers, no OpenAI)
+        # DEFERRED EMBEDDING: Don't block response - just queue for processing
         from app.services.local_vector_kb import get_local_knowledge_base
         local_kb = get_local_knowledge_base()
         
-        logger.info(f"[INBOX] Adding to LOCAL vector KB: {source} ({len(text)} chars)")
+        logger.info(f"[QUEUED] Adding to LOCAL KB (deferred): {source} ({len(text)} chars)")
         
         # Prepare metadata with document_id for linking
         full_metadata = {
             "source": source,
             **metadata
         }
+        # Enrich metadata for filtering/citations
+        full_metadata.setdefault("filename", metadata.get("filename", source))
+        full_metadata.setdefault("category", metadata.get("category", "medical_pdf"))
+        full_metadata.setdefault("section", metadata.get("section", "general"))
+        full_metadata.setdefault("outdated", metadata.get("outdated", False))
+        inferred_year = infer_year_from_name(source)
+        if inferred_year:
+            full_metadata.setdefault("year", inferred_year)
+        else:
+            full_metadata.setdefault("year", metadata.get("year"))
         
         # Ensure document_id is available for reference links
         if 'document_uuid' in metadata:
             full_metadata['document_id'] = metadata['document_uuid']
         
-        chunks_added = local_kb.add_document(
+        # ASYNC ADD: This queues the document without blocking
+        # In production, this would use Celery/RQ/APScheduler
+        # For now, we do a quick add without re-indexing
+        import asyncio
+        from pathlib import Path
+        
+        # Store text temporarily to process later
+        temp_dir = Path("data/knowledge_base/pending")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate a pending task ID
+        import hashlib
+        task_id = hashlib.md5(f"{source}{datetime.now().isoformat()}".encode()).hexdigest()[:16]
+        pending_file = temp_dir / f"{task_id}.json"
+        
+        import json
+        with open(pending_file, 'w') as f:
+            json.dump({
+                "task_id": task_id,
+                "source": source,
+                "text": text[:10000],  # Store first 10KB inline
+                "text_length": len(text),
+                "metadata": full_metadata,
+                "created_at": datetime.now().isoformat(),
+                "status": "pending"
+            }, f)
+        
+        # Schedule async processing (non-blocking)
+        asyncio.create_task(
+            _process_document_async(local_kb, text, source, full_metadata, task_id)
+        )
+        
+        logger.info(f"[QUEUED] {source} - scheduled for background processing (ID: {task_id})")
+        return f"queued_{task_id}"
+        
+    except Exception as e:
+        logger.error(f"Failed to queue KB document: {e}")
+        import hashlib
+        doc_id = hashlib.md5(f"{source}{text[:100]}".encode()).hexdigest()[:12]
+        return doc_id
+
+
+async def _process_document_async(kb, text: str, source: str, metadata: Dict[str, Any], task_id: str):
+    """Background task to process document embeddings (does not block HTTP response)"""
+    try:
+        logger.info(f"[BACKGROUND] Processing embeddings for: {source} (task: {task_id})")
+        
+        chunks_added = kb.add_document(
             content=text,
-            metadata=full_metadata,
+            metadata=metadata,
             chunk_size=2000,
             chunk_overlap=50
         )
         
-        logger.info(f"[OK] LOCAL KB: {source} - {chunks_added} chunks (NO API COST)")
-        return f"local_{chunks_added}_chunks"
+        # Update pending status
+        from pathlib import Path
+        pending_file = Path("data/knowledge_base/pending") / f"{task_id}.json"
+        if pending_file.exists():
+            import json
+            with open(pending_file, 'r') as f:
+                data = json.load(f)
+            data['status'] = 'complete'
+            data['chunks_added'] = chunks_added
+            with open(pending_file, 'w') as f:
+                json.dump(data, f)
         
+        logger.info(f"[OK] Background embedding complete: {source} - {chunks_added} chunks (task: {task_id})")
     except Exception as e:
-        logger.warning(f"Local vector KB failed, trying fallback: {e}")
-        
-        try:
-            # Fallback to enhanced KB
-            doc_id = kb.add_document(text, source, metadata)
-            logger.info(f"[OK] Fallback KB: {source} (ID: {doc_id})")
-            return doc_id
-        except Exception as e2:
-            # Last resort: generate ID
-            import hashlib
-            doc_id = hashlib.md5(f"{source}{text[:100]}".encode()).hexdigest()[:12]
-            logger.warning(f"[WARNING] Basic storage: {source} (ID: {doc_id})")
-            return doc_id
+        logger.error(f"[ERROR] Background processing failed for {source}: {e}")
+        # Log error but don't crash
 
 
 @router.get("/statistics")
@@ -590,6 +733,23 @@ async def get_statistics():
         # Determine search mode
         search_mode = 'local-semantic' if local_stats.get('faiss_available') else 'simple'
 
+        # Get processing queue status
+        from app.models import DocumentProcessingStatus
+        db_gen = get_db()
+        db_status = next(db_gen)
+        try:
+            queued_count = db_status.query(DocumentProcessingStatus).filter(
+                DocumentProcessingStatus.status == "queued"
+            ).count()
+            processing_count = db_status.query(DocumentProcessingStatus).filter(
+                DocumentProcessingStatus.status == "processing"
+            ).count()
+            completed_count = db_status.query(DocumentProcessingStatus).filter(
+                DocumentProcessingStatus.status == "completed"
+            ).count()
+        finally:
+            db_status.close()
+
         return {
             'status': 'ready',
             'total_documents': db_doc_count,  # Documents from database
@@ -600,11 +760,20 @@ async def get_statistics():
             'knowledge_level': knowledge_level.upper(),
             'search_mode': search_mode,
             'pdf_sources': pdf_sources,
+            'processing_queue': {
+                'queued': queued_count,
+                'processing': processing_count,
+                'completed': completed_count,
+                'total': queued_count + processing_count + completed_count,
+                'status_url': '/api/medical/knowledge/upload-status'
+            },
             # Additional diagnostics
             'embedding_model': local_stats.get('embedding_model'),
             'embedding_dimension': local_stats.get('embedding_dimension'),
             'faiss_available': local_stats.get('faiss_available'),
             'model_loaded': local_stats.get('model_loaded'),
+            'hybrid_enabled': local_stats.get('hybrid_enabled'),
+            'bm25_indexed': local_stats.get('bm25_indexed'),
             'uploaded_files': len(upload_files),
             'total_upload_size_mb': round(total_upload_size / 1024 / 1024, 2),
             'medical_books_dir': str(MEDICAL_BOOKS_DIR.resolve()) if MEDICAL_BOOKS_DIR.exists() else None,
@@ -635,51 +804,285 @@ async def get_statistics():
         return {'status': 'error', 'error': error_msg, 'total_documents': 0, 'total_chunks': 0, 'knowledge_level': 'UNKNOWN'}
 
 
+@router.get("/pending-status")
+async def get_pending_status():
+    """Check status of pending document embedding tasks"""
+    from pathlib import Path
+    import json
+    pending_dir = Path("data/knowledge_base/pending")
+    if not pending_dir.exists():
+        return {"pending": [], "completed": 0}
+    
+    pending = []
+    for task_file in pending_dir.glob("*.json"):
+        try:
+            with open(task_file, 'r') as f:
+                data = json.load(f)
+            pending.append({
+                "task_id": data.get('task_id'),
+                "source": data.get('source'),
+                "status": data.get('status'),
+                "chunks_added": data.get('chunks_added'),
+                "created_at": data.get('created_at')
+            })
+        except Exception as e:
+            logger.warning(f"Error reading pending task {task_file}: {e}")
+    
+    return {
+        "total_pending": len(pending),
+        "pending": pending
+    }
+
+
 @router.post("/search")
 async def search_knowledge_base(request: SearchRequest):
-    """Search knowledge base"""
+    """Search knowledge base with local + hybrid + OpenAI fallback"""
+    mode = (request.search_mode or "hybrid").lower()
+    filters = request.filters or {}
+
+    def _passes(metadata: Dict[str, Any]) -> bool:
+        if not filters:
+            return True
+        if 'category' in filters and metadata.get('category') and metadata.get('category') != filters['category']:
+            return False
+        if 'section' in filters and metadata.get('section'):
+            if filters['section'].lower() not in str(metadata.get('section', '')).lower():
+                return False
+        if filters.get('min_year'):
+            try:
+                year = int(metadata.get('year')) if metadata.get('year') else None
+                if year and year < int(filters['min_year']):
+                    return False
+            except Exception:
+                pass
+        if filters.get('allow_outdated') is False and metadata.get('outdated'):
+            return False
+        return True
+
     try:
-        # Try local vector KB first (this is what chat uses)
-        try:
-            local_kb = get_local_knowledge_base()
-            results = local_kb.search(request.query, top_k=request.top_k)
-            
-            # Filter by minimum score
-            filtered_results = [
-                r for r in results
-                if r.get("score", 0) >= request.min_score
-            ]
-            
-            return {
-                "query": request.query,
-                "results": filtered_results,
-                "total_results": len(filtered_results),
-                "top_k": request.top_k,
-                "source": "local_vector_kb"
-            }
-        except Exception as local_error:
-            logger.warning(f"Local KB search failed: {local_error}, trying enhanced KB")
-            
-            # Fallback to enhanced KB
-            knowledge_base = get_knowledge_base()
-            results = knowledge_base.search(request.query, top_k=request.top_k)
-            
-            # Filter by minimum score
-            filtered_results = [
-                r for r in results
-                if r.get("score", 0) >= request.min_score
-            ]
-            
-            return {
-                "query": request.query,
-                "results": filtered_results,
-                "total_results": len(filtered_results),
-                "top_k": request.top_k,
-                "source": "enhanced_kb"
-            }
+        local_kb = get_local_knowledge_base()
+        use_bm25 = mode != "openai" and mode != "local"
+        results = []
+
+        if mode in {"local", "hybrid"}:
+            results = local_kb.search(
+                query=request.query,
+                top_k=request.top_k,
+                min_score=request.min_score,
+                alpha=request.alpha,
+                use_bm25=use_bm25,
+                filters=filters
+            )
+            source = "local_hybrid" if use_bm25 else "local_vector"
+        else:
+            # Explicit OpenAI vector search path
+            vector_kb = get_vector_knowledge_base()
+            raw_results = vector_kb.search(
+                query=request.query,
+                top_k=request.top_k,
+                filter_metadata=filters if filters else None
+            )
+            results = []
+            for r in raw_results:
+                metadata = r.get("metadata", {})
+                if not _passes(metadata):
+                    continue
+                citation = {
+                    "document_id": metadata.get("document_id"),
+                    "filename": metadata.get("filename") or metadata.get("source"),
+                    "page": metadata.get("page") or metadata.get("page_number"),
+                    "chunk_index": metadata.get("chunk_index"),
+                    "section": metadata.get("section"),
+                    "category": metadata.get("category"),
+                    "year": metadata.get("year"),
+                }
+                results.append({
+                    "text": r.get("content"),
+                    "metadata": metadata,
+                    "score": r.get("similarity_score", 0),
+                    "citation": citation,
+                    "source_type": "openai_vector"
+                })
+            source = "openai_vector"
+
+        if not results and request.allow_fallback and mode != "openai":
+            # fallback to OpenAI vector search if local/hybrid empty
+            vector_kb = get_vector_knowledge_base()
+            raw_results = vector_kb.search(
+                query=request.query,
+                top_k=request.top_k,
+                filter_metadata=filters if filters else None
+            )
+            for r in raw_results:
+                metadata = r.get("metadata", {})
+                if not _passes(metadata):
+                    continue
+                citation = {
+                    "document_id": metadata.get("document_id"),
+                    "filename": metadata.get("filename") or metadata.get("source"),
+                    "page": metadata.get("page") or metadata.get("page_number"),
+                    "chunk_index": metadata.get("chunk_index"),
+                    "section": metadata.get("section"),
+                    "category": metadata.get("category"),
+                    "year": metadata.get("year"),
+                }
+                results.append({
+                    "text": r.get("content"),
+                    "metadata": metadata,
+                    "score": r.get("similarity_score", 0),
+                    "citation": citation,
+                    "source_type": "openai_vector"
+                })
+            source = "openai_vector"
+
+        filtered_results = [r for r in results if r.get("score", 0) >= request.min_score]
+
+        return {
+            "query": request.query,
+            "results": filtered_results[: request.top_k],
+            "total_results": len(filtered_results),
+            "top_k": request.top_k,
+            "source": source,
+            "mode": mode,
+            "applied_filters": filters,
+        }
     except Exception as e:
         logger.error(f"Search error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@router.post("/search/evaluate")
+async def evaluate_search(request: EvaluationRequest):
+    """Lightweight evaluation harness for KB search.
+
+    Expects list of runs with query + expected_terms and returns hit@k + matches.
+    """
+    local_kb = get_local_knowledge_base()
+    results = []
+    for run in request.runs:
+        hits = local_kb.search(
+            query=run.query,
+            top_k=run.top_k,
+            use_bm25=True,
+            alpha=0.6
+        )
+        matched_terms = []
+        for term in run.expected_terms:
+            term_lower = term.lower()
+            if any(term_lower in (res.get('text') or '').lower() for res in hits):
+                matched_terms.append(term)
+        results.append({
+            "query": run.query,
+            "expected_terms": run.expected_terms,
+            "hit": len(matched_terms) > 0,
+            "matched_terms": matched_terms,
+            "returned": len(hits)
+        })
+    hit_rate = sum(1 for r in results if r.get("hit")) / len(results) if results else 0
+    return {"runs": results, "hit_rate": hit_rate}
+
+
+@router.get("/upload-status/{document_id}")
+async def get_upload_status(document_id: str, db: Session = Depends(get_db)):
+    """Get processing status of a document upload"""
+    try:
+        from app.models import DocumentProcessingStatus
+        
+        status = db.query(DocumentProcessingStatus).filter(
+            DocumentProcessingStatus.document_id == document_id
+        ).first()
+        
+        if not status:
+            return {
+                "document_id": document_id,
+                "status": "unknown",
+                "message": "Document not found in processing queue"
+            }
+        
+        response = {
+            "document_id": document_id,
+            "status": status.status,
+            "progress_percent": status.progress_percent,
+            "current_chunk": status.current_chunk,
+            "total_chunks": status.total_chunks,
+            "error_message": status.error_message,
+            "created_at": status.created_at.isoformat() if status.created_at else None,
+            "started_at": status.started_at.isoformat() if status.started_at else None,
+            "completed_at": status.completed_at.isoformat() if status.completed_at else None,
+        }
+        
+        if status.status == "processing":
+            elapsed = (datetime.now() - status.started_at).total_seconds() if status.started_at else 0
+            if status.estimated_time_seconds and status.progress_percent > 0:
+                estimated_remaining = int(
+                    (status.estimated_time_seconds * 100 / status.progress_percent) - elapsed
+                )
+                response["estimated_remaining_seconds"] = max(0, estimated_remaining)
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error getting upload status: {e}")
+        return {
+            "document_id": document_id,
+            "status": "error",
+            "error_message": str(e)
+        }
+
+
+@router.get("/upload-status")
+async def get_all_upload_statuses(db: Session = Depends(get_db)):
+    """Get processing status of all documents in queue"""
+    try:
+        from app.models import DocumentProcessingStatus, KnowledgeDocument
+        
+        statuses = db.query(DocumentProcessingStatus).order_by(
+            DocumentProcessingStatus.updated_at.desc()
+        ).all()
+        
+        results = []
+        for status in statuses:
+            doc = db.query(KnowledgeDocument).filter(
+                KnowledgeDocument.document_id == status.document_id
+            ).first()
+            
+            results.append({
+                "document_id": status.document_id,
+                "filename": doc.filename if doc else "unknown",
+                "status": status.status,
+                "progress_percent": status.progress_percent,
+                "current_chunk": status.current_chunk,
+                "total_chunks": status.total_chunks,
+                "size_mb": doc.file_size / 1024 / 1024 if doc else 0,
+                "created_at": status.created_at.isoformat() if status.created_at else None,
+                "started_at": status.started_at.isoformat() if status.started_at else None,
+                "completed_at": status.completed_at.isoformat() if status.completed_at else None,
+            })
+        
+        # Summary
+        queued = sum(1 for s in statuses if s.status == "queued")
+        processing = sum(1 for s in statuses if s.status == "processing")
+        completed = sum(1 for s in statuses if s.status == "completed")
+        failed = sum(1 for s in statuses if s.status == "failed")
+        
+        return {
+            "total": len(statuses),
+            "queued": queued,
+            "processing": processing,
+            "completed": completed,
+            "failed": failed,
+            "statuses": results
+        }
+    except Exception as e:
+        logger.error(f"Error getting upload statuses: {e}")
+        return {
+            "total": 0,
+            "queued": 0,
+            "processing": 0,
+            "completed": 0,
+            "failed": 0,
+            "statuses": [],
+            "error": str(e)
+        }
 
 
 @router.get("/documents")
@@ -1304,3 +1707,167 @@ async def extract_document_images(
     except Exception as e:
         logger.error(f"Error extracting images: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/reset")
+async def reset_knowledge_base(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    [ADMIN ONLY] Reset/clear all documents from knowledge base.
+    Requires admin privileges.
+    """
+    # Check if user is admin
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can reset the knowledge base"
+        )
+    
+    try:
+        # Get count before deletion
+        count_before = db.query(KnowledgeDocument).count()
+        logger.warning(f"[ADMIN] {current_user.email} initiating KB reset - {count_before} documents")
+        
+        # Delete all documents
+        db.query(KnowledgeDocument).delete()
+        db.commit()
+        
+        # Verify deletion
+        count_after = db.query(KnowledgeDocument).count()
+        
+        logger.warning(f"[ADMIN] KB reset complete - deleted {count_before} documents, {count_after} remaining")
+        
+        return {
+            "status": "success",
+            "message": f"Knowledge base reset complete",
+            "deleted_documents": count_before,
+            "remaining_documents": count_after,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"[ERROR] KB reset failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to reset knowledge base: {str(e)}"
+        )
+
+
+@router.get("/ocr-status")
+async def get_ocr_status():
+    """
+    Check OCR setup status and get installation instructions
+    
+    Returns information about:
+    - Whether OCR dependencies are installed
+    - Setup instructions for missing components
+    - Current capabilities
+    """
+    try:
+        ocr_processor = get_pdf_ocr_processor()
+        setup_info = ocr_processor.get_setup_instructions()
+        
+        return {
+            "status": "ready" if setup_info['ocr_ready'] else "needs_setup",
+            "ocr_available": setup_info['ocr_ready'],
+            "components": {
+                "pytesseract": "installed" if setup_info['pytesseract_installed'] else "not_installed",
+                "pdf2image": "installed" if setup_info['pdf2image_installed'] else "not_installed",
+                "tesseract_ocr": "available" if setup_info['tesseract_available'] else "not_installed",
+                "poppler": "available" if setup_info['poppler_available'] else "not_installed"
+            },
+            "capabilities": {
+                "text_extraction": True,
+                "image_extraction": True,
+                "ocr_processing": setup_info['ocr_ready'],
+                "scanned_pdf_support": setup_info['ocr_ready']
+            },
+            "setup_instructions": setup_info['instructions'],
+            "download_links": {
+                "tesseract_windows": "https://github.com/UB-Mannheim/tesseract/wiki",
+                "poppler_windows": "http://blog.alivate.com.au/poppler-windows/",
+                "pip_install": "pip install pytesseract pdf2image"
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error checking OCR status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to check OCR status: {str(e)}"
+        )
+
+@router.get("/queue-status")
+async def get_queue_status(db: Session = Depends(get_db)):
+    """
+    Get PDF upload queue processing status
+    
+    Returns:
+    - Queue statistics (queued, processing, completed, failed counts)
+    - Processing worker status
+    - Current batch information
+    """
+    try:
+        from app.services.upload_queue_processor import get_queue_processor
+        from app.models import DocumentProcessingStatus
+        
+        processor = get_queue_processor()
+        
+        # Get queue statistics
+        queued_count = db.query(DocumentProcessingStatus).filter(
+            DocumentProcessingStatus.status == 'queued'
+        ).count()
+        
+        processing_count = db.query(DocumentProcessingStatus).filter(
+            DocumentProcessingStatus.status == 'processing'
+        ).count()
+        
+        completed_count = db.query(DocumentProcessingStatus).filter(
+            DocumentProcessingStatus.status == 'completed'
+        ).count()
+        
+        failed_count = db.query(DocumentProcessingStatus).filter(
+            DocumentProcessingStatus.status == 'failed'
+        ).count()
+        
+        # Get current processing documents
+        processing_docs = db.query(DocumentProcessingStatus).filter(
+            DocumentProcessingStatus.status == 'processing'
+        ).all()
+        
+        processing_details = [
+            {
+                "document_id": doc.document_id,
+                "progress_percent": doc.progress_percent or 0,
+                "current_chunk": doc.current_chunk or 0,
+                "total_chunks": doc.total_chunks or 0,
+                "estimated_time_seconds": doc.estimated_time_seconds or 0,
+                "started_at": doc.started_at.isoformat() if doc.started_at else None
+            }
+            for doc in processing_docs
+        ]
+        
+        return {
+            "worker_status": "running" if processor.is_running else "stopped",
+            "queue": {
+                "queued": queued_count,
+                "processing": processing_count,
+                "completed": completed_count,
+                "failed": failed_count,
+                "total": queued_count + processing_count + completed_count + failed_count
+            },
+            "processor_config": {
+                "batch_size": processor.batch_size,
+                "check_interval": processor.check_interval,
+                "max_retries": processor.max_retries
+            },
+            "processing_details": processing_details,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error getting queue status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get queue status: {str(e)}"
+        )

@@ -5,22 +5,17 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 from typing import Generator
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# Simple SQLite database - no external dependencies
+DATABASE_URL = "sqlite:///./natpudan.db"
 
-# Get database URL from environment or use SQLite for development
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./natpudan.db")
-
-# Create engine with appropriate settings
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-else:
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# Create engine - lazy connection
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+    pool_pre_ping=False,  # Disable pre-ping to avoid connection attempts at import time
+)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -42,5 +37,10 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db():
     """Initialize database tables."""
-    from app.models import Base
-    Base.metadata.create_all(bind=engine)
+    try:
+        from app.models import Base
+        Base.metadata.create_all(bind=engine)
+        print("[DATABASE] Tables created successfully")
+    except Exception as e:
+        print(f"[DATABASE ERROR] Failed to create tables: {e}")
+        # Don't raise - allow app to start even if DB init fails

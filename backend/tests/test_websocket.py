@@ -2,6 +2,7 @@
 WebSocket streaming tests for real-time diagnosis and prescription generation.
 Tests progress updates, incremental streaming, and error handling.
 """
+import pytest
 import asyncio
 import json
 import websockets
@@ -10,6 +11,7 @@ from datetime import datetime
 # Test configuration
 WS_URL = "ws://127.0.0.1:8001/ws/test_user"
 
+@pytest.mark.asyncio
 async def test_diagnosis_streaming():
     """Test real-time diagnosis streaming with progress updates."""
     print("\n" + "="*60)
@@ -43,8 +45,8 @@ async def test_diagnosis_streaming():
                 }
             }
             
-            print(f"\n✓ Connected to WebSocket")
-            print(f"✓ Sending diagnosis request...")
+            print(f"\n[OK] Connected to WebSocket")
+            print(f"[OK] Sending diagnosis request...")
             await websocket.send(json.dumps(request))
             
             # Receive streaming responses
@@ -65,11 +67,11 @@ async def test_diagnosis_streaming():
                         
                     elif msg_type == "stream_chunk":
                         content = message.get("content", {})
-                        print(f"  📦 Stream chunk: {json.dumps(content, indent=2)}")
+                        print(f"  [PACKAGE] Stream chunk: {json.dumps(content, indent=2)}")
                         
                     elif msg_type == "complete":
                         result = message.get("result", {})
-                        print(f"\n✓ Diagnosis complete!")
+                        print(f"\n[OK] Diagnosis complete!")
                         print(f"  Primary diagnosis: {result.get('primary_diagnosis', 'N/A')}")
                         print(f"  Confidence: {result.get('confidence', 'N/A')}")
                         print(f"  Urgency: {result.get('urgency', 'N/A')}")
@@ -87,7 +89,7 @@ async def test_diagnosis_streaming():
                     print("\n✗ Timeout waiting for response")
                     break
             
-            print(f"\n✓ Test completed - Received {message_count} messages")
+            print(f"\n[OK] Test completed - Received {message_count} messages")
             return True
             
     except Exception as e:
@@ -95,6 +97,7 @@ async def test_diagnosis_streaming():
         return False
 
 
+@pytest.mark.asyncio
 async def test_prescription_streaming():
     """Test real-time prescription streaming with progress updates."""
     print("\n" + "="*60)
@@ -119,8 +122,8 @@ async def test_prescription_streaming():
                 }
             }
             
-            print(f"\n✓ Connected to WebSocket")
-            print(f"✓ Sending prescription request...")
+            print(f"\n[OK] Connected to WebSocket")
+            print(f"[OK] Sending prescription request...")
             await websocket.send(json.dumps(request))
             
             # Receive streaming responses
@@ -146,13 +149,13 @@ async def test_prescription_streaming():
                         if "medication" in content:
                             med = content["medication"]
                             medications.append(med)
-                            print(f"  💊 {med.get('name', 'Unknown')}: {med.get('dosage', 'N/A')}")
+                            print(f"  [MED] {med.get('name', 'Unknown')}: {med.get('dosage', 'N/A')}")
                         else:
-                            print(f"  📦 Stream chunk: {json.dumps(content, indent=2)}")
+                            print(f"  [PACKAGE] Stream chunk: {json.dumps(content, indent=2)}")
                         
                     elif msg_type == "complete":
                         result = message.get("result", {})
-                        print(f"\n✓ Prescription complete!")
+                        print(f"\n[OK] Prescription complete!")
                         print(f"  Total medications: {len(medications)}")
                         print(f"  Interactions checked: {result.get('interactions_checked', 'N/A')}")
                         print(f"  Monitoring: {result.get('monitoring_required', 'N/A')}")
@@ -167,7 +170,7 @@ async def test_prescription_streaming():
                     print("\n✗ Timeout waiting for response")
                     break
             
-            print(f"\n✓ Test completed - Received {message_count} messages")
+            print(f"\n[OK] Test completed - Received {message_count} messages")
             return True
             
     except Exception as e:
@@ -175,6 +178,7 @@ async def test_prescription_streaming():
         return False
 
 
+@pytest.mark.asyncio
 async def test_chat_message():
     """Test simple chat message (non-streaming)."""
     print("\n" + "="*60)
@@ -191,15 +195,15 @@ async def test_chat_message():
                 }
             }
             
-            print(f"\n✓ Connected to WebSocket")
-            print(f"✓ Sending chat message...")
+            print(f"\n[OK] Connected to WebSocket")
+            print(f"[OK] Sending chat message...")
             await websocket.send(json.dumps(request))
             
             # Receive response
             response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
             message = json.loads(response)
             
-            print(f"✓ Received: {message.get('type', 'unknown')}")
+            print(f"[OK] Received: {message.get('type', 'unknown')}")
             print(f"  Content: {message.get('content', 'N/A')}")
             
             return True
@@ -209,6 +213,7 @@ async def test_chat_message():
         return False
 
 
+@pytest.mark.asyncio
 async def test_error_handling():
     """Test error handling with invalid message type."""
     print("\n" + "="*60)
@@ -223,8 +228,8 @@ async def test_error_handling():
                 "data": {}
             }
             
-            print(f"\n✓ Connected to WebSocket")
-            print(f"✓ Sending invalid message type...")
+            print(f"\n[OK] Connected to WebSocket")
+            print(f"[OK] Sending invalid message type...")
             await websocket.send(json.dumps(request))
             
             # Receive error response
@@ -232,7 +237,7 @@ async def test_error_handling():
             message = json.loads(response)
             
             if message.get("type") == "error":
-                print(f"✓ Error handled correctly: {message.get('error', 'N/A')}")
+                print(f"[OK] Error handled correctly: {message.get('error', 'N/A')}")
                 return True
             else:
                 print(f"✗ Expected error response, got: {message.get('type')}")
@@ -272,7 +277,7 @@ async def run_all_tests():
     total = len(results)
     
     for test_name, result in results.items():
-        status = "✓ PASS" if result else "✗ FAIL"
+        status = "[OK] PASS" if result else "✗ FAIL"
         print(f"{status}: {test_name}")
     
     print(f"\n{passed}/{total} tests passed ({passed*100//total}%)")
@@ -280,12 +285,12 @@ async def run_all_tests():
 
 
 if __name__ == "__main__":
-    print("\n🚀 Starting WebSocket streaming tests...")
-    print("⚠️  Make sure the backend server is running on http://127.0.0.1:8000")
+    print("\n[STARTING] Starting WebSocket streaming tests...")
+    print("[WARNING]  Make sure the backend server is running on http://127.0.0.1:8000")
     
     try:
         asyncio.run(run_all_tests())
     except KeyboardInterrupt:
-        print("\n\n⚠️  Tests interrupted by user")
+        print("\n\n[WARNING]  Tests interrupted by user")
     except Exception as e:
         print(f"\n\n✗ Test suite failed: {e}")

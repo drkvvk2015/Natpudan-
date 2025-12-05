@@ -1,6 +1,6 @@
 """Database models for Natpudan AI - Consolidated from app/models.py and app/database/models.py"""
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -172,6 +172,31 @@ class PatientIntake(Base):
     age = Column(String(10))
     gender = Column(String(20))
     blood_type = Column(String(10))
+    
+    # Extended Anthropometry
+    height_cm = Column(Integer, nullable=True)
+    weight_kg = Column(Integer, nullable=True)
+    bmi = Column(Integer, nullable=True)
+    waist_cm = Column(Integer, nullable=True)
+    hip_cm = Column(Integer, nullable=True)
+    whr = Column(Integer, nullable=True)
+    muac_cm = Column(Integer, nullable=True)
+    head_circumference_cm = Column(Integer, nullable=True)
+    chest_expansion_cm = Column(Integer, nullable=True)
+    sitting_height_cm = Column(Integer, nullable=True)
+    standing_height_cm = Column(Integer, nullable=True)
+    arm_span_cm = Column(Integer, nullable=True)
+    body_fat_percent = Column(Integer, nullable=True)
+    bp_systolic = Column(Integer, nullable=True)
+    bp_diastolic = Column(Integer, nullable=True)
+    pulse_per_min = Column(Integer, nullable=True)
+    resp_rate_per_min = Column(Integer, nullable=True)
+    temperature_c = Column(Integer, nullable=True)
+    
+    # Chief Complaints and Present History (stored as JSON text)
+    chief_complaints = Column(Text, nullable=True)  # JSON: [{complaint, duration}]
+    present_history = Column(Text, nullable=True)  # JSON: [{id, title, duration, associationFactors, relievingFactors, aggravatingFactors}]
+    
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     
@@ -395,6 +420,73 @@ class KnowledgeDocument(Base):
     
     # Relationships
     uploaded_by = relationship("User", foreign_keys=[uploaded_by_id])
+    extracted_images = relationship("ExtractedImage", back_populates="document", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<KnowledgeDocument(id={self.document_id}, filename={self.filename})>"
+
+class DocumentProcessingStatus(Base):
+    """Track processing status of uploaded documents during background embedding"""
+    __tablename__ = "document_processing_status"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(String(36), ForeignKey("knowledge_documents.document_id"), unique=True, index=True)
+    
+    # Status tracking
+    status = Column(String(20), default="queued", index=True)  # queued|processing|completed|failed
+    progress_percent = Column(Integer, default=0)  # 0-100
+    current_chunk = Column(Integer, default=0)
+    total_chunks = Column(Integer, default=0)
+    
+    # Timing
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Error handling
+    error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, default=0)
+    
+    # Metadata
+    processing_type = Column(String(50), default="embedding")  # embedding|indexing|verification
+    estimated_time_seconds = Column(Integer, nullable=True)
+    
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    document = relationship("KnowledgeDocument", foreign_keys=[document_id])
+    
+    def __repr__(self):
+        return f"<DocumentProcessingStatus(doc_id={self.document_id}, status={self.status})>"
+
+
+class ExtractedImage(Base):
+    """Model for storing extracted PDF images with metadata"""
+    __tablename__ = "extracted_images"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    image_id = Column(String, unique=True, index=True)  # Unique identifier
+    document_id = Column(String, ForeignKey("knowledge_documents.document_id"), index=True)
+    filename = Column(String)  # Image filename
+    file_path = Column(String)  # Path to saved image
+    page_number = Column(Integer)  # Page in PDF
+    image_index = Column(Integer)  # Index on page
+    xref = Column(Integer)  # PyMuPDF xref
+    extension = Column(String)  # Image format (png, jpg, etc.)
+    size_bytes = Column(Integer)  # File size
+    width = Column(Integer, nullable=True)
+    height = Column(Integer, nullable=True)
+    
+    # OCR/AI analysis (for future use)
+    ocr_text = Column(Text, nullable=True)  # OCR'd text from image
+    caption = Column(Text, nullable=True)  # AI-generated caption
+    tags = Column(JSON, nullable=True)  # Image tags/labels
+    
+    # Timestamps
+    extracted_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    document = relationship("KnowledgeDocument", back_populates="extracted_images")
+    
+    def __repr__(self):
+        return f"<ExtractedImage(id={self.image_id}, doc={self.document_id}, page={self.page_number})>"

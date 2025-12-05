@@ -1,15 +1,32 @@
-"""OpenAI integration for AI-powered responses."""
+"""OpenAI integration for AI-powered responses with robust error handling."""
 
 import os
+import logging
 from typing import List, Dict
-from openai import OpenAI
+from openai import OpenAI, APITimeoutError, RateLimitError, APIError
 from dotenv import load_dotenv
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
+# Load environment variables from backend/.env file
+backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+env_path = os.path.join(backend_dir, '.env')
+load_dotenv(env_path)
+
+# Initialize OpenAI client with timeout and error handling
+api_key = os.getenv("OPENAI_API_KEY")
+client = None
+
+if not api_key or api_key.startswith("sk-your"):
+    logger.warning("[WARNING] OpenAI API key not configured properly - AI features will be limited")
+else:
+    try:
+        client = OpenAI(api_key=api_key, timeout=30.0, max_retries=2)
+        logger.info("[OK] OpenAI client initialized successfully")
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to initialize OpenAI client: {e}")
+
+MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 
 
 async def generate_ai_response(
@@ -30,12 +47,18 @@ async def generate_ai_response(
     Returns:
         AI generated response text
     """
+    # Check if client is available
+    if not client:
+        logger.error("OpenAI client not initialized")
+        raise Exception("OpenAI API not configured. Please set OPENAI_API_KEY in backend/.env file. Visit: https://platform.openai.com/api-keys")
+    
     try:
         # Prepare messages with system prompt
         formatted_messages = [{"role": "system", "content": system_prompt}]
         formatted_messages.extend(messages)
         
-        # Call OpenAI API
+        # Call OpenAI API with timeout and retry
+        logger.debug(f"Calling OpenAI {MODEL} with {len(messages)} messages")
         response = client.chat.completions.create(
             model=MODEL,
             messages=formatted_messages,
@@ -43,12 +66,40 @@ async def generate_ai_response(
             temperature=temperature,
         )
         
-        return response.choices[0].message.content
+        result = response.choices[0].message.content
+        logger.debug(f"OpenAI response received ({len(result)} chars)")
+        return result
+    
+    except APITimeoutError as e:
+        logger.error(f"OpenAI API timeout after 30s: {e}")
+        raise Exception("OpenAI timeout (30s). Please try with a shorter query or use knowledge base search.")
+    
+    except RateLimitError as e:
+        logger.error(f"OpenAI rate limit exceeded: {e}")
+        raise Exception("OpenAI rate limit exceeded. Please wait a few seconds and try again, or use knowledge base.")
+    
+    except APIError as api_error:
+        error_msg = str(api_error)
+        logger.error(f"OpenAI API Error: {error_msg}")
         
+        # Provide specific, actionable error messages
+        if "api_key" in error_msg.lower() or "authentication" in error_msg.lower() or "401" in error_msg:
+            raise Exception("OpenAI API key invalid. Please check OPENAI_API_KEY in backend/.env file.")
+        elif "quota" in error_msg.lower() or "insufficient_quota" in error_msg.lower():
+            raise Exception("OpenAI quota exceeded. Please add credits at https://platform.openai.com/account/billing")
+        elif "model" in error_msg.lower():
+            raise Exception(f"Model '{MODEL}' not available. Try setting OPENAI_MODEL=gpt-4o-mini in backend/.env")
+        else:
+            raise Exception(f"OpenAI API error: {error_msg[:150]}. Using knowledge base fallback.")
+    
     except Exception as e:
-        print(f"OpenAI API Error: {str(e)}")
-        # Fallback response if API fails
-        return "I apologize, but I'm having trouble processing your request right now. Please try again later or contact support if the issue persists."
+        error_msg = str(e)
+        logger.error(f"Unexpected error in AI service: {error_msg}", exc_info=True)
+        # Re-raise if already a user-friendly exception
+        if "OpenAI" in error_msg or "API" in error_msg or "quota" in error_msg:
+            raise
+        # Otherwise, create generic error with fallback suggestion
+        raise Exception(f"AI service error: {error_msg[:100]}. Please try knowledge base search.")
 
 
 async def generate_discharge_summary(patient_data: Dict[str, str]) -> str:

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natpudan AI - HTTPS Connection Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #2c3e50; }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .pending { background: #fff3cd; color: #856404; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .info {
+            background: #d1ecf1;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 Natpudan AI - HTTPS Connection Test</h1>
+        
+        <div class="info">
+            <strong>Note:</strong> Accept the self-signed certificate warnings in your browser before running these tests.
+        </div>
+
+        <div class="test-section">
+            <h3>Test 1: Backend Health Check <span id="test1-status" class="status pending">Pending</span></h3>
+            <button onclick="testHealth()">Run Test</button>
+            <pre id="test1-result">Click "Run Test" to check backend connection</pre>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 2: Login API <span id="test2-status" class="status pending">Pending</span></h3>
+            <button onclick="testLogin()">Run Test</button>
+            <pre id="test2-result">Click "Run Test" to test login endpoint</pre>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 3: CORS Check <span id="test3-status" class="status pending">Pending</span></h3>
+            <button onclick="testCORS()">Run Test</button>
+            <pre id="test3-result">Click "Run Test" to verify CORS configuration</pre>
+        </div>
+
+        <div class="test-section">
+            <h3>Summary</h3>
+            <ul>
+                <li><strong>Frontend:</strong> https://127.0.0.1:5173</li>
+                <li><strong>Backend:</strong> https://127.0.0.1:8000</li>
+                <li><strong>Architecture:</strong> Direct HTTPS calls (no proxy)</li>
+                <li><strong>CORS:</strong> Backend allows frontend origin</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://127.0.0.1:8000';
+
+        async function testHealth() {
+            const resultEl = document.getElementById('test1-result');
+            const statusEl = document.getElementById('test1-status');
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                resultEl.textContent = `✅ Success!\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`;
+                statusEl.textContent = 'Pass';
+                statusEl.className = 'status success';
+            } catch (error) {
+                resultEl.textContent = `❌ Error: ${error.message}\n\nMake sure:\n1. Backend is running on https://127.0.0.1:8000\n2. You've accepted the SSL certificate warning`;
+                statusEl.textContent = 'Fail';
+                statusEl.className = 'status error';
+            }
+        }
+
+        async function testLogin() {
+            const resultEl = document.getElementById('test2-result');
+            const statusEl = document.getElementById('test2-status');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'test@test.com',
+                        password: 'wrongpassword'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.status === 401) {
+                    resultEl.textContent = `✅ Success! Login endpoint working correctly.\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}\n\n(401 is expected for wrong credentials)`;
+                    statusEl.textContent = 'Pass';
+                    statusEl.className = 'status success';
+                } else {
+                    resultEl.textContent = `⚠️ Unexpected response:\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`;
+                    statusEl.textContent = 'Warn';
+                    statusEl.className = 'status pending';
+                }
+            } catch (error) {
+                resultEl.textContent = `❌ Error: ${error.message}`;
+                statusEl.textContent = 'Fail';
+                statusEl.className = 'status error';
+            }
+        }
+
+        async function testCORS() {
+            const resultEl = document.getElementById('test3-result');
+            const statusEl = document.getElementById('test3-status');
+            
+            try {
+                // Try a preflight request
+                const response = await fetch(`${API_BASE}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Custom-Header': 'test'
+                    }
+                });
+                
+                const corsHeaders = {
+                    'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+                    'access-control-allow-credentials': response.headers.get('access-control-allow-credentials'),
+                };
+                
+                if (corsHeaders['access-control-allow-origin']) {
+                    resultEl.textContent = `✅ CORS is configured correctly!\n\nCORS Headers:\n${JSON.stringify(corsHeaders, null, 2)}\n\nThe backend allows requests from this origin.`;
+                    statusEl.textContent = 'Pass';
+                    statusEl.className = 'status success';
+                } else {
+                    resultEl.textContent = `⚠️ CORS headers not found.\nThis might cause issues with some requests.\n\nReceived headers: ${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}`;
+                    statusEl.textContent = 'Warn';
+                    statusEl.className = 'status pending';
+                }
+            } catch (error) {
+                resultEl.textContent = `❌ Error: ${error.message}`;
+                statusEl.textContent = 'Fail';
+                statusEl.className = 'status error';
+            }
+        }
+
+        // Auto-run tests on load
+        window.addEventListener('load', () => {
+            console.log('Natpudan AI - HTTPS Test Page Loaded');
+            console.log('Backend URL:', API_BASE);
+            console.log('Run tests manually or open browser console for more details');
+        });
+    </script>
+</body>
+</html>

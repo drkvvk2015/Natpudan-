@@ -101,11 +101,16 @@ async def detailed_health_check() -> Dict[str, Any]:
             "service": "Physician AI Assistant",
             "version": "1.0.0",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "uptime": {
-                "seconds": round(uptime_seconds, 2),
-                "hours": round(uptime_hours, 2),
-                "human_readable": _format_uptime(uptime_seconds)
+            # Frontend expects these fields
+            "uptime": round(uptime_seconds, 2),
+            "cpu_usage": round(cpu_percent, 1),
+            "memory_usage": {
+                "percent": round(memory.percent, 1)
             },
+            "disk_usage": {
+                "percent": round(disk.percent, 1)
+            },
+            # Detailed system info for debugging
             "system": {
                 "cpu_percent": cpu_percent,
                 "memory": {
@@ -118,6 +123,11 @@ async def detailed_health_check() -> Dict[str, Any]:
                     "free_gb": round(disk.free / 1024 / 1024 / 1024, 2),
                     "used_percent": disk.percent
                 }
+            },
+            "uptime_details": {
+                "seconds": round(uptime_seconds, 2),
+                "hours": round(uptime_hours, 2),
+                "human_readable": _format_uptime(uptime_seconds)
             },
             "process": {
                 "memory_mb": round(process_memory.rss / 1024 / 1024, 2),

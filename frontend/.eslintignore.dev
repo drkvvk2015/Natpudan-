@@ -1,0 +1,6 @@
+# Ignore during development
+*.spec.ts
+*.test.ts
+*.spec.tsx
+*.test.tsx
+coverage/

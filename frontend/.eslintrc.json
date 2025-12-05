@@ -1,0 +1,9 @@
+{
+  "extends": ["eslint:recommended"],
+  "rules": {
+    "no-inline-styles": "off",
+    "jsx-a11y/no-invalid-aria-role": "off",
+    "jsx-a11y/aria-role": "off",
+    "react/no-inline-styles": "off"
+  }
+}

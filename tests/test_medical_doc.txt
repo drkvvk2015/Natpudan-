@@ -1,0 +1,11 @@
+Medical Knowledge Test Document
+
+**Hypertension Management**
+- First-line medications: ACE inhibitors, ARBs, CCBs, thiazide diuretics
+- Target BP: < 140/90 mmHg (< 130/80 for diabetics)
+- Lifestyle modifications: reduce sodium, exercise, weight loss
+
+**Diabetes Type 2 Treatment**
+- First-line: Metformin 500-2000mg daily
+- HbA1c target: < 7% for most patients
+- Monitor for complications: retinopathy, nephropathy, neuropathy

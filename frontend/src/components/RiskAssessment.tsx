@@ -173,7 +173,7 @@ const RiskAssessment: React.FC<RiskAssessmentProps> = ({ patientData, showDetail
             <>
               <Divider sx={{ my: 2 }} />
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                ⚠️ Risk Alerts
+                [WARNING] Risk Alerts
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {riskScore.alerts.map((alert, index) => (
@@ -192,7 +192,7 @@ const RiskAssessment: React.FC<RiskAssessmentProps> = ({ patientData, showDetail
           {/* Recommendations */}
           <Divider sx={{ my: 2 }} />
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-            📋 Recommendations
+            [LIST] Recommendations
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {riskScore.recommendations.map((rec, index) => (

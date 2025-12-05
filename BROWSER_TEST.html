@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natpudan Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-box {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background: #4caf50; color: white; }
+        .error { background: #f44336; color: white; }
+        .warning { background: #ff9800; color: white; }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #0b7dda; }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .step {
+            background: #e3f2fd;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏥 Natpudan AI Medical Assistant - Connection Test</h1>
+    
+    <div class="test-box">
+        <h2>📋 Pre-Flight Checklist</h2>
+        <div class="step">
+            <strong>Step 1:</strong> Test Backend API
+            <br><button onclick="window.open('http://127.0.0.1:8000/health', '_blank')">Open Backend Health Check</button>
+            <br><small>No certificate warnings needed (using HTTP)</small>
+        </div>
+        <div class="step">
+            <strong>Step 2:</strong> Open Frontend App
+            <br><button onclick="window.open('http://127.0.0.1:5173', '_blank')">Open Frontend App</button>
+            <br><small>No certificate warning for frontend (using HTTP)</small>
+        </div>
+    </div>
+
+    <div class="test-box">
+        <h2>🔍 Connection Tests</h2>
+        <div id="tests">
+            <p>Click "Run Tests" after accepting both certificates</p>
+        </div>
+        <button onclick="runTests()">Run Tests</button>
+    </div>
+
+    <div class="test-box">
+        <h2>ℹ️ About HTTP Mode</h2>
+        <p><strong>Why HTTP instead of HTTPS?</strong></p>
+        <ul>
+            <li>✅ No certificate warnings or mixed content issues</li>
+            <li>🔧 Avoids Node.js v22 WebSocket compatibility problems</li>
+            <li>🔒 Safe for local development on 127.0.0.1 (loopback interface)</li>
+            <li>💡 In production, you'll use proper HTTPS with real certificates</li>
+        </ul>
+        <p><strong>Is it safe?</strong> Yes! Traffic on 127.0.0.1 never leaves your computer.</p>
+    </div>
+
+    <script>
+        async function runTests() {
+            const testsDiv = document.getElementById('tests');
+            testsDiv.innerHTML = '<p>Running tests...</p>';
+            
+            let html = '';
+            
+            // Test 1: Backend Health
+            html += '<div class="test-box"><h3>Test 1: Backend API</h3>';
+            try {
+                const response = await fetch('http://127.0.0.1:8000/health');
+                const data = await response.json();
+                html += `<span class="status success">✓ CONNECTED</span>`;
+                html += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                html += `<span class="status error">✗ FAILED</span>`;
+                html += `<pre>Error: ${error.message}</pre>`;
+                html += `<p><strong>Fix:</strong> Check if backend is running at <a href="http://127.0.0.1:8000/health" target="_blank">http://127.0.0.1:8000/health</a></p>`;
+            }
+            html += '</div>';
+            
+            // Test 2: Frontend
+            html += '<div class="test-box"><h3>Test 2: Frontend Server</h3>';
+            try {
+                const response = await fetch('http://127.0.0.1:5173/');
+                const text = await response.text();
+                if (text.includes('root') && text.includes('vite')) {
+                    html += `<span class="status success">✓ CONNECTED</span>`;
+                    html += `<p>Frontend is serving React app (HTTP mode)</p>`;
+                } else {
+                    html += `<span class="status warning">⚠ UNEXPECTED RESPONSE</span>`;
+                }
+            } catch (error) {
+                html += `<span class="status error">✗ FAILED</span>`;
+                html += `<pre>Error: ${error.message}</pre>`;
+                html += `<p><strong>Fix:</strong> Check if frontend is running at <a href="http://127.0.0.1:5173" target="_blank">http://127.0.0.1:5173</a></p>`;
+            }
+            html += '</div>';
+            
+            // Test 3: Login endpoint
+            html += '<div class="test-box"><h3>Test 3: Login API</h3>';
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'test@test.com', password: 'test' })
+                });
+                if (response.status === 401) {
+                    html += `<span class="status success">✓ WORKING</span>`;
+                    html += `<p>Login endpoint responding correctly (401 = invalid credentials, as expected)</p>`;
+                } else {
+                    html += `<span class="status warning">⚠ Status: ${response.status}</span>`;
+                }
+            } catch (error) {
+                html += `<span class="status error">✗ FAILED</span>`;
+                html += `<pre>Error: ${error.message}</pre>`;
+            }
+            html += '</div>';
+            
+            testsDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
