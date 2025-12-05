@@ -1,121 +1,86 @@
-###############################################
-# Consolidated ignore rules (UTF-8)
-# Node, Python, env, IDE, OS, caches, data
-###############################################
-
-# Node/JS
-node_modules/
-frontend/node_modules/
-backend/node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-dist/
-frontend/dist/
-build/
-*.min.js
-*.min.css
-.vite/
-
 # Python
 __pycache__/
 *.py[cod]
+*.class
 *.so
 .Python
-env/
+.venv/
+.venv311/
 venv/
 ENV/
-.venv/
-
-# Environment files (never commit secrets)
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-backend/.env
-frontend/.env*
-
-# IDE/Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS-generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+env/
 
 # Logs
 *.log
 logs/
+backend/logs/*.log
 
-# Temp and caches
-tmp/
-temp/
+# Database backups
+*.db.bak
+*.db.backup*
+physician_ai.db
+
+# IDE
+.vscode/
+.idea/
+.vs/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+*.test.js
+*.spec.js
+
+# Cache
+.pytest_cache/
+.cache/
+
+# Environment
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# PDF uploads (managed in backend/data/knowledge_base)
+/*.pdf
+
+# Large files - Don't commit to GitHub
+backend/data/knowledge_base/*.pdf
+backend/data/**/*.pdf
+frontend/release/
+frontend/android/app/build/
+frontend/android/app/release/
+*.exe
+natpudan-ai
+
+# Certificates
+backend/certs/
+frontend/certs/
+
+# Database files
+*.db
+natpudan.db
+
+# Temporary files
 *.tmp
 *.temp
-.cache
-.parcel-cache
-.yarn-integrity
+*.swp
+*.swo
 
-# Coverage
-coverage/
-*.lcov
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Framework outputs
-.next
-.nuxt
-.vuepress/dist
-.serverless
-.fusebox/
-.dynamodb/
-
-# App/generated data (do not version large artifacts)
-backend/data/knowledge_base/chroma_db/
-backend/data/knowledge_base/simple_index/
-backend/data/medical_books/
-data/medical_books/
-**/*.pdf
-
-# Local databases and backups
-physician_ai.db
-physician_ai.db.bak
-backend/physician_ai.db
-*.sqlite
-*.db
-*.db.bak
-
-# Android/Mobile
-frontend/android/local.properties
-frontend/android/app/build/
-android/local.properties
-*.apk
-*.aab
-
-# Desktop/Electron builds (too large for GitHub)
+# Debug files
+debug_*
+test_output_*
+# Large build artifacts
 frontend/release/
-release/
-*.exe
-*.dmg
-*.AppImage
-*.deb
-*.rpm
-
-# Misc
-.python-version
-*.bak
-*.orig
-*.patch
+backend/data/knowledge_base/*.pdf
+!backend/data/knowledge_base/.gitkeep
+backend/data/medical_books/*.pdf
