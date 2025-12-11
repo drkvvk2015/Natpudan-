@@ -1,19 +1,129 @@
-/* Minimal base styles to ensure readable defaults */
+/* Minimal base styles to ensure readable defaults with cross-browser compatibility */
 :root {
   --bg: #0b0c10;
   --fg: #e6e6e6;
+  /* Text sizing adjustments - vendor prefixes for compatibility */
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* User selection */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
-html, body, #root {
+html {
   height: 100%;
+  /* Text decoration skip ink for better readability */
+  -webkit-text-decoration-skip: ink;
+  text-decoration-skip-ink: auto;
 }
 
 body {
+  height: 100%;
   margin: 0;
   font-family: Inter, ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
   background: var(--bg);
   color: var(--fg);
+  /* Font smoothing */
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
 }
 
-a { color: #61dafb; text-decoration: none; }
-a:hover { text-decoration: underline; }
+#root {
+  height: 100%;
+  display: flex;
+}
+
+/* Button and form element accessibility */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+button,
+[role="button"] {
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  /* Focus styles for accessibility */
+  outline: none;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* Link styles with accessibility focus */
+a {
+  color: #61dafb;
+  text-decoration: none;
+  -webkit-text-decoration-skip: ink;
+  text-decoration-skip-ink: auto;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+a:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Scrollbar styling with cross-browser support */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.7);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-color: rgba(102, 126, 234, 0.5) rgba(0, 0, 0, 0.1);
+  scrollbar-width: thin;
+}
+
+/* Backdrop filter support with fallbacks */
+@supports (backdrop-filter: blur(1px)) {
+  .backdrop-blur {
+    backdrop-filter: blur(10px);
+  }
+}
+
+@supports (-webkit-backdrop-filter: blur(1px)) {
+  .backdrop-blur {
+    -webkit-backdrop-filter: blur(10px);
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  button,
+  [role="button"] {
+    display: none !important;
+  }
+}

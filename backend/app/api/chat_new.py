@@ -279,13 +279,27 @@ async def send_message(
 
 **YOUR TASK - CREATE A CONSOLIDATED RESPONSE:**
 
+First, DIRECTLY ANSWER the user's question in the opening paragraph. If they ask "what is fever?" start with a clear definition. Then expand with comprehensive details.
+
 Write a SINGLE, UNIFIED clinical response that synthesizes ALL {len(search_results)} references into one coherent narrative. DO NOT list references separately - instead, INTEGRATE the information seamlessly.
+
+**IMPORTANT:** 
+- For definition questions (what is..., define...), START with a clear 2-3 sentence definition
+- For clinical questions, START with the most relevant answer
+- Then provide comprehensive details organized by sections below
 
 **Required Structure:**
 
+## DIRECT ANSWER
+(START HERE: 1-2 paragraphs directly answering the user's specific question)
+- If they ask "what is X?" → Define X clearly first
+- If they ask "how to treat Y?" → State treatment approach first
+- If they ask "what causes Z?" → Explain causes first
+[Then continue with comprehensive details below]
+
 ## [TARGET] CLINICAL OVERVIEW
 (2-3 paragraphs synthesizing key information from all references)
-- Definition and significance
+- Definition and significance (expand on direct answer)
 - Epidemiology and prevalence
 - Primary mechanisms/pathophysiology
 [Cite sources throughout: [1], [2], [3], etc.]
@@ -462,14 +476,44 @@ Below is information from our medical knowledge base, organized by relevance. Ea
 
  **For urgent medical concerns, call emergency services immediately**"""
         else:
-            # No knowledge base results - try OpenAI or provide general guidance
+            # No knowledge base results - try OpenAI with enhanced medical prompt
             try:
+                enhanced_medical_prompt = f"""You are an expert medical AI assistant with comprehensive medical knowledge. Provide detailed, accurate medical information for healthcare professionals.
+
+**User Query:** "{request.message}"
+
+**Your Task:**
+Provide a comprehensive, professional medical response covering:
+
+1. **DEFINITION & OVERVIEW** - Clear explanation of the condition/topic
+2. **PATHOPHYSIOLOGY** - Underlying mechanisms and biology
+3. **CLINICAL PRESENTATION** - Signs, symptoms, and physical findings
+4. **DIAGNOSIS** - Diagnostic criteria, tests, and workup
+5. **TREATMENT** - Evidence-based management strategies with specifics
+6. **PROGNOSIS** - Expected outcomes and complications
+7. **PATIENT EDUCATION** - Key counseling points
+
+**Guidelines:**
+- Be thorough and clinically detailed
+- Include specific values, criteria, and dosages when relevant
+- Use medical terminology appropriately
+- Cite evidence levels when possible (e.g., "per guidelines...")
+- Emphasize clinical decision-making
+- Include warning signs and red flags
+- Note when specialist consultation is needed
+
+**Format:**
+Use clear markdown headers (##) and bullet points for readability. Make it comprehensive enough for clinical decision support.
+
+**Safety Note:**
+Always end with appropriate safety reminders about emergencies."""
+
                 ai_response = await generate_ai_response(
                     messages=conversation_history,
-                    system_prompt="You are a helpful medical AI assistant for healthcare professionals. Provide accurate, professional medical information and assistance. Always emphasize when clinical judgment is required and when emergency care should be sought.",
+                    system_prompt=enhanced_medical_prompt,
                 )
                 openai_available = True
-                logger.info("Response from OpenAI (no KB results)")
+                logger.info("Response from OpenAI with enhanced medical prompt (no KB results)")
             except Exception as e:
                 logger.warning(f"Both KB and OpenAI unavailable: {e}")
                 ai_response = f"""I apologize, but I couldn't find specific information about your query in our medical knowledge base.

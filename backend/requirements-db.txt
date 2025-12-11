@@ -1,5 +1,5 @@
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
+sqlalchemy==2.0.44
+# psycopg2-binary==2.9.9
 alembic==1.12.1
 passlib==1.7.4
 bcrypt==4.1.1

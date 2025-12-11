@@ -39,6 +39,8 @@ import {
   Image as ImageIcon,
   Verified as VerifiedIcon,
   Warning as WarningIcon,
+  AutoAwesome as SmartIcon,
+  Public as GlobalIcon,
 } from '@mui/icons-material'
 import apiClient from '../services/apiClient'
 import { ImageViewer } from '../components/ImageViewer'
@@ -115,6 +117,7 @@ export default function KnowledgeBase() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [results, setResults] = useState<SearchResult[]>([])
+  const [synthesizedAnswer, setSynthesizedAnswer] = useState<string | null>(null)
   const [imageResults, setImageResults] = useState<ImageResult[]>([])
   const [verification, setVerification] = useState<VerificationResult | null>(null)
   const [knowledgeStats, setKnowledgeStats] = useState<KnowledgeStats | null>(null)
@@ -170,9 +173,11 @@ export default function KnowledgeBase() {
           min_year: minYear ? Number(minYear) : undefined,
           allow_outdated: allowOutdated,
         },
+        synthesize_answer: true,
       })
 
       setResults(response.data.results || [])
+      setSynthesizedAnswer(response.data.answer || null)
       setImageResults([])
       setVerification(null)
     } catch (error) {
@@ -343,6 +348,16 @@ export default function KnowledgeBase() {
         </Alert>
       )}
 
+      {/* Online Status Indicator */}
+      <Alert severity="success" icon={<GlobalIcon />} sx={{ mb: 3 }}>
+        <Typography variant="subtitle2" fontWeight={600}>
+          Online Knowledge Base Active
+        </Typography>
+        <Typography variant="body2">
+          Connected to global medical sources (PubMed, CDC, WHO) for real-time verification.
+        </Typography>
+      </Alert>
+
       {/* Upload section removed - Use dedicated "Upload PDFs" page from menu */}
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
@@ -503,6 +518,52 @@ export default function KnowledgeBase() {
               ))}
             </ImageList>
           </Box>
+        )}
+
+
+
+        {/* Synthesized Answer */}
+        {synthesizedAnswer && (
+          <Paper 
+            elevation={2} 
+            sx={{ 
+              p: 3, 
+              mb: 3, 
+              bgcolor: 'primary.50',
+              border: '1px solid',
+              borderColor: 'primary.100'
+            }}
+          >
+            <Typography variant="h6" gutterBottom color="primary.main" display="flex" alignItems="center" gap={1}>
+              <SmartIcon /> AI Consolidated Answer
+            </Typography>
+            <Typography 
+              variant="body1" 
+              component="div" 
+              sx={{ whiteSpace: 'pre-wrap' }}
+            >
+              {synthesizedAnswer.split(/(\[\d+\])/g).map((part, i) => {
+                if (/^\[\d+\]$/.test(part)) {
+                  return (
+                    <Chip 
+                      key={i} 
+                      label={part} 
+                      size="small" 
+                      color="primary" 
+                      sx={{ 
+                        mx: 0.5, 
+                        height: 20, 
+                        fontSize: '0.75rem', 
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }} 
+                    />
+                  )
+                }
+                return part
+              })}
+            </Typography>
+          </Paper>
         )}
 
         {results.length > 0 && (

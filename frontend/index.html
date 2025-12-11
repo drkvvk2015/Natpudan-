@@ -10,6 +10,24 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Natpudan AI" />
     
+    <!-- CSS Compatibility & Accessibility Fixes -->
+    <style>
+      :root {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+      @supports (backdrop-filter: blur(1px)) {
+        .backdrop-blur {
+          backdrop-filter: blur(10px);
+        }
+      }
+      @supports (-webkit-backdrop-filter: blur(1px)) {
+        .backdrop-blur {
+          -webkit-backdrop-filter: blur(10px);
+        }
+      }
+    </style>
+    
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
     

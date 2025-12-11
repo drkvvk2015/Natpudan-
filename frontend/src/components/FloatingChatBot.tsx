@@ -26,6 +26,9 @@ import {
   Minimize as MinimizeIcon,
   AutoAwesome as SparklesIcon,
   Psychology as BrainIcon,
+  Medication as MedicationIcon,
+  MonitorHeart as StethoscopeIcon,
+  FormatListBulleted as ListIcon,
 } from '@mui/icons-material';
 import { sendChatMessage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -573,7 +576,8 @@ const FloatingChatBot: React.FC = () => {
             {/* Quick Actions */}
             <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
               <Chip
-                label="[PILL] Medications"
+                icon={<MedicationIcon sx={{ fontSize: '18px !important' }} />}
+                label="Medications"
                 size="small"
                 onClick={() => !isLoading && setInputMessage('Tell me about common medications')}
                 sx={{
@@ -590,7 +594,8 @@ const FloatingChatBot: React.FC = () => {
                 }}
               />
               <Chip
-                label="[STETHOSCOPE] Symptoms"
+                icon={<StethoscopeIcon sx={{ fontSize: '18px !important' }} />}
+                label="Symptoms"
                 size="small"
                 onClick={() => !isLoading && setInputMessage('Help me understand symptoms')}
                 sx={{
@@ -607,7 +612,8 @@ const FloatingChatBot: React.FC = () => {
                 }}
               />
               <Chip
-                label="[LIST] Procedures"
+                icon={<ListIcon sx={{ fontSize: '18px !important' }} />}
+                label="Procedures"
                 size="small"
                 onClick={() => !isLoading && setInputMessage('Explain medical procedures')}
                 sx={{

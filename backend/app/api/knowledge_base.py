@@ -3,7 +3,7 @@ Knowledge Base API - PDF Upload, Processing, and Management
 Supports: Multiple PDF uploads, Full text extraction, Intelligent chunking
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
@@ -17,16 +17,47 @@ from app.services.enhanced_knowledge_base import get_knowledge_base
 from app.services.local_vector_kb import get_local_knowledge_base
 from app.services.vector_knowledge_base import get_vector_knowledge_base
 from app.api.auth_new import get_current_user
-from app.models import User, KnowledgeDocument
+from app.models import User, KnowledgeDocument, UserRole
 from app.database import get_db
 from sqlalchemy.orm import Session
 import hashlib
+import hashlib
 import uuid
+import os
+import openai
 from app.services.online_knowledge_service import OnlineKnowledgeService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["knowledge-base"])
+
+# ==================== Access Control ====================
+
+def require_kb_management_role(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Dependency to ensure user has KB management permissions (Admin or Doctor only).
+    Raises 403 if user is not authorized.
+    """
+    if current_user.role not in [UserRole.ADMIN, UserRole.DOCTOR]:
+        logger.warning(f"KB access denied for user {current_user.email} with role {current_user.role}")
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied. Knowledge Base management requires Admin or Doctor role. Your role: {current_user.role.value}"
+        )
+    return current_user
+
+def require_admin_role(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Dependency to ensure user is Admin only.
+    Raises 403 if user is not an admin.
+    """
+    if current_user.role != UserRole.ADMIN:
+        logger.warning(f"Admin access denied for user {current_user.email} with role {current_user.role}")
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied. This operation requires Admin role. Your role: {current_user.role.value}"
+        )
+    return current_user
 
 @router.get("/test")
 async def test_kb():
@@ -74,6 +105,7 @@ class SearchRequest(BaseModel):
     alpha: float = 0.6  # hybrid weight
     filters: Optional[Dict[str, Any]] = None
     allow_fallback: bool = True
+    synthesize_answer: bool = False  # New: Generate consolidated answer
 
 
 class EvaluationItem(BaseModel):
@@ -93,11 +125,12 @@ async def upload_pdfs(
     chunk_size: int = 1000,
     extract_images: bool = True,  # Extract and index images
     ocr_enabled: bool = True,  # Enable OCR for scanned PDFs
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_kb_management_role),
     db: Session = Depends(get_db)
 ):
     """
     Upload multiple PDF files to knowledge base.
+    **Requires Admin or Doctor role.**
     
     - **files**: List of PDF files (up to 200MB each, 1GB total)
     - **use_full_content**: If False (default), intelligent chunking; if True, full PDF as single document
@@ -185,6 +218,9 @@ async def upload_pdfs(
             extracted_images = []
             extraction_method = "text"
             
+            # Generate unique document ID early for OCR usage
+            doc_uuid = str(uuid.uuid4())
+            
             if file_ext == ".pdf":
                 # Use enhanced OCR processor
                 ocr_processor = get_pdf_ocr_processor()
@@ -228,9 +264,6 @@ async def upload_pdfs(
                     "file_size_mb": len(content) / 1024 / 1024
                 })
                 continue
-            
-            # Generate unique document ID
-            doc_uuid = str(uuid.uuid4())
             
             # Process content
             if use_full_content:
@@ -936,10 +969,48 @@ async def search_knowledge_base(request: SearchRequest):
             source = "openai_vector"
 
         filtered_results = [r for r in results if r.get("score", 0) >= request.min_score]
+        final_results = filtered_results[: request.top_k]
+        
+        # Synthesize answer if requested
+        answer = None
+        if request.synthesize_answer and final_results:
+            try:
+                # Prepare context
+                context_parts = []
+                for i, r in enumerate(final_results):
+                    source = r.get("citation", {}).get("filename", "Unknown")
+                    text = r.get("text", "").strip()
+                    context_parts.append(f"[{i+1}] Source: {source}\n{text}")
+                
+                context = "\n\n".join(context_parts)
+                system_prompt = (
+                    "You are a helpful medical assistant. "
+                    "Answer the user's question using ONLY the provided context. "
+                    "Cite your sources using brackets like [1], [2] corresponding to the source numbers provided. "
+                    "If the answer is not in the context, say so. "
+                    "Format your answer in Markdown with clear headings and bullet points."
+                )
+                
+                user_prompt = f"Question: {request.query}\n\nContext:\n{context}"
+                
+                client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                response = client.chat.completions.create(
+                    model="gpt-4", # Or gpt-3.5-turbo
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.3
+                )
+                answer = response.choices[0].message.content
+            except Exception as e:
+                logger.error(f"Error synthesizing answer: {e}")
+                answer = "Error generating answer. Please try again."
 
         return {
             "query": request.query,
-            "results": filtered_results[: request.top_k],
+            "results": final_results,
+            "answer": answer,
             "total_results": len(filtered_results),
             "top_k": request.top_k,
             "source": source,
@@ -1144,12 +1215,12 @@ async def delete_document(
 @router.post("/upload-large")
 async def upload_large_pdf(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
-    Upload and process large PDF files (up to 1GB).
-    Uses streaming and chunking for memory efficiency.
-    Ideal for medical textbooks like Oxford Handbook, Harrison's, etc.
+    Upload and process large PDF files (up to 2GB) asynchronously.
     """
     try:
         # Validate file type
@@ -1183,39 +1254,114 @@ async def upload_large_pdf(
                 status_code=400,
                 detail=f"File exceeds maximum size of {MAX_FILE_SIZE / 1024 / 1024:.0f}MB"
             )
-        
-        # Process with large PDF processor
-        processor = get_large_pdf_processor()
-        knowledge_base = get_knowledge_base()
-        
-        # Progress tracking
-        processing_status = {
-            'current_page': 0,
-            'total_pages': 0,
-            'progress': 0
-        }
-        
-        async def progress_callback(progress: float, message: str):
-            processing_status['progress'] = progress
-            logger.info(f"Processing: {progress:.1f}% - {message}")
-        
-        # Process PDF and add to KB
-        result = await processor.process_large_pdf(
-            file_path=file_path,
-            add_to_kb=lambda text, source, metadata: add_to_knowledge_base(
-                knowledge_base, text, source, metadata
-            ),
-            progress_callback=progress_callback
+
+        # Create processing status record
+        doc_uuid = str(uuid.uuid4())
+        status_record = DocumentProcessingStatus(
+            document_id=doc_uuid,
+            status="queued",
+            processing_type="large_file_embedding",
+            progress_percent=0,
+            error_message=None
         )
+        db.add(status_record)
+        db.commit() # Commit to get ID and ensure visibility
+
+        # Background processing function
+        async def process_large_file_task(file_path: Path, doc_uuid: str):
+            try:
+                # Update status to processing
+                with next(get_db()) as task_db:
+                    status = task_db.query(DocumentProcessingStatus).filter(
+                        DocumentProcessingStatus.document_id == doc_uuid
+                    ).first()
+                    if status:
+                        status.status = "processing"
+                        status.started_at = datetime.utcnow()
+                        task_db.commit()
+
+                processor = get_large_pdf_processor()
+                knowledge_base = get_knowledge_base()
+
+                # Progress callback wrapper
+                async def progress_wrapper(progress: float, message: str):
+                    logger.info(f"Processing {doc_uuid}: {progress:.1f}% - {message}")
+                    # In a real scenario, you might update DB less frequently to avoid lock contention
+                    # For now we log it, real DB updates happen inside processor if it supported it, 
+                    # or we rely on the processor to call this
+                    with next(get_db()) as progress_db:
+                         s = progress_db.query(DocumentProcessingStatus).filter(
+                            DocumentProcessingStatus.document_id == doc_uuid
+                         ).first()
+                         if s:
+                             s.progress_percent = int(progress)
+                             progress_db.commit()
+
+                # Process
+                await processor.process_large_pdf(
+                    file_path=file_path,
+                    add_to_kb=lambda text, source, metadata: add_to_knowledge_base(
+                        knowledge_base, text, source, {**metadata, "document_uuid": doc_uuid, "uploaded_by": current_user.email}
+                    ),
+                    progress_callback=progress_wrapper
+                )
+
+                # Create KnowledgeDocument record 
+                with next(get_db()) as final_db:
+                    # Update status to completed
+                    s = final_db.query(DocumentProcessingStatus).filter(
+                        DocumentProcessingStatus.document_id == doc_uuid
+                    ).first()
+                    if s:
+                        s.status = "completed"
+                        s.progress_percent = 100
+                        s.completed_at = datetime.utcnow()
+                    
+                    # Create the main document record if not exists (process_large_pdf might not do this)
+                    # Note: Ideally process_large_pdf helper handles this or returns stats. 
+                    # For simplicity, we assume successful return means success.
+                    # We need to insert KnowledgeDocument here because process_large_pdf mostly adds chunks.
+                    
+                    # Check if doc exists (added by processor?)
+                    doc = final_db.query(KnowledgeDocument).filter(KnowledgeDocument.document_id == doc_uuid).first()
+                    if not doc:
+                         new_doc = KnowledgeDocument(
+                            document_id=doc_uuid,
+                            filename=file.filename,
+                            file_path=str(file_path),
+                            file_hash=hashlib.sha256(file.filename.encode()).hexdigest(), # Simplified hash for now
+                            file_size=int(file_path.stat().st_size),
+                            extension=file_ext,
+                            is_indexed=True,
+                            uploaded_by_id=current_user.id
+                        )
+                         final_db.add(new_doc)
+                    
+                    final_db.commit()
+
+            except Exception as e:
+                logger.error(f"Error processing large file {doc_uuid}: {e}")
+                with next(get_db()) as error_db:
+                    s = error_db.query(DocumentProcessingStatus).filter(
+                        DocumentProcessingStatus.document_id == doc_uuid
+                    ).first()
+                    if s:
+                        s.status = "failed"
+                        s.error_message = str(e)
+                        error_db.commit()
         
+        # Add to background tasks
+        background_tasks.add_task(process_large_file_task, file_path, doc_uuid)
+
         return {
-            "message": f"Successfully processed {file.filename}",
-            "filename": file.filename,
-            "saved_as": safe_filename,
-            "file_size_mb": file_size_mb,
-            "processing_result": result,
-            "uploaded_by": current_user.email,
-            "upload_time": datetime.now().isoformat()
+            "message": "File uploaded and queued for processing",
+            "results": [{
+                "filename": file.filename,
+                "status": "success", # Initial upload success
+                "document_id": doc_uuid,
+                "info": "Large file queued for background processing",
+                "size_mb": file_size_mb
+            }]
         }
         
     except HTTPException:
@@ -1716,6 +1862,11 @@ async def reset_knowledge_base(
 ):
     """
     [ADMIN ONLY] Reset/clear all documents from knowledge base.
+    Clears:
+    - Database records (KnowledgeDocument)
+    - Uploaded files (data/uploaded_documents)
+    - FAISS index
+    - Cached embeddings
     Requires admin privileges.
     """
     # Check if user is admin
@@ -1726,13 +1877,49 @@ async def reset_knowledge_base(
         )
     
     try:
+        import shutil
+        from pathlib import Path
+        
         # Get count before deletion
         count_before = db.query(KnowledgeDocument).count()
         logger.warning(f"[ADMIN] {current_user.email} initiating KB reset - {count_before} documents")
         
-        # Delete all documents
+        # 1. Delete all database records
         db.query(KnowledgeDocument).delete()
         db.commit()
+        
+        # 2. Delete uploaded files directory
+        uploads_dir = Path("data/uploaded_documents")
+        if uploads_dir.exists():
+            logger.warning(f"Deleting uploaded files directory: {uploads_dir}")
+            shutil.rmtree(uploads_dir)
+            uploads_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 3. Delete FAISS index files
+        data_dir = Path("data/knowledge_base")
+        faiss_index_path = data_dir / "local_faiss_index.bin"
+        metadata_path = data_dir / "metadata.json"
+        embeddings_cache = Path("backend/cache/online_knowledge")
+        
+        if faiss_index_path.exists():
+            logger.warning(f"Deleting FAISS index: {faiss_index_path}")
+            faiss_index_path.unlink()
+        
+        if metadata_path.exists():
+            logger.warning(f"Deleting metadata: {metadata_path}")
+            metadata_path.unlink()
+        
+        if embeddings_cache.exists():
+            logger.warning(f"Deleting embeddings cache: {embeddings_cache}")
+            shutil.rmtree(embeddings_cache)
+            embeddings_cache.mkdir(parents=True, exist_ok=True)
+        
+        # 4. Reinitialize knowledge base
+        kb = _get_kb()
+        if kb:
+            logger.info("Reinitializing knowledge base...")
+            kb._initialize_index()
+            kb.save_index()
         
         # Verify deletion
         count_after = db.query(KnowledgeDocument).count()
@@ -1741,8 +1928,13 @@ async def reset_knowledge_base(
         
         return {
             "status": "success",
-            "message": f"Knowledge base reset complete",
-            "deleted_documents": count_before,
+            "message": f"Knowledge base fully reset",
+            "cleared": {
+                "database_documents": count_before,
+                "uploaded_files": "cleared",
+                "faiss_index": "deleted",
+                "embeddings_cache": "cleared"
+            },
             "remaining_documents": count_after,
             "timestamp": datetime.now().isoformat()
         }

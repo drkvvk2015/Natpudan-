@@ -110,12 +110,67 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"[ERROR] Queue processor initialization failed: {e}")
     
+    # Initialize APScheduler for scheduled tasks
+    scheduler = None
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        from app.tasks import update_knowledge_base
+        
+        scheduler = BackgroundScheduler()
+        
+        def schedule_kb_update():
+            """Submit KB update task to Celery queue"""
+            try:
+                logger.info("[SCHEDULER] Submitting KB update task to Celery...")
+                # Send task to Celery worker
+                task = update_knowledge_base.delay(
+                    topics=[
+                        "diabetes mellitus",
+                        "hypertension",
+                        "heart disease",
+                        "cancer",
+                        "pneumonia",
+                        "COVID-19",
+                        "depression",
+                        "arthritis"
+                    ],
+                    papers_per_topic=5,
+                    days_back=7
+                )
+                logger.info(f"[SCHEDULER] ✅ KB update task queued (Task ID: {task.id})")
+            except Exception as e:
+                logger.error(f"[SCHEDULER] ❌ Error submitting task: {e}")
+        
+        # Schedule KB update: Daily at 2 AM UTC
+        scheduler.add_job(
+            schedule_kb_update,
+            CronTrigger(hour=2, minute=0),
+            id="kb_daily_update",
+            name="Daily Knowledge Base Update",
+            replace_existing=True
+        )
+        
+        scheduler.start()
+        logger.info("[OK] APScheduler started - KB updates scheduled for 2:00 AM UTC daily")
+    except Exception as e:
+        logger.warning(f"[WARNING] APScheduler initialization failed (Celery updates disabled): {e}")
+        scheduler = None
+    
     logger.info(f"[STARTED] Application started - Services: DB={service_health['database']}, OpenAI={service_health['openai']}, KB={service_health['knowledge_base']}")
     
     yield  # Application runs
     
     # Shutdown: Cleanup
     logger.info("[STOPPING] Natpudan AI Medical Assistant...")
+    
+    # Stop scheduler
+    if scheduler:
+        try:
+            scheduler.shutdown(wait=False)
+            logger.info("[OK] APScheduler stopped")
+        except Exception as e:
+            logger.warning(f"Warning stopping scheduler: {e}")
     try:
         # Stop queue processor
         from app.services.upload_queue_processor import get_queue_processor

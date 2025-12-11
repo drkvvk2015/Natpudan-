@@ -10,7 +10,7 @@ $ErrorActionPreference = "Continue"
 $rootDir = "D:\Users\CNSHO\Documents\GitHub\Natpudan-"
 $backendDir = Join-Path $rootDir "backend"
 $frontendDir = Join-Path $rootDir "frontend"
-$venvPython = Join-Path $rootDir ".venv311\Scripts\python.exe"
+$venvPython = Join-Path $rootDir ".venv\Scripts\python.exe"
 
 function Write-Status {
     param([string]$Message, [string]$Type = "Info")
@@ -200,3 +200,4 @@ if ($Verbose) {
 }
 
 Write-Status "`n[SPARKLE] Startup complete! App is ready." "Success"
+Read-Host "Press Enter to stop services and exit..."

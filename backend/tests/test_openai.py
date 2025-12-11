@@ -6,6 +6,9 @@ import asyncio
 
 load_dotenv(override=True)
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_api():
     api_key = os.getenv('OPENAI_API_KEY', '')
     print(f"API Key Length: {len(api_key)}")

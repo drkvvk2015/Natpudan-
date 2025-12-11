@@ -1,0 +1,87 @@
+{
+  "kb_update_schedule": {
+    "enabled": true,
+    "timezone": "UTC",
+    "frequency": "daily",
+    "time": "02:00",
+    "description": "Automatic knowledge base update at 2 AM UTC"
+  },
+  "topics": [
+    {
+      "name": "diabetes mellitus",
+      "priority": "high",
+      "enabled": true
+    },
+    {
+      "name": "hypertension",
+      "priority": "high",
+      "enabled": true
+    },
+    {
+      "name": "heart disease",
+      "priority": "high",
+      "enabled": true
+    },
+    {
+      "name": "cancer",
+      "priority": "high",
+      "enabled": true
+    },
+    {
+      "name": "pneumonia",
+      "priority": "medium",
+      "enabled": true
+    },
+    {
+      "name": "COVID-19",
+      "priority": "medium",
+      "enabled": true
+    },
+    {
+      "name": "depression",
+      "priority": "medium",
+      "enabled": true
+    },
+    {
+      "name": "arthritis",
+      "priority": "medium",
+      "enabled": true
+    }
+  ],
+  "update_settings": {
+    "papers_per_topic": 5,
+    "days_back": 7,
+    "max_retries": 3,
+    "retry_delay_seconds": 60,
+    "timeout_seconds": 3600
+  },
+  "sources": {
+    "pubmed": {
+      "enabled": true,
+      "description": "PubMed - Latest medical research papers"
+    },
+    "who": {
+      "enabled": true,
+      "description": "WHO - World Health Organization guidelines"
+    },
+    "cdc": {
+      "enabled": true,
+      "description": "CDC - Disease and health data"
+    },
+    "nih": {
+      "enabled": true,
+      "description": "NIH - National Institutes of Health"
+    }
+  },
+  "notifications": {
+    "email_on_success": false,
+    "email_on_failure": false,
+    "log_level": "INFO"
+  },
+  "advanced": {
+    "cleanup_old_documents_days": 30,
+    "max_document_age_days": 90,
+    "index_batch_size": 10,
+    "cache_embeddings": true
+  }
+}

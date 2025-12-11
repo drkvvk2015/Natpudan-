@@ -142,7 +142,7 @@ const KnowledgeBaseUpload: React.FC = () => {
       'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
     },
-    maxSize: 50 * 1024 * 1024, // 50MB
+    maxSize: 2.5 * 1024 * 1024 * 1024, // 2.5GB limit
     multiple: true,
   });
 
@@ -157,82 +157,137 @@ const KnowledgeBaseUpload: React.FC = () => {
     setUploadResults(null);
 
     try {
-      const formData = new FormData();
-      
-      files.forEach((fileData) => {
-        formData.append('files', fileData.file);
-      });
-      
-      formData.append('use_full_content', String(useFullContent));
-      formData.append('chunk_size', String(chunkSize));
+      // Split files into large (>50MB) and standard
+      const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024;
+      const standardFiles = files.filter(f => f.file.size <= LARGE_FILE_THRESHOLD);
+      const largeFiles = files.filter(f => f.file.size > LARGE_FILE_THRESHOLD);
 
-      // Update status to uploading with initial message
-      setFiles((prev) =>
-        prev.map((f) => ({ 
-          ...f, 
-          status: 'uploading' as const, 
-          progress: 10,
-          statusMessage: '[UP] Uploading file to server...'
-        }))
-      );
+    let standardResults = { results: [] };
+    let largeFileResults: any[] = [];
 
-      const response = await apiClient.post('/api/medical/knowledge/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = progressEvent.total
-            ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
-            : 0;
-          
-          let statusMessage = '[UP] Uploading file to server...';
-          if (percentCompleted > 80) {
-            statusMessage = '[GEAR] Processing and extracting text...';
-          } else if (percentCompleted > 50) {
-            statusMessage = '[UP] Uploading... Almost there!';
+    // 1. Process Standard Files (Batch)
+    if (standardFiles.length > 0) {
+        const formData = new FormData();
+        standardFiles.forEach((fileData) => {
+           formData.append('files', fileData.file);
+        });
+        formData.append('use_full_content', String(useFullContent));
+        formData.append('chunk_size', String(chunkSize));
+
+        // Update status for standard files
+        setFiles(prev => prev.map(f => {
+            if (standardFiles.some(sf => sf.file === f.file)) {
+                return { ...f, status: 'uploading', progress: 10, statusMessage: '[UP] Uploading standard file...' };
+            }
+            return f;
+        }));
+
+        try {
+            const response = await apiClient.post('/api/medical/knowledge/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    const percent = progressEvent.total ? Math.round((progressEvent.loaded * 100) / progressEvent.total) : 0;
+                    setFiles(prev => prev.map(f => {
+                         if (standardFiles.some(sf => sf.file === f.file)) {
+                             return { ...f, progress: percent };
+                         }
+                         return f;
+                    }));
+                }
+            });
+            standardResults = response.data;
+        } catch (error: any) {
+            console.error("Standard upload failed", error);
+            // Mark standard files as error
+             setFiles(prev => prev.map(f => {
+                 if (standardFiles.some(sf => sf.file === f.file)) {
+                     return { ...f, status: 'error', error: 'Batch upload failed', statusMessage: '[ERROR] Upload failed' };
+                 }
+                 return f;
+             }));
+        }
+      }
+
+      // 2. Process Large Files (Individually)
+      for (const largeFile of largeFiles) {
+          try {
+             setFiles(prev => prev.map(f => {
+                 if (f.file === largeFile.file) {
+                     return { ...f, status: 'uploading' as const, progress: 1, statusMessage: '[UP] Uploading large file (this may take time)...' };
+                 }
+                 return f;
+             }));
+
+             const formData = new FormData();
+             formData.append('file', largeFile.file);
+             
+             const response = await apiClient.post('/api/medical/knowledge/upload-large', formData, {
+                 headers: { 'Content-Type': 'multipart/form-data' },
+                 timeout: 600000, // 10 minute timeout for large uploads
+                 onUploadProgress: (progressEvent) => {
+                     const percent = progressEvent.total ? Math.round((progressEvent.loaded * 100) / progressEvent.total) : 0;
+                     setFiles(prev => prev.map(f => {
+                         if (f.file === largeFile.file) {
+                             return { ...f, progress: percent };
+                         }
+                         return f;
+                     }));
+                 }
+             });
+             
+             if (response.data.results && response.data.results[0]) {
+                 largeFileResults.push(response.data.results[0]);
+             }
+          } catch (error: any) {
+             console.error(`Large file upload failed: ${largeFile.file.name}`, error);
+             setFiles(prev => prev.map(f => {
+                 if (f.file === largeFile.file) {
+                     return { ...f, status: 'error', error: 'Large file upload failed', statusMessage: '[ERROR] Server timeout or error' };
+                 }
+                 return f;
+             }));
           }
-          
-          setFiles((prev) =>
-            prev.map((f) => ({ 
-              ...f, 
-              progress: percentCompleted,
-              statusMessage: f.status === 'uploading' ? statusMessage : f.statusMessage
-            }))
-          );
-        },
-      });
+      }
 
-      // Processing phase
-      setFiles((prev) =>
-        prev.map((f) => ({ 
-          ...f, 
-          status: 'processing' as const,
-          progress: 90,
-          statusMessage: '[BACKGROUND] Embeddings being generated asynchronously - will be ready in 10-30 seconds'
-        }))
-      );
+      // Merge results
+      const allResults = [...(standardResults.results || []), ...largeFileResults];
+      const mergedResponse = {
+          message: `Processed ${allResults.length} files`,
+          results: allResults,
+          summary: {
+              successful: allResults.filter((r: any) => r.status === 'success').length,
+              failed: allResults.filter((r: any) => r.status === 'error').length,
+              total_chunks_created: 0, // Simplified
+              total_size_mb: 0
+          }
+      };
 
-      setUploadResults(response.data);
+      setUploadResults(mergedResponse);
 
       // Extract document IDs and start polling
       const docIds: string[] = [];
-      response.data.results.forEach((result: any) => {
+      allResults.forEach((result: any) => {
         if (result.status === 'success' && result.document_id) {
           docIds.push(result.document_id);
         }
       });
       
       if (docIds.length > 0) {
-        setUploadedDocumentIds(docIds);
+        setUploadedDocumentIds(prev => [...prev, ...docIds]);
         setPollingActive(true);
       }
 
-      // Update file statuses based on results
+      // Update UI status based on results
       setFiles((prev) =>
-        prev.map((fileData, index) => {
-          const result = response.data.results[index];
+        prev.map((fileData) => {
+          // Match result by filename
+          const result = allResults.find((r: any) => r.filename === fileData.file.name);
+          
+          if (!result) return fileData; // Keep existing status if not in this batch (or error handled above)
+
           const info = result.info ? `\n${result.info}` : '';
-          return {
+          
+          const updatedFile: UploadedFile = {
             ...fileData,
             status: result.status === 'success' ? 'success' : 'error',
             progress: 100,
@@ -241,9 +296,15 @@ const KnowledgeBaseUpload: React.FC = () => {
             characters: result.characters,
             documentId: result.document_id,
             statusMessage: result.status === 'success' 
-              ? `[OK] Document queued - background processing started${info}` 
-              : `[ERROR] ${result.error}`,
+              ? `[OK] Queued for processing${info}` 
+              : result.status === 'skipped'
+                ? `[INFO] ${result.reason || 'Document already uploaded'}`
+                : `[ERROR] ${result.error || 'Unknown error'}`,
           };
+          
+          if (result.status === 'skipped') updatedFile.status = 'success';
+          
+          return updatedFile;
         })
       );
 
@@ -251,15 +312,8 @@ const KnowledgeBaseUpload: React.FC = () => {
       await loadStatistics();
 
     } catch (error: any) {
+        // Global error handler (fallback)
       console.error('Upload error:', error);
-      setFiles((prev) =>
-        prev.map((f) => ({
-          ...f,
-          status: 'error',
-          error: error.response?.data?.detail || 'Upload failed',
-          statusMessage: `[ERROR] ${error.response?.data?.detail || 'Upload failed'}`,
-        }))
-      );
     } finally {
       setUploading(false);
       setCurrentUploadingFile('');
@@ -317,14 +371,7 @@ const KnowledgeBaseUpload: React.FC = () => {
                   {statistics.categories_count || 0}
                 </Typography>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Typography variant="body2" color="text.secondary">
-                  Categories
-                </Typography>
-                <Typography variant="h5">
-                  {statistics.source_details?.['Local Database']?.categories || 0}
-                </Typography>
-              </Grid>
+
             </Grid>
           </CardContent>
         </Card>
