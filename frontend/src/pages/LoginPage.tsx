@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { login as apiLogin } from '../services/api';
-import { TextField, Button, Container, Typography, Box, Divider, Alert } from '@mui/material';
+import { TextField, Button, Container, Typography, Box, Divider, Alert, Chip, Stack } from '@mui/material';
+import { checkBackendHealth } from '../services/apiClient';
 import { Google as GoogleIcon, GitHub as GitHubIcon, Microsoft as MicrosoftIcon } from '@mui/icons-material';
 
 const LoginPage: React.FC = () => {
@@ -13,6 +14,7 @@ const LoginPage: React.FC = () => {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [backendOk, setBackendOk] = useState<boolean | null>(null);
 
   // Navigate to dashboard after successful login (once auth state updates)
   useEffect(() => {
@@ -21,6 +23,14 @@ const LoginPage: React.FC = () => {
       navigate('/dashboard');
     }
   }, [loginSuccess, isAuthenticated, navigate]);
+
+  // On mount, ping backend health to show status indicator
+  useEffect(() => {
+    (async () => {
+      const res = await checkBackendHealth();
+      setBackendOk(res.ok);
+    })();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +60,15 @@ const LoginPage: React.FC = () => {
       } else if (err?.message) {
         errorMsg = err.message;
       }
+      // Automatic correction hints
+      const hints: string[] = [];
+      if (!backendOk) hints.push('Backend server appears down. Please start backend on 127.0.0.1:8000.');
+      if (!email.includes('@')) hints.push('Email looks invalid (missing @).');
+      if (password.length < 6) hints.push('Password seems too short.');
+      if (errorMsg.toLowerCase().includes('incorrect')) hints.push('Incorrect email or password. Check Caps Lock.');
+      if (hints.length) {
+        errorMsg = `${errorMsg}\n• ${hints.join('\n• ')}`;
+      }
       
       setError(errorMsg);
       setLoading(false);
@@ -61,7 +80,8 @@ const LoginPage: React.FC = () => {
       setError(''); // Clear previous errors
       setLoading(true);
       
-      const frontendURL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+      // Use current origin to ensure redirect URI matches across all ports
+      const frontendURL = window.location.origin;
       const redirectUri = `${frontendURL}/auth/callback`;
       const baseURL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
       
@@ -112,6 +132,10 @@ const LoginPage: React.FC = () => {
         <Typography component="h1" variant="h5">
           Login
         </Typography>
+        {/* Server status indicators */}
+        <Stack direction="row" spacing={1} sx={{ mt: 1, mb: 1 }}>
+          <Chip label={`Backend: ${backendOk === null ? 'Checking…' : backendOk ? 'Online' : 'Offline'}`} color={backendOk ? 'success' : 'default'} variant={backendOk ? 'filled' : 'outlined'} />
+        </Stack>
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
           <TextField
             margin="normal"

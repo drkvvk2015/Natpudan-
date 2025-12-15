@@ -162,10 +162,10 @@ class LocalVectorKnowledgeBase:
             
         if SENTENCE_TRANSFORMER_AVAILABLE and self.embedding_model is None:
             try:
-                logger.info(f"Loading local embedding model: {self.model_name_to_load}...")
+                logger.info(f"[FAST] Loading embedding model once: {self.model_name_to_load}...")
                 self.embedding_model = SentenceTransformer(self.model_name_to_load)
                 self._model_loaded = True
-                logger.info(f"[OK] Local embedding model loaded")
+                logger.info(f"[OK] Model loaded - future embeddings will be faster")
             except Exception as e:
                 logger.error(f"Failed to load embedding model: {e}")
     
@@ -189,9 +189,11 @@ class LocalVectorKnowledgeBase:
             # FAST: Process all texts at once (batched internally)
             embeddings = self.embedding_model.encode(
                 texts,
-                batch_size=32,
+                batch_size=128,  # Increased for maximum speed (no data loss)
                 show_progress_bar=True,
-                convert_to_numpy=True
+                convert_to_numpy=True,
+                normalize_embeddings=True,  # Pre-normalize for faster search
+                num_workers=4  # Parallel processing within batches
             )
             logger.info(f"[OK] Generated {len(embeddings)} local embeddings (no API cost)")
             return [emb.astype('float32') for emb in embeddings]

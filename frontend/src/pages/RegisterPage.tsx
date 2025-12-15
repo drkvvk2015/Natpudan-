@@ -55,7 +55,8 @@ const RegisterPage: React.FC = () => {
       setError('');
       setLoading(true);
       
-      const frontendURL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+      // Use current origin to ensure redirect URI matches across all ports
+      const frontendURL = window.location.origin;
       const redirectUri = `${frontendURL}/auth/callback`;
       const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
       

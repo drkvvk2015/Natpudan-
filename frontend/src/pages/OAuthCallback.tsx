@@ -40,16 +40,21 @@ const OAuthCallback: React.FC = () => {
         return;
       }
 
-      // Verify state for CSRF protection
-      if (state && storedState && state !== storedState) {
-        console.error('State mismatch - possible CSRF attack');
-        setError('Security validation failed. Please try again.');
-        setTimeout(() => navigate('/login'), 3000);
-        return;
+      // Verify state for CSRF protection (warn but don't block if missing)
+      if (state && storedState) {
+        if (state !== storedState) {
+          console.error('State mismatch - possible CSRF attack');
+          setError('Security validation failed. Please try logging in again.');
+          setTimeout(() => navigate('/login'), 3000);
+          return;
+        }
+      } else {
+        console.warn('[OAuth] State parameter missing - CSRF protection bypassed');
       }
 
       // Store OAuth data for later use
-      const frontendURL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+      // Use current origin to ensure consistency (handles dynamic ports like 5174)
+      const frontendURL = window.location.origin;
       const redirectUri = `${frontendURL}/auth/callback`;
       
       setOauthData({

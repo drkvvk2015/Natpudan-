@@ -86,3 +86,22 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
+// Lightweight health check helpers for UI status indicators
+export async function checkBackendHealth(): Promise<{ ok: boolean; status?: any }> {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/health`, { timeout: 5000 });
+    return { ok: res.status === 200, status: res.data };
+  } catch (e) {
+    return { ok: false };
+  }
+}
+
+export async function checkBackendDetailed(): Promise<{ ok: boolean; status?: any }> {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/health/detailed`, { timeout: 5000 });
+    return { ok: res.status === 200, status: res.data };
+  } catch (e) {
+    return { ok: false };
+  }
+}

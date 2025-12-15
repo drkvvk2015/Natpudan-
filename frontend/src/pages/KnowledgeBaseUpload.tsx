@@ -20,6 +20,7 @@ import {
   ListItemText,
   ListItemSecondaryAction,
 } from '@mui/material';
+import { keyframes } from '@mui/system';
 import {
   CloudUpload as UploadIcon,
   Delete as DeleteIcon,
@@ -29,6 +30,34 @@ import {
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import apiClient from '../services/apiClient';
+
+// Futuristic animations
+const gradientShift = keyframes`
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+`;
+
+const progressGlow = keyframes`
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+`;
+
+const pulse = keyframes`
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+`;
+
+const fadeIn = keyframes`
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+`;
+
+const shake = keyframes`
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+`;
 
 interface UploadedFile {
   file: File;
@@ -134,6 +163,13 @@ const KnowledgeBaseUpload: React.FC = () => {
     setFiles((prev) => [...prev, ...newFiles]);
   }, []);
 
+  // Upload constraints (aligned with backend):
+  // - Standard path: <= 50MB goes to /upload (synchronous)
+  // - Large path: > 50MB goes to /upload-large (background)
+  // - Backend hard limit: 1GB per file, 5GB total
+  const MAX_FILE_BYTES = 1024 * 1024 * 1024; // 1GB
+  const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -142,7 +178,7 @@ const KnowledgeBaseUpload: React.FC = () => {
       'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
     },
-    maxSize: 2.5 * 1024 * 1024 * 1024, // 2.5GB limit
+    maxSize: MAX_FILE_BYTES,
     multiple: true,
   });
 
@@ -158,7 +194,6 @@ const KnowledgeBaseUpload: React.FC = () => {
 
     try {
       // Split files into large (>50MB) and standard
-      const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024;
       const standardFiles = files.filter(f => f.file.size <= LARGE_FILE_THRESHOLD);
       const largeFiles = files.filter(f => f.file.size > LARGE_FILE_THRESHOLD);
 
@@ -222,8 +257,9 @@ const KnowledgeBaseUpload: React.FC = () => {
              formData.append('file', largeFile.file);
              
              const response = await apiClient.post('/api/medical/knowledge/upload-large', formData, {
-                 headers: { 'Content-Type': 'multipart/form-data' },
-                 timeout: 600000, // 10 minute timeout for large uploads
+               headers: { 'Content-Type': 'multipart/form-data' },
+               // Allow very long uploads for large textbooks (e.g., 300MB+)
+               timeout: 20 * 60 * 1000, // 20 minutes
                  onUploadProgress: (progressEvent) => {
                      const percent = progressEvent.total ? Math.round((progressEvent.loaded * 100) / progressEvent.total) : 0;
                      setFiles(prev => prev.map(f => {
@@ -452,7 +488,7 @@ const KnowledgeBaseUpload: React.FC = () => {
             <Chip label="DOCX" size="small" />
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-            Max 50MB per file - Max 20 files - Max 200MB total
+            Max 1GB per file (PDF/TXT/DOC/DOCX) · Max 20 files · Max 5GB total. Files over 50MB are queued for background processing.
           </Typography>
         </Box>
       </Paper>
@@ -492,34 +528,132 @@ const KnowledgeBaseUpload: React.FC = () => {
                       {(fileData.status === 'uploading' || fileData.status === 'processing') && (
                         <Box sx={{ mt: 1 }}>
                           <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                            <Typography variant="caption" color="primary" fontWeight={600}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{
+                                fontWeight: 600,
+                                background: fileData.status === 'processing' 
+                                  ? 'linear-gradient(90deg, #00f5ff 0%, #00d4ff 50%, #0099ff 100%)'
+                                  : 'linear-gradient(90deg, #4CAF50 0%, #81C784 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: fileData.status === 'processing' 
+                                  ? `${gradientShift} 3s ease infinite`
+                                  : 'none',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                              }}
+                            >
                               {fileData.statusMessage || 'Processing...'}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {fileData.progress}%
-                            </Typography>
+                            <Chip 
+                              label={`${fileData.progress}%`}
+                              size="small"
+                              sx={{
+                                bgcolor: fileData.status === 'processing' ? '#00d4ff' : '#4CAF50',
+                                color: 'white',
+                                fontWeight: 'bold',
+                                animation: fileData.status === 'processing'
+                                  ? `${pulse} 2s ease-in-out infinite`
+                                  : 'none',
+                              }}
+                            />
                           </Box>
                           <LinearProgress
                             variant="determinate"
                             value={fileData.progress}
-                            sx={{ height: 6, borderRadius: 3 }}
+                            sx={{ 
+                              height: 8, 
+                              borderRadius: 4,
+                              background: 'linear-gradient(90deg, #f0f0f0 0%, #e0e0e0 100%)',
+                              '& .MuiLinearProgress-bar': {
+                                background: fileData.status === 'processing'
+                                  ? 'linear-gradient(90deg, #00f5ff 0%, #00d4ff 50%, #0099ff 100%)'
+                                  : 'linear-gradient(90deg, #4CAF50 0%, #81C784 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: fileData.status === 'processing'
+                                  ? `${progressGlow} 2s linear infinite`
+                                  : 'none',
+                                borderRadius: 4,
+                                boxShadow: fileData.status === 'processing'
+                                  ? '0 0 10px rgba(0, 212, 255, 0.5)'
+                                  : '0 0 10px rgba(76, 175, 80, 0.3)',
+                              }
+                            }}
                           />
                         </Box>
                       )}
                       {fileData.status === 'success' && (
-                        <Alert severity="success" sx={{ mt: 1, display: 'block' }} icon={<SuccessIcon />}>
-                          <Typography variant="caption" display="block" fontWeight={600}>
-                            {fileData.statusMessage}
+                        <Alert 
+                          severity="success" 
+                          sx={{ 
+                            mt: 1, 
+                            display: 'block',
+                            background: 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
+                            border: '2px solid #4CAF50',
+                            animation: `${fadeIn} 0.5s ease-out`,
+                          }} 
+                          icon={<SuccessIcon sx={{ color: '#2E7D32' }} />}
+                        >
+                          <Typography variant="caption" display="block" fontWeight={600} sx={{ color: '#1B5E20' }}>
+                            ✅ {fileData.statusMessage}
                           </Typography>
-                          <Typography variant="caption" display="block">
+                          <Typography variant="caption" display="block" sx={{ color: '#2E7D32' }}>
                             {fileData.chunks} chunks - {fileData.characters?.toLocaleString()} characters
                           </Typography>
                         </Alert>
                       )}
                       {fileData.status === 'error' && (
-                        <Alert severity="error" sx={{ mt: 1, display: 'block' }} icon={<ErrorIcon />}>
-                          {fileData.statusMessage || fileData.error}
-                        </Alert>
+                        <Box sx={{ mt: 1 }}>
+                          <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{
+                                fontWeight: 600,
+                                color: '#d32f2f',
+                              }}
+                            >
+                              ❌ Upload Failed
+                            </Typography>
+                            <Chip 
+                              label="0%"
+                              size="small"
+                              sx={{
+                                bgcolor: '#d32f2f',
+                                color: 'white',
+                                fontWeight: 'bold',
+                              }}
+                            />
+                          </Box>
+                          <LinearProgress
+                            variant="determinate"
+                            value={0}
+                            sx={{ 
+                              height: 8, 
+                              borderRadius: 4,
+                              background: '#ffebee',
+                              '& .MuiLinearProgress-bar': {
+                                background: '#d32f2f',
+                                borderRadius: 4,
+                              }
+                            }}
+                          />
+                          <Alert 
+                            severity="error" 
+                            sx={{ 
+                              mt: 1,
+                              display: 'block',
+                              background: 'linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%)',
+                              border: '2px solid #d32f2f',
+                              animation: `${shake} 0.6s ease`,
+                            }} 
+                            icon={<ErrorIcon sx={{ color: '#c62828' }} />}
+                          >
+                            <Typography variant="caption" sx={{ color: '#b71c1c', fontWeight: 600 }}>
+                              {fileData.statusMessage || fileData.error}
+                            </Typography>
+                          </Alert>
+                        </Box>
                       )}
                     </span>
                   }

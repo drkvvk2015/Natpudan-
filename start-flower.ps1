@@ -1,71 +1,51 @@
-#!/usr/bin/env pwsh
-<#
-.SYNOPSIS
-Start Celery Flower - Task Monitoring Dashboard
+# Start Flower Monitoring Dashboard for Celery
+# Web UI to monitor tasks and workers at http://localhost:5555
 
-.DESCRIPTION
-Starts Flower, a real-time monitoring web interface for Celery.
-Provides visibility into background tasks, workers, and execution stats.
+$BackendDir = Join-Path (Get-Location) "backend"
+$VenvPath = Join-Path $BackendDir "venv"
+$Port = 5555
 
-.PARAMETER Port
-Port for Flower web interface (default: 5555)
+Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "   Flower Monitoring Dashboard" -ForegroundColor Cyan
+Write-Host "========================================`n" -ForegroundColor Cyan
 
-.EXAMPLE
-.\start-flower.ps1
-
-.\start-flower.ps1 -Port 5555
-
-.NOTES
-Access the dashboard at: http://localhost:5555
-#>
-
-param(
-    [int]$Port = 5555
-)
-
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
-$Green = @{ ForegroundColor = "Green" }
-$Yellow = @{ ForegroundColor = "Yellow" }
-$Red = @{ ForegroundColor = "Red" }
-
-Write-Host "`n╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║         Celery Flower - Task Monitoring Dashboard             ║" -ForegroundColor Cyan
-Write-Host "╚════════════════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
-
-$RootDir = Split-Path -Parent $PSScriptRoot
-$BackendDir = Join-Path $RootDir "backend"
-
-if (-not (Test-Path $BackendDir)) {
-    Write-Host "❌ Backend directory not found: $BackendDir" @Red
-    exit 1
+# Activate virtual environment (if not already active)
+$venvActive = Test-Path env:VIRTUAL_ENV
+if (-not $venvActive) {
+    if (Test-Path $VenvPath) {
+        Write-Host "[INFO] Using virtual environment..." -ForegroundColor Yellow
+        & "$VenvPath\Scripts\Activate.ps1"
+    } else {
+        Write-Host "[WARNING] Virtual environment not found" -ForegroundColor Yellow
+        exit 1
+    }
+} else {
+    Write-Host "[INFO] Virtual environment already active" -ForegroundColor Green
 }
 
+# Change to backend
 Push-Location $BackendDir
 
 try {
-    # Check if venv exists
-    $VenvPath = Join-Path $BackendDir "venv"
-    if (Test-Path $VenvPath) {
-        Write-Host "Activating virtual environment..." @Yellow
-        & "$VenvPath\Scripts\Activate.ps1"
-    }
-
-    Write-Host "`n⚙️  Configuration:" @Yellow
-    Write-Host "   Port: $Port"
-    Write-Host "   Broker: $(if ($env:REDIS_URL) { $env:REDIS_URL } else { 'redis://localhost:6379/0' })"
-
-    Write-Host "`n🚀 Starting Celery Flower..." @Green
-    Write-Host "📊 Open browser: http://localhost:$Port`n" @Yellow
-
+    Write-Host "[INFO] Starting Flower dashboard..." -ForegroundColor Yellow
+    Write-Host "      URL: http://localhost:$Port" -ForegroundColor Cyan
+    Write-Host "      Username: admin" -ForegroundColor Cyan
+    Write-Host "      Password: admin" -ForegroundColor Cyan
+    Write-Host "`n[INFO] Open browser to http://localhost:$Port`n" -ForegroundColor Green
+    Write-Host "Logs will appear below:" -ForegroundColor Gray
+    Write-Host "----------------------------------------`n" -ForegroundColor Gray
+    
+    # Set Celery broker and result backend for SQLite
+    $env:CELERY_BROKER_URL = 'sqla+sqlite:///./celery_broker.db'
+    $env:CELERY_RESULT_BACKEND = 'db+sqlite:///./celery_results.db'
+    
     # Start Flower
-    celery -A app.celery_config flower `
+    python -m celery -A app.celery_config flower `
         --port=$Port `
         --basic_auth=admin:admin
 
 } catch {
-    Write-Host "`n❌ Error: $_" @Red
+    Write-Host "`n[ERROR] Failed to start Flower: $_" -ForegroundColor Red
     exit 1
 } finally {
     Pop-Location

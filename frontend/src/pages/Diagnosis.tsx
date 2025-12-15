@@ -1216,6 +1216,9 @@ export default function ClinicalCaseSheet() {
                         {icon}
                         <Box sx={{ ml: 1 }}>{system}</Box>
                       </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                        Left-click: Normal (green) • Right-click: Abnormal (red)
+                      </Typography>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {findings.map(finding => {
                           const existing = clinicalFindings.find(f => f.system === system && f.finding === finding)
@@ -1228,10 +1231,14 @@ export default function ClinicalCaseSheet() {
                               size="small"
                               variant={isSelected ? 'filled' : 'outlined'}
                               onClick={() => toggleClinicalFinding(system, finding, true)}
-                              onDelete={() => {
+                              onContextMenu={(e) => {
+                                e.preventDefault()
+                                toggleClinicalFinding(system, finding, false)
+                              }}
+                              onDelete={isSelected ? () => {
                                 // remove specific finding
                                 setClinicalFindings((clinicalFindings || []).filter(f => !(f.system === system && f.finding === finding)))
-                              }}
+                              } : undefined}
                               sx={{ cursor: 'pointer' }}
                               color={isSelected ? (isNormal ? 'success' : 'error') : 'default'}
                             />
@@ -1537,6 +1544,21 @@ export default function ClinicalCaseSheet() {
                 </Box>
               </AccordionDetails>
             </Accordion>
+
+            {/* AI Diagnosis Button */}
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+              <Button
+                variant="contained"
+                size="large"
+                color="primary"
+                startIcon={<PsychologyIcon />}
+                onClick={handleLiveDiagnosis}
+                disabled={isAnalyzing || (complaints || []).filter(c => c.complaint?.trim()).length === 0}
+                sx={{ px: 4, py: 1.5 }}
+              >
+                {isAnalyzing ? 'Analyzing...' : 'Generate AI Diagnosis'}
+              </Button>
+            </Box>
 
             {/* Assessment and Plan */}
             <Accordion sx={{ mb: 2 }}>

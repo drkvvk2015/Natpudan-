@@ -23,7 +23,7 @@ class UploadQueueProcessor:
     
     def __init__(self):
         self.is_running = False
-        self.batch_size = 3  # Process 3 at a time
+        self.batch_size = 8  # Process 8 at a time (safe parallel processing)
         self.check_interval = 10  # Check queue every 10 seconds
         self.max_retries = 3
         self.max_processing_time = 3600  # 1 hour max per document

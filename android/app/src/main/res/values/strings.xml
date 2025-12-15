@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Natpudan AI</string>
+    <string name="title_activity_main">Natpudan AI</string>
+    <string name="package_name">com.natpudan.medical</string>
+    <string name="custom_url_scheme">com.natpudan.medical</string>
+</resources>

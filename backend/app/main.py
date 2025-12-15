@@ -12,6 +12,7 @@ diagnosis engine, ICD code provider, etc.).
 from fastapi import FastAPI, APIRouter, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi import Response
 from typing import List, Dict, Any
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -138,6 +139,7 @@ async def lifespan(app: FastAPI):
                     papers_per_topic=5,
                     days_back=7
                 )
+
                 logger.info(f"[SCHEDULER] ✅ KB update task queued (Task ID: {task.id})")
             except Exception as e:
                 logger.error(f"[SCHEDULER] ❌ Error submitting task: {e}")
@@ -238,8 +240,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
         "http://127.0.0.1:3000"
     ],
     allow_credentials=True,
@@ -251,6 +255,11 @@ app.add_middleware(
 @app.get("/")
 def root() -> Dict[str, Any]:
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
+# Quiet favicon 404s in dev: serve empty response
+@app.get("/favicon.ico")
+def favicon():
+    return Response(status_code=204)
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
@@ -313,16 +322,17 @@ def detailed_health() -> Dict[str, Any]:
 api_router = APIRouter(prefix="/api")
 
 # ---- Medical / Knowledge Base ----
-from app.services.icd10_service import get_icd10_service
-from app.services.vector_knowledge_base import get_vector_knowledge_base
-from app.services.document_manager import get_document_manager
-from app.services.local_vector_kb import get_local_knowledge_base
-# Futuristic services
-from app.services.hybrid_search import get_hybrid_search
-from app.services.rag_service import get_rag_service
-from app.services.medical_entity_extractor import get_entity_extractor
-from app.services.pubmed_integration import get_pubmed_integration
-from app.services.knowledge_graph import get_knowledge_graph
+# Moved imports to lazy load within functions to avoid blocking startup
+# from app.services.icd10_service import get_icd10_service
+# from app.services.vector_knowledge_base import get_vector_knowledge_base
+# from app.services.document_manager import get_document_manager
+# from app.services.local_vector_kb import get_local_knowledge_base
+# # Futuristic services
+# from app.services.hybrid_search import get_hybrid_search
+# from app.services.rag_service import get_rag_service
+# from app.services.medical_entity_extractor import get_entity_extractor
+# from app.services.pubmed_integration import get_pubmed_integration
+# from app.services.knowledge_graph import get_knowledge_graph
 
 medical_router = APIRouter(prefix="/medical")
 
@@ -330,6 +340,9 @@ medical_router = APIRouter(prefix="/medical")
 def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Generate diagnosis suggestions from symptoms"""
     try:
+        # Lazy import to avoid blocking startup
+        from app.services.icd10_service import get_icd10_service
+        
         symptoms: List[str] = payload.get("symptoms", [])
         
         if not symptoms:
@@ -374,6 +387,8 @@ def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
 def analyze_symptoms(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze symptoms and suggest related conditions"""
     try:
+        from app.services.icd10_service import get_icd10_service
+        
         symptoms = payload.get("symptoms", [])
         
         if not symptoms:
@@ -403,6 +418,8 @@ def analyze_symptoms(payload: Dict[str, Any]) -> Dict[str, Any]:
 def icd_search(query: str, max_results: int = 20) -> List[Dict[str, str]]:
     """Search ICD-10 codes by code or description"""
     try:
+        from app.services.icd10_service import get_icd10_service
+        
         if not query:
             return []
         
@@ -418,6 +435,8 @@ def icd_search(query: str, max_results: int = 20) -> List[Dict[str, str]]:
 def icd_get_code(code: str) -> Dict[str, Any]:
     """Get specific ICD-10 code details"""
     try:
+        from app.services.icd10_service import get_icd10_service
+        
         icd_service = get_icd10_service()
         result = icd_service.get_code(code)
         
@@ -433,6 +452,8 @@ def icd_get_code(code: str) -> Dict[str, Any]:
 def icd_categories() -> List[str]:
     """Get all ICD-10 categories"""
     try:
+        from app.services.icd10_service import get_icd10_service
+        
         icd_service = get_icd10_service()
         return icd_service.get_categories()
     except Exception as e:
@@ -448,6 +469,9 @@ def hybrid_search(payload: Dict[str, Any]) -> Dict[str, Any]:
     Uses Reciprocal Rank Fusion for optimal results
     """
     try:
+        from app.services.vector_knowledge_base import get_vector_knowledge_base
+        from app.services.hybrid_search import get_hybrid_search
+        
         query = payload.get("query", "")
         top_k = payload.get("top_k", 10)
         alpha = payload.get("alpha", 0.5)  # 0=BM25 only, 1=vector only
@@ -483,6 +507,9 @@ def rag_query(payload: Dict[str, Any]) -> Dict[str, Any]:
     Retrieves relevant documents and generates cited responses
     """
     try:
+        from app.services.vector_knowledge_base import get_vector_knowledge_base
+        from app.services.rag_service import get_rag_service
+        
         query = payload.get("query", "")
         max_context = payload.get("max_context_chunks", 5)
         
@@ -510,6 +537,8 @@ def extract_medical_entities(payload: Dict[str, Any]) -> Dict[str, Any]:
     Uses advanced NLP pattern matching
     """
     try:
+        from app.services.medical_entity_extractor import get_entity_extractor
+        
         text = payload.get("text", "")
         include_summary = payload.get("include_summary", True)
         
@@ -550,6 +579,8 @@ def pubmed_latest_research(
     Real-time access to latest published papers
     """
     try:
+        from app.services.pubmed_integration import get_pubmed_integration
+        
         pubmed = get_pubmed_integration()
         papers = pubmed.search_papers(
             query=topic,
@@ -575,6 +606,9 @@ def pubmed_auto_update(payload: Dict[str, Any]) -> Dict[str, Any]:
     Keeps knowledge base current with newest findings
     """
     try:
+        from app.services.pubmed_integration import get_pubmed_integration
+        from app.services.vector_knowledge_base import get_vector_knowledge_base
+        
         topics = payload.get("topics", ["diabetes", "hypertension", "cancer"])
         papers_per_topic = payload.get("papers_per_topic", 3)
         days_back = payload.get("days_back", 7)
@@ -605,6 +639,8 @@ def visualize_knowledge_graph(
     Shows connections between diseases, symptoms, medications
     """
     try:
+        from app.services.knowledge_graph import get_knowledge_graph
+        
         kg = get_knowledge_graph()
         
         # Find node
@@ -638,6 +674,9 @@ def build_graph_from_text(payload: Dict[str, Any]) -> Dict[str, Any]:
     Automatically extracts entities and creates relationships
     """
     try:
+        from app.services.medical_entity_extractor import get_entity_extractor
+        from app.services.knowledge_graph import get_knowledge_graph
+        
         text = payload.get("text", "")
         
         # Extract entities
@@ -671,6 +710,8 @@ def export_knowledge_graph() -> Dict[str, Any]:
     For analysis, visualization, or backup
     """
     try:
+        from app.services.knowledge_graph import get_knowledge_graph
+        
         kg = get_knowledge_graph()
         graph_data = kg.export_graph()
         return graph_data
@@ -695,6 +736,9 @@ async def upload_document(
     The document will be processed, indexed, and made searchable.
     """
     try:
+        from app.services.document_manager import get_document_manager
+        from app.services.vector_knowledge_base import get_vector_knowledge_base
+        
         # Read file content
         content = await file.read()
         
@@ -747,6 +791,8 @@ async def upload_document(
 def list_documents():
     """List all uploaded documents"""
     try:
+        from app.services.document_manager import get_document_manager
+        
         doc_manager = get_document_manager()
         documents = doc_manager.list_documents()
         
@@ -763,6 +809,8 @@ def list_documents():
 def get_document(document_id: str):
     """Get document information"""
     try:
+        from app.services.document_manager import get_document_manager
+        
         doc_manager = get_document_manager()
         doc_info = doc_manager.get_document(document_id)
         
@@ -783,6 +831,9 @@ def get_document(document_id: str):
 def delete_document(document_id: str):
     """Delete a document and remove from knowledge base"""
     try:
+        from app.services.document_manager import get_document_manager
+        from app.services.vector_knowledge_base import get_vector_knowledge_base
+        
         # Delete from document manager
         doc_manager = get_document_manager()
         deleted = doc_manager.delete_document(document_id)

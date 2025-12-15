@@ -48,6 +48,7 @@ pycparser==2.23
 pydantic==2.12.3
 pydantic_core==2.41.4
 Pygments==2.19.2
+reportlab==4.4.6
 PyMuPDF==1.26.5
 pytest==8.4.2
 pytest-asyncio==0.23.5
@@ -91,3 +92,8 @@ gunicorn==21.2.0
 apscheduler==3.10.4
 celery==5.3.6
 redis==5.0.1
+# Celery Monitoring
+flower==2.0.1
+tornado<7.0.0,>=5.0.0
+prometheus-client>=0.8.0
+humanize==4.14.0
