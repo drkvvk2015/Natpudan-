@@ -55,6 +55,12 @@ build/
 
 # Large files - Don't commit to GitHub
 backend/data/knowledge_base/*.pdf
+backend/data/knowledge_base/images/*
+backend/data/knowledge_base/pending/*
+backend/data/knowledge_base/uploads/*
+!backend/data/knowledge_base/images/.gitkeep
+!backend/data/knowledge_base/pending/.gitkeep
+!backend/data/knowledge_base/uploads/.gitkeep
 backend/data/**/*.pdf
 frontend/release/
 frontend/android/app/build/
@@ -83,4 +89,7 @@ test_output_*
 frontend/release/
 backend/data/knowledge_base/*.pdf
 !backend/data/knowledge_base/.gitkeep
+!backend/data/knowledge_base/images/.gitkeep
+!backend/data/knowledge_base/pending/.gitkeep
+!backend/data/knowledge_base/uploads/.gitkeep
 backend/data/medical_books/*.pdf
