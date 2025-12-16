@@ -14,7 +14,7 @@ colorama==0.4.6
 cryptography==46.0.3
 distro==1.9.0
 dnspython==2.8.0
-ecdsa==0.19.1
+# ecdsa - REMOVED (CVE-2024-23342, was python-jose dependency)
 email-validator==2.3.0
 fastapi==0.120.1
 filelock==3.20.0
@@ -42,8 +42,8 @@ pillow==12.0.0
 pluggy==1.6.0
 psutil==7.1.3
 # psycopg2-binary==2.9.11
-PyJWT==2.8.0
-pyasn1==0.6.1
+PyJWT==2.10.1  # Primary JWT library - upgraded for security
+# pyasn1 - REMOVED (python-jose dependency)
 pycparser==2.23
 pydantic==2.12.3
 pydantic_core==2.41.4
@@ -53,7 +53,7 @@ PyMuPDF==1.26.5
 pytest==8.4.2
 pytest-asyncio==0.23.5
 python-dotenv==1.2.1
-python-jose==3.5.0
+# python-jose - REMOVED (unused, code uses PyJWT directly)
 python-multipart==0.0.20
 PyYAML==6.0.3
 # Knowledge Base Dependencies
@@ -65,7 +65,7 @@ lxml==6.0.2
 rank-bm25==0.2.2  # BM25 keyword search for hybrid search
 regex==2025.10.23
 requests==2.32.5
-rsa==4.9.1
+# rsa, pyasn1 - REMOVED (python-jose dependencies)
 safetensors==0.6.2
 scikit-learn==1.7.2
 scipy==1.16.2
