@@ -87,7 +87,7 @@ uvicorn==0.38.0
 watchfiles==1.1.1
 websockets==15.0.1
 # Production Server
-gunicorn==21.2.0
+gunicorn==23.0.0  # Updated - CVE-2024-1135, CVE-2024-6827
 # Scheduled Tasks & Background Jobs
 apscheduler==3.10.4
 celery==5.3.6
