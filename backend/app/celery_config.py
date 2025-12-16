@@ -8,13 +8,19 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Redis broker URL (change to your Redis server)
+# Broker/Backend configuration
+# Priority order:
+# 1) Explicit Celery env vars (CELERY_BROKER_URL, CELERY_RESULT_BACKEND)
+# 2) REDIS_URL env var
+# 3) Sensible local default (Redis on localhost)
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 
 # Celery configuration
 class CeleryConfig:
-    broker_url = REDIS_URL
-    result_backend = REDIS_URL
+    broker_url = CELERY_BROKER_URL
+    result_backend = CELERY_RESULT_BACKEND
     
     # Task settings
     task_serializer = "json"
@@ -41,6 +47,11 @@ class CeleryConfig:
     # Beat scheduler settings (for periodic tasks)
     beat_scheduler = "celery.beat:PersistentScheduler"
 
+    # Connection retry behavior (Celery 6 deprecation notice workaround)
+    # Prevent CPendingDeprecationWarning by using the new startup retry flag
+    broker_connection_retry_on_startup = True
+    broker_connection_retry = True
+
 def init_celery(app):
     """Initialize Celery with FastAPI app"""
     from celery import Celery
@@ -48,7 +59,7 @@ def init_celery(app):
     celery_app = Celery(
         app.title if hasattr(app, 'title') else "natpudan",
         broker=CeleryConfig.broker_url,
-        backend=CeleryConfig.result_backend
+        backend=CeleryConfig.result_backend,
     )
     
     # Load configuration
@@ -59,7 +70,7 @@ def init_celery(app):
         "app.tasks"
     ])
     
-    logger.info(f"[CELERY] Initialized with broker: {REDIS_URL}")
+    logger.info(f"[CELERY] Initialized with broker: {CeleryConfig.broker_url}")
     
     return celery_app
 
@@ -68,8 +79,8 @@ try:
     from celery import Celery
     celery_app = Celery(
         "natpudan",
-        broker=REDIS_URL,
-        backend=REDIS_URL
+        broker=CeleryConfig.broker_url,
+        backend=CeleryConfig.result_backend,
     )
     celery_app.config_from_object(CeleryConfig)
     logger.info("[CELERY] Configuration loaded")
@@ -84,8 +95,8 @@ def get_celery_app():
         from celery import Celery
         celery_app = Celery(
             "natpudan",
-            broker=REDIS_URL,
-            backend=REDIS_URL
+            broker=CeleryConfig.broker_url,
+            backend=CeleryConfig.result_backend,
         )
         celery_app.config_from_object(CeleryConfig)
     return celery_app

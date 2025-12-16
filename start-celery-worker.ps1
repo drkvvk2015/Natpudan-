@@ -32,8 +32,9 @@ Push-Location $BackendDir
 try {
     Write-Host "[INFO] Starting Celery worker..." -ForegroundColor Yellow
     Write-Host "      App: app.celery_config" -ForegroundColor Cyan
-    Write-Host "      Concurrency: 4 workers" -ForegroundColor Cyan
+    Write-Host "      Concurrency: 4 workers (Windows uses solo pool)" -ForegroundColor Cyan
     Write-Host "      Log level: info" -ForegroundColor Cyan
+    Write-Host "      Task events: ENABLED (-E)" -ForegroundColor Cyan
     Write-Host "`n[INFO] Worker ready and waiting for tasks...`n" -ForegroundColor Green
     Write-Host "Logs will appear below:" -ForegroundColor Gray
     Write-Host "----------------------------------------`n" -ForegroundColor Gray
@@ -42,7 +43,8 @@ try {
     celery -A app.celery_config worker `
         --loglevel=info `
         --concurrency=4 `
-        --max-tasks-per-child=1000
+        --max-tasks-per-child=1000 `
+        -E
     
 } catch {
     Write-Host "`n[ERROR] Failed to start worker: $_" -ForegroundColor Red

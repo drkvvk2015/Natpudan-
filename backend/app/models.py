@@ -83,6 +83,7 @@ class User(Base):
     # Relationships
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
     discharge_summaries = relationship("DischargeSummary", back_populates="created_by", cascade="all, delete-orphan")
+    pdf_processing_jobs = relationship("PDFProcessing", back_populates="user", cascade="all, delete-orphan")
 
 
 class Conversation(Base):
@@ -193,10 +194,24 @@ class PatientIntake(Base):
     resp_rate_per_min = Column(Integer, nullable=True)
     temperature_c = Column(Integer, nullable=True)
     
-    # Chief Complaints and Present History (stored as JSON text)
-    chief_complaints = Column(Text, nullable=True)  # JSON: [{complaint, duration}]
-    present_history = Column(Text, nullable=True)  # JSON: [{id, title, duration, associationFactors, relievingFactors, aggravatingFactors}]
+    # Chief Complaints and Present History (stored as JSON)
+    chief_complaints = Column(JSON, nullable=True)  # JSON: List of structured complaints with chronology
+    associated_symptoms = Column(JSON, nullable=True)  # JSON: List of associated symptoms
+    present_history = Column(Text, nullable=True)  # JSON: Legacy field for backward compatibility
     
+    # Past history
+    past_medical_history = Column(JSON, nullable=True)  # List of past medical conditions
+    past_surgical_history = Column(JSON, nullable=True)  # List of past surgeries
+    current_medications = Column(JSON, nullable=True)  # List of current medications
+    allergies = Column(JSON, nullable=True)  # List of allergies
+    
+    # Social history
+    smoking = Column(String(100), nullable=True)
+    alcohol = Column(String(100), nullable=True)
+    occupation = Column(String(200), nullable=True)
+    
+    # Metadata
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     
@@ -490,3 +505,58 @@ class ExtractedImage(Base):
     
     def __repr__(self):
         return f"<ExtractedImage(id={self.image_id}, doc={self.document_id}, page={self.page_number})>"
+
+
+class PDFProcessingStatus(str, enum.Enum):
+    """PDF processing status enumeration."""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class PDFProcessing(Base):
+    """Track PDF processing state for pause/resume functionality."""
+    __tablename__ = "pdf_processing"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    pdf_file_id = Column(String, unique=True, index=True)  # Unique identifier for PDF
+    pdf_name = Column(String)  # Original filename
+    status = Column(String, default=PDFProcessingStatus.PENDING)  # PENDING, PROCESSING, PAUSED, COMPLETED, FAILED
+    
+    # Progress tracking
+    total_pages = Column(Integer, default=0)
+    pages_processed = Column(Integer, default=0)
+    last_page_processed = Column(Integer, default=0)
+    embeddings_created = Column(Integer, default=0)
+    
+    # Error tracking
+    error_message = Column(Text, nullable=True)
+    error_details = Column(JSON, nullable=True)  # Store detailed error info
+    
+    # Processing metadata
+    file_size = Column(Integer)  # File size in bytes
+    started_at = Column(DateTime, nullable=True)
+    paused_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # User tracking
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="pdf_processing_jobs")
+    
+    def __repr__(self):
+        return f"<PDFProcessing(id={self.id}, name={self.pdf_name}, status={self.status}, progress={self.pages_processed}/{self.total_pages})>"
+    
+    @property
+    def progress_percentage(self) -> float:
+        """Calculate progress percentage."""
+        if self.total_pages == 0:
+            return 0.0
+        return (self.pages_processed / self.total_pages) * 100

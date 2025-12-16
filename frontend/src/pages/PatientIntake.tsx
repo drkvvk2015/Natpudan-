@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Container,
@@ -29,7 +29,7 @@ import {
   Alert,
   Snackbar,
   Tooltip,
-} from '@mui/material'
+} from "@mui/material";
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
@@ -43,124 +43,134 @@ import {
   Edit as EditIcon,
   Assessment as AssessmentIcon,
   Description as ReportIcon,
-} from '@mui/icons-material'
-import { motion, AnimatePresence } from 'framer-motion'
-import { savePatientIntake, getPatientIntake, updatePatientIntake, generatePatientIntakeReport, downloadPDF } from '../services/api'
-import RiskAssessment from '../components/RiskAssessment'
-import MedicalTimeline from '../components/MedicalTimeline'
+} from "@mui/icons-material";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  savePatientIntake,
+  getPatientIntake,
+  updatePatientIntake,
+  generatePatientIntakeReport,
+  downloadPDF,
+} from "../services/api";
+import RiskAssessment from "../components/RiskAssessment";
+import MedicalTimeline from "../components/MedicalTimeline";
+import {
+  ComplaintSelector,
+  ChiefComplaint,
+} from "../components/ComplaintSelector";
 
 // Animation variants
 const sectionVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
-    transition: { duration: 0.4, ease: 'easeOut' }
-  }
-}
+    transition: { duration: 0.4, ease: "easeOut" },
+  },
+};
 
 const chipVariants = {
   hidden: { scale: 0, opacity: 0 },
-  visible: { 
-    scale: 1, 
+  visible: {
+    scale: 1,
     opacity: 1,
-    transition: { type: 'spring', stiffness: 500, damping: 30 }
+    transition: { type: "spring", stiffness: 500, damping: 30 },
   },
-  exit: { 
-    scale: 0, 
+  exit: {
+    scale: 0,
     opacity: 0,
-    transition: { duration: 0.2 }
-  }
-}
+    transition: { duration: 0.2 },
+  },
+};
 
 const cardVariants = {
   hidden: { opacity: 0, x: 20 },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     x: 0,
-    transition: { duration: 0.3 }
+    transition: { duration: 0.3 },
   },
-  exit: { 
-    opacity: 0, 
+  exit: {
+    opacity: 0,
     x: -20,
-    transition: { duration: 0.2 }
-  }
-}
+    transition: { duration: 0.2 },
+  },
+};
 
 // Motion Paper wrapper
-const MotionPaper = motion.create(Paper)
+const MotionPaper = motion.create(Paper);
 
 interface TravelHistory {
-  id: string
-  destination: string
-  departureDate: string
-  returnDate: string
-  duration: string
-  purpose: string
-  activities: string[]
+  id: string;
+  destination: string;
+  departureDate: string;
+  returnDate: string;
+  duration: string;
+  purpose: string;
+  activities: string[];
 }
 
 interface FamilyHistory {
-  id: string
-  relationship: string
-  condition: string
-  ageOfOnset: string
-  duration: string
-  status: 'ongoing' | 'resolved' | 'deceased'
-  notes: string
+  id: string;
+  relationship: string;
+  condition: string;
+  ageOfOnset: string;
+  duration: string;
+  status: "ongoing" | "resolved" | "deceased";
+  notes: string;
 }
 
 interface PatientDetails {
-  name: string
-  age: string
-  gender: string
-  bloodType: string
-  travelHistory: TravelHistory[]
-  familyHistory: FamilyHistory[]
+  name: string;
+  age: string;
+  gender: string;
+  bloodType: string;
+  travelHistory: TravelHistory[];
+  familyHistory: FamilyHistory[];
   // Extended Anthropometry
-  heightCm?: number
-  weightKg?: number
-  bmi?: number
-  waistCm?: number
-  hipCm?: number
-  whr?: number
-  muacCm?: number
-  headCircumferenceCm?: number
-  chestExpansionCm?: number
-  sittingHeightCm?: number
-  standingHeightCm?: number
-  armSpanCm?: number
-  bodyFatPercent?: number
-  bpSystolic?: number
-  bpDiastolic?: number
-  pulsePerMin?: number
-  respRatePerMin?: number
-  temperatureC?: number
+  heightCm?: number;
+  weightKg?: number;
+  bmi?: number;
+  waistCm?: number;
+  hipCm?: number;
+  whr?: number;
+  muacCm?: number;
+  headCircumferenceCm?: number;
+  chestExpansionCm?: number;
+  sittingHeightCm?: number;
+  standingHeightCm?: number;
+  armSpanCm?: number;
+  bodyFatPercent?: number;
+  bpSystolic?: number;
+  bpDiastolic?: number;
+  pulsePerMin?: number;
+  respRatePerMin?: number;
+  temperatureC?: number;
   // Complaints and histories
-  chiefComplaints?: { complaint: string; duration: string }[]
+  chiefComplaints?: ChiefComplaint[];
   presentHistory?: Array<{
-    id: string
-    title: string
-    duration: string
-    associationFactors: string[]
-    relievingFactors: string[]
-    aggravatingFactors: string[]
-  }>
+    id: string;
+    title: string;
+    duration: string;
+    associationFactors: string[];
+    relievingFactors: string[];
+    aggravatingFactors: string[];
+  }>;
 }
 
 const PatientIntake: React.FC = () => {
-  const { intakeId } = useParams<{ intakeId: string }>()
-  const navigate = useNavigate()
-  const isViewMode = window.location.pathname.includes('/view/')
-  const isEditMode = window.location.pathname.includes('/edit/') || !!intakeId
-  const isCreateMode = !intakeId
-  
-  const [loading, setLoading] = useState(false)
+  const { intakeId } = useParams<{ intakeId: string }>();
+  const navigate = useNavigate();
+  const isViewMode = window.location.pathname.includes("/view/");
+  const isEditMode = window.location.pathname.includes("/edit/") || !!intakeId;
+  const isCreateMode = !intakeId;
+
+  const [loading, setLoading] = useState(false);
   const [patientDetails, setPatientDetails] = useState<PatientDetails>({
-    name: '',
-    age: '',
-    gender: '',
-    bloodType: '',
+    name: "",
+    age: "",
+    gender: "",
+    bloodType: "",
     travelHistory: [],
     familyHistory: [],
     heightCm: undefined,
@@ -183,46 +193,65 @@ const PatientIntake: React.FC = () => {
     temperatureC: undefined,
     chiefComplaints: [],
     presentHistory: [],
-  })
+  });
 
-  const [showTravelDialog, setShowTravelDialog] = useState(false)
-  const [showFamilyDialog, setShowFamilyDialog] = useState(false)
-  const [currentTravel, setCurrentTravel] = useState<Partial<TravelHistory>>({})
-  const [currentFamily, setCurrentFamily] = useState<Partial<FamilyHistory>>({})
-  const [saving, setSaving] = useState(false)
-  const [generatingReport, setGeneratingReport] = useState(false)
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+  const [showTravelDialog, setShowTravelDialog] = useState(false);
+  const [showFamilyDialog, setShowFamilyDialog] = useState(false);
+  const [currentTravel, setCurrentTravel] = useState<Partial<TravelHistory>>(
+    {}
+  );
+  const [currentFamily, setCurrentFamily] = useState<Partial<FamilyHistory>>(
+    {}
+  );
+  const [saving, setSaving] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error";
+  }>({
     open: false,
-    message: '',
-    severity: 'success',
-  })
+    message: "",
+    severity: "success",
+  });
 
   const handleGenerateReport = async () => {
-    if (!intakeId) return
-    setGeneratingReport(true)
+    if (!intakeId) return;
+    setGeneratingReport(true);
     try {
-      const blob = await generatePatientIntakeReport(intakeId)
-      downloadPDF(blob, `patient_intake_${patientDetails.name.replace(/\s+/g, '_')}.pdf`)
-      setSnackbar({ open: true, message: 'Report generated successfully!', severity: 'success' })
+      const blob = await generatePatientIntakeReport(intakeId);
+      downloadPDF(
+        blob,
+        `patient_intake_${patientDetails.name.replace(/\s+/g, "_")}.pdf`
+      );
+      setSnackbar({
+        open: true,
+        message: "Report generated successfully!",
+        severity: "success",
+      });
     } catch (error) {
-      console.error('Error generating report:', error)
-      setSnackbar({ open: true, message: 'Failed to generate report', severity: 'error' })
+      console.error("Error generating report:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to generate report",
+        severity: "error",
+      });
     } finally {
-      setGeneratingReport(false)
+      setGeneratingReport(false);
     }
-  }
+  };
 
   // Load patient data if in edit/view mode
   useEffect(() => {
     if (intakeId) {
-      loadPatientData(intakeId)
+      loadPatientData(intakeId);
     }
-  }, [intakeId])
+  }, [intakeId]);
 
   const loadPatientData = async (id: string) => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const data = await getPatientIntake(id)
+      const data = await getPatientIntake(id);
       setPatientDetails({
         name: data.name,
         age: data.age,
@@ -230,230 +259,246 @@ const PatientIntake: React.FC = () => {
         bloodType: data.bloodType,
         travelHistory: data.travelHistory,
         familyHistory: data.familyHistory as FamilyHistory[],
-      })
+      });
     } catch (error) {
-      console.error('Failed to load patient data:', error)
+      console.error("Failed to load patient data:", error);
       setSnackbar({
         open: true,
-        message: 'Failed to load patient data',
-        severity: 'error',
-      })
+        message: "Failed to load patient data",
+        severity: "error",
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Quick selection options
   const commonDestinations = [
-    'Asia - China',
-    'Asia - India',
-    'Asia - Thailand',
-    'Asia - Philippines',
-    'Europe - Italy',
-    'Europe - Spain',
-    'Europe - France',
-    'Europe - UK',
-    'Africa - Kenya',
-    'Africa - South Africa',
-    'Africa - Egypt',
-    'South America - Brazil',
-    'South America - Argentina',
-    'Middle East - UAE',
-    'Middle East - Saudi Arabia',
-  ]
+    "Asia - China",
+    "Asia - India",
+    "Asia - Thailand",
+    "Asia - Philippines",
+    "Europe - Italy",
+    "Europe - Spain",
+    "Europe - France",
+    "Europe - UK",
+    "Africa - Kenya",
+    "Africa - South Africa",
+    "Africa - Egypt",
+    "South America - Brazil",
+    "South America - Argentina",
+    "Middle East - UAE",
+    "Middle East - Saudi Arabia",
+  ];
 
-  const travelPurposes = ['Tourism', 'Business', 'Medical', 'Education', 'Family Visit', 'Other']
+  const travelPurposes = [
+    "Tourism",
+    "Business",
+    "Medical",
+    "Education",
+    "Family Visit",
+    "Other",
+  ];
 
   const travelActivities = [
-    'Hiking/Trekking',
-    'Swimming',
-    'Wildlife Safari',
-    'Urban Tourism',
-    'Beach Activities',
-    'Water Sports',
-    'Camping',
-    'Cave Exploration',
-    'Street Food',
-    'Hospital/Clinic Visit',
-    'Rural Areas',
-    'Crowded Events',
-  ]
+    "Hiking/Trekking",
+    "Swimming",
+    "Wildlife Safari",
+    "Urban Tourism",
+    "Beach Activities",
+    "Water Sports",
+    "Camping",
+    "Cave Exploration",
+    "Street Food",
+    "Hospital/Clinic Visit",
+    "Rural Areas",
+    "Crowded Events",
+  ];
 
   const familyRelationships = [
-    'Father',
-    'Mother',
-    'Brother',
-    'Sister',
-    'Son',
-    'Daughter',
-    'Paternal Grandfather',
-    'Paternal Grandmother',
-    'Maternal Grandfather',
-    'Maternal Grandmother',
-    'Uncle (Paternal)',
-    'Uncle (Maternal)',
-    'Aunt (Paternal)',
-    'Aunt (Maternal)',
-    'Cousin',
-  ]
+    "Father",
+    "Mother",
+    "Brother",
+    "Sister",
+    "Son",
+    "Daughter",
+    "Paternal Grandfather",
+    "Paternal Grandmother",
+    "Maternal Grandfather",
+    "Maternal Grandmother",
+    "Uncle (Paternal)",
+    "Uncle (Maternal)",
+    "Aunt (Paternal)",
+    "Aunt (Maternal)",
+    "Cousin",
+  ];
 
   const commonConditions = [
-    'Diabetes Type 2',
-    'Hypertension',
-    'Heart Disease',
-    'Stroke',
-    'Cancer - Breast',
-    'Cancer - Lung',
-    'Cancer - Colon',
-    'Cancer - Prostate',
-    'Asthma',
-    'COPD',
-    'Kidney Disease',
-    'Liver Disease',
-    'Alzheimer\'s Disease',
-    'Depression',
-    'Anxiety Disorder',
-    'Thyroid Disease',
-    'Arthritis',
-    'Osteoporosis',
-    'Epilepsy',
-    'Multiple Sclerosis',
-  ]
+    "Diabetes Type 2",
+    "Hypertension",
+    "Heart Disease",
+    "Stroke",
+    "Cancer - Breast",
+    "Cancer - Lung",
+    "Cancer - Colon",
+    "Cancer - Prostate",
+    "Asthma",
+    "COPD",
+    "Kidney Disease",
+    "Liver Disease",
+    "Alzheimer's Disease",
+    "Depression",
+    "Anxiety Disorder",
+    "Thyroid Disease",
+    "Arthritis",
+    "Osteoporosis",
+    "Epilepsy",
+    "Multiple Sclerosis",
+  ];
 
   const calculateDuration = (startDate: string, endDate: string): string => {
-    if (!startDate || !endDate) return ''
-    const start = new Date(startDate)
-    const end = new Date(endDate)
-    const diffTime = Math.abs(end.getTime() - start.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    if (diffDays === 0) return '1 day'
-    if (diffDays === 1) return '1 day'
-    if (diffDays < 7) return `${diffDays} days`
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks`
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months`
-    return `${Math.floor(diffDays / 365)} years`
-  }
+    if (!startDate || !endDate) return "";
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "1 day";
+    if (diffDays === 1) return "1 day";
+    if (diffDays < 7) return `${diffDays} days`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months`;
+    return `${Math.floor(diffDays / 365)} years`;
+  };
 
   const handleAddTravel = () => {
-    if (!currentTravel.destination || !currentTravel.departureDate || !currentTravel.returnDate) {
-      return
+    if (
+      !currentTravel.destination ||
+      !currentTravel.departureDate ||
+      !currentTravel.returnDate
+    ) {
+      return;
     }
 
-    const duration = calculateDuration(currentTravel.departureDate!, currentTravel.returnDate!)
+    const duration = calculateDuration(
+      currentTravel.departureDate!,
+      currentTravel.returnDate!
+    );
     const newTravel: TravelHistory = {
       id: Date.now().toString(),
       destination: currentTravel.destination!,
       departureDate: currentTravel.departureDate!,
       returnDate: currentTravel.returnDate!,
       duration,
-      purpose: currentTravel.purpose || 'Not specified',
+      purpose: currentTravel.purpose || "Not specified",
       activities: currentTravel.activities || [],
-    }
+    };
 
     setPatientDetails({
       ...patientDetails,
       travelHistory: [...patientDetails.travelHistory, newTravel],
-    })
+    });
 
-    setCurrentTravel({})
-    setShowTravelDialog(false)
-  }
+    setCurrentTravel({});
+    setShowTravelDialog(false);
+  };
 
   const handleAddFamily = () => {
     if (!currentFamily.relationship || !currentFamily.condition) {
-      return
+      return;
     }
 
     const newFamily: FamilyHistory = {
       id: Date.now().toString(),
       relationship: currentFamily.relationship!,
       condition: currentFamily.condition!,
-      ageOfOnset: currentFamily.ageOfOnset || 'Unknown',
-      duration: currentFamily.duration || 'Unknown',
-      status: currentFamily.status || 'ongoing',
-      notes: currentFamily.notes || '',
-    }
+      ageOfOnset: currentFamily.ageOfOnset || "Unknown",
+      duration: currentFamily.duration || "Unknown",
+      status: currentFamily.status || "ongoing",
+      notes: currentFamily.notes || "",
+    };
 
     setPatientDetails({
       ...patientDetails,
       familyHistory: [...patientDetails.familyHistory, newFamily],
-    })
+    });
 
-    setCurrentFamily({})
-    setShowFamilyDialog(false)
-  }
+    setCurrentFamily({});
+    setShowFamilyDialog(false);
+  };
 
   const handleDeleteTravel = (id: string) => {
     setPatientDetails({
       ...patientDetails,
       travelHistory: patientDetails.travelHistory.filter((t) => t.id !== id),
-    })
-  }
+    });
+  };
 
   const handleDeleteFamily = (id: string) => {
     setPatientDetails({
       ...patientDetails,
       familyHistory: patientDetails.familyHistory.filter((f) => f.id !== id),
-    })
-  }
+    });
+  };
 
   const handleSave = async () => {
     // Validation
     if (!patientDetails.name || !patientDetails.age || !patientDetails.gender) {
       setSnackbar({
         open: true,
-        message: 'Please fill in all required fields (Name, Age, Gender)',
-        severity: 'error',
-      })
-      return
+        message: "Please fill in all required fields (Name, Age, Gender)",
+        severity: "error",
+      });
+      return;
     }
 
-    setSaving(true)
+    setSaving(true);
     try {
       if (intakeId) {
         // Update existing patient
-        await updatePatientIntake(intakeId, patientDetails)
+        await updatePatientIntake(intakeId, patientDetails);
         setSnackbar({
           open: true,
           message: `Patient ${intakeId} updated successfully!`,
-          severity: 'success',
-        })
+          severity: "success",
+        });
       } else {
         // Create new patient
-        const response = await savePatientIntake(patientDetails)
+        const response = await savePatientIntake(patientDetails);
         setSnackbar({
           open: true,
           message: `Patient intake saved successfully! ID: ${response.intake_id}`,
-          severity: 'success',
-        })
+          severity: "success",
+        });
       }
-      
+
       // Navigate back to patient list after 2 seconds
       setTimeout(() => {
-        navigate('/patients')
-      }, 2000)
+        navigate("/patients");
+      }, 2000);
     } catch (error) {
       setSnackbar({
         open: true,
-        message: `Failed to ${intakeId ? 'update' : 'save'} patient intake. Please try again.`,
-        severity: 'error',
-      })
+        message: `Failed to ${
+          intakeId ? "update" : "save"
+        } patient intake. Please try again.`,
+        severity: "error",
+      });
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false })
-  }
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   const handleClear = () => {
     setPatientDetails({
-      name: '',
-      age: '',
-      gender: '',
-      bloodType: '',
+      name: "",
+      age: "",
+      gender: "",
+      bloodType: "",
       travelHistory: [],
       familyHistory: [],
       heightCm: undefined,
@@ -476,22 +521,23 @@ const PatientIntake: React.FC = () => {
       temperatureC: undefined,
       chiefComplaints: [],
       presentHistory: [],
-    })
-  }
+    });
+  };
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
           <Tooltip title="Back to Patient List">
-            <IconButton 
-              onClick={() => navigate('/patients')}
+            <IconButton
+              onClick={() => navigate("/patients")}
               sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                color: "white",
+                "&:hover": {
+                  background:
+                    "linear-gradient(135deg, #764ba2 0%, #667eea 100%)",
                 },
               }}
             >
@@ -502,30 +548,44 @@ const PatientIntake: React.FC = () => {
             variant="h3"
             sx={{
               fontWeight: 700,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
             }}
           >
-            [P] {intakeId ? (isViewMode ? 'View Patient' : 'Edit Patient') : 'Patient Intake Form'}
+            [P]{" "}
+            {intakeId
+              ? isViewMode
+                ? "View Patient"
+                : "Edit Patient"
+              : "Patient Intake Form"}
           </Typography>
         </Box>
-        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 800 }}>
-          Complete patient information including basic details, travel history, and family medical history
+        <Typography
+          variant="body1"
+          color="text.secondary"
+          sx={{ maxWidth: 800 }}
+        >
+          Complete patient information including basic details, travel history,
+          and family medical history
         </Typography>
       </Box>
-      
+
       {/* Loading Spinner */}
       {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
           <CircularProgress />
         </Box>
       )}
 
       {/* Basic Information */}
       <Paper sx={{ p: 4, mb: 3 }}>
-        <Typography variant="h5" gutterBottom sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography
+          variant="h5"
+          gutterBottom
+          sx={{ mb: 3, display: "flex", alignItems: "center", gap: 1 }}
+        >
           <Person color="primary" />
           Basic Information
         </Typography>
@@ -535,7 +595,9 @@ const PatientIntake: React.FC = () => {
               fullWidth
               label="Full Name"
               value={patientDetails.name}
-              onChange={(e) => setPatientDetails({ ...patientDetails, name: e.target.value })}
+              onChange={(e) =>
+                setPatientDetails({ ...patientDetails, name: e.target.value })
+              }
               required
               disabled={isViewMode}
             />
@@ -546,7 +608,9 @@ const PatientIntake: React.FC = () => {
               label="Age"
               type="number"
               value={patientDetails.age}
-              onChange={(e) => setPatientDetails({ ...patientDetails, age: e.target.value })}
+              onChange={(e) =>
+                setPatientDetails({ ...patientDetails, age: e.target.value })
+              }
               required
               disabled={isViewMode}
             />
@@ -557,7 +621,12 @@ const PatientIntake: React.FC = () => {
               <Select
                 value={patientDetails.gender}
                 label="Gender"
-                onChange={(e) => setPatientDetails({ ...patientDetails, gender: e.target.value })}
+                onChange={(e) =>
+                  setPatientDetails({
+                    ...patientDetails,
+                    gender: e.target.value,
+                  })
+                }
                 disabled={isViewMode}
               >
                 <MenuItem value="male">Male</MenuItem>
@@ -572,7 +641,12 @@ const PatientIntake: React.FC = () => {
               <Select
                 value={patientDetails.bloodType}
                 label="Blood Type"
-                onChange={(e) => setPatientDetails({ ...patientDetails, bloodType: e.target.value })}
+                onChange={(e) =>
+                  setPatientDetails({
+                    ...patientDetails,
+                    bloodType: e.target.value,
+                  })
+                }
                 disabled={isViewMode}
               >
                 <MenuItem value="A+">A+</MenuItem>
@@ -591,8 +665,18 @@ const PatientIntake: React.FC = () => {
 
       {/* Travel History */}
       <Paper sx={{ p: 4, mb: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 3,
+          }}
+        >
+          <Typography
+            variant="h5"
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+          >
             <Flight color="secondary" />
             Travel History (Last 2 Years)
           </Typography>
@@ -608,8 +692,12 @@ const PatientIntake: React.FC = () => {
         </Box>
 
         {patientDetails.travelHistory.length === 0 ? (
-          <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-            No travel history recorded. Click "Add Travel" to add travel details.
+          <Typography
+            color="text.secondary"
+            sx={{ textAlign: "center", py: 4 }}
+          >
+            No travel history recorded. Click "Add Travel" to add travel
+            details.
           </Typography>
         ) : (
           <Grid container spacing={2}>
@@ -617,12 +705,22 @@ const PatientIntake: React.FC = () => {
               <Grid item xs={12} key={travel.id}>
                 <Card variant="outlined">
                   <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                      }}
+                    >
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" gutterBottom>
                           {travel.destination}
                         </Typography>
-                        <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          sx={{ mb: 1, flexWrap: "wrap", gap: 1 }}
+                        >
                           <Chip
                             icon={<CalendarToday />}
                             label={`${travel.departureDate} to ${travel.returnDate}`}
@@ -630,24 +728,43 @@ const PatientIntake: React.FC = () => {
                             color="primary"
                             variant="outlined"
                           />
-                          <Chip label={`Duration: ${travel.duration}`} size="small" color="secondary" />
+                          <Chip
+                            label={`Duration: ${travel.duration}`}
+                            size="small"
+                            color="secondary"
+                          />
                           <Chip label={travel.purpose} size="small" />
                         </Stack>
                         {travel.activities.length > 0 && (
                           <Box sx={{ mt: 1 }}>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               Activities:
                             </Typography>
-                            <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: 'wrap', gap: 0.5 }}>
+                            <Stack
+                              direction="row"
+                              spacing={0.5}
+                              sx={{ mt: 0.5, flexWrap: "wrap", gap: 0.5 }}
+                            >
                               {travel.activities.map((activity, idx) => (
-                                <Chip key={idx} label={activity} size="small" variant="outlined" />
+                                <Chip
+                                  key={idx}
+                                  label={activity}
+                                  size="small"
+                                  variant="outlined"
+                                />
                               ))}
                             </Stack>
                           </Box>
                         )}
                       </Box>
                       {!isViewMode && (
-                        <IconButton color="error" onClick={() => handleDeleteTravel(travel.id)}>
+                        <IconButton
+                          color="error"
+                          onClick={() => handleDeleteTravel(travel.id)}
+                        >
                           <DeleteIcon />
                         </IconButton>
                       )}
@@ -662,8 +779,18 @@ const PatientIntake: React.FC = () => {
 
       {/* Family History */}
       <Paper sx={{ p: 4, mb: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 3,
+          }}
+        >
+          <Typography
+            variant="h5"
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+          >
             <FamilyRestroom color="success" />
             Family Medical History
           </Typography>
@@ -680,8 +807,12 @@ const PatientIntake: React.FC = () => {
         </Box>
 
         {patientDetails.familyHistory.length === 0 ? (
-          <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-            No family history recorded. Click "Add Family History" to add medical conditions.
+          <Typography
+            color="text.secondary"
+            sx={{ textAlign: "center", py: 4 }}
+          >
+            No family history recorded. Click "Add Family History" to add
+            medical conditions.
           </Typography>
         ) : (
           <Grid container spacing={2}>
@@ -689,41 +820,66 @@ const PatientIntake: React.FC = () => {
               <Grid item xs={12} md={6} key={family.id}>
                 <Card variant="outlined">
                   <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                      }}
+                    >
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" gutterBottom>
                           {family.relationship}
                         </Typography>
-                        <Typography variant="body1" color="text.primary" gutterBottom>
+                        <Typography
+                          variant="body1"
+                          color="text.primary"
+                          gutterBottom
+                        >
                           {family.condition}
                         </Typography>
-                        <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', gap: 1 }}>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          sx={{ mb: 1, flexWrap: "wrap", gap: 1 }}
+                        >
                           <Chip
                             label={`Age of Onset: ${family.ageOfOnset}`}
                             size="small"
                             variant="outlined"
                           />
-                          <Chip label={`Duration: ${family.duration}`} size="small" variant="outlined" />
+                          <Chip
+                            label={`Duration: ${family.duration}`}
+                            size="small"
+                            variant="outlined"
+                          />
                           <Chip
                             label={family.status}
                             size="small"
                             color={
-                              family.status === 'ongoing'
-                                ? 'warning'
-                                : family.status === 'resolved'
-                                ? 'success'
-                                : 'default'
+                              family.status === "ongoing"
+                                ? "warning"
+                                : family.status === "resolved"
+                                ? "success"
+                                : "default"
                             }
                           />
                         </Stack>
                         {family.notes && (
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mt: 1 }}
+                          >
                             Notes: {family.notes}
                           </Typography>
                         )}
                       </Box>
                       {!isViewMode && (
-                        <IconButton color="error" onClick={() => handleDeleteFamily(family.id)}>
+                        <IconButton
+                          color="error"
+                          onClick={() => handleDeleteFamily(family.id)}
+                        >
                           <DeleteIcon />
                         </IconButton>
                       )}
@@ -737,7 +893,7 @@ const PatientIntake: React.FC = () => {
       </Paper>
 
       {/* Extended Anthropometry */}
-      <MotionPaper 
+      <MotionPaper
         sx={{ p: 4, mb: 3 }}
         initial="hidden"
         animate="visible"
@@ -748,187 +904,314 @@ const PatientIntake: React.FC = () => {
         </Typography>
         <Grid container spacing={3}>
           <Grid item xs={12} md={3}>
-            <TextField label="Height (cm)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.heightCm ?? ''}
+            <TextField
+              label="Height (cm)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.heightCm ?? ""}
               onChange={(e) => {
-                const height = parseFloat(e.target.value)
-                const bmi = patientDetails.weightKg && height ? +(patientDetails.weightKg / Math.pow(height/100,2)).toFixed(2) : undefined
-                setPatientDetails({ ...patientDetails, heightCm: isNaN(height)? undefined: height, bmi })
+                const height = parseFloat(e.target.value);
+                const bmi =
+                  patientDetails.weightKg && height
+                    ? +(
+                        patientDetails.weightKg / Math.pow(height / 100, 2)
+                      ).toFixed(2)
+                    : undefined;
+                setPatientDetails({
+                  ...patientDetails,
+                  heightCm: isNaN(height) ? undefined : height,
+                  bmi,
+                });
               }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Weight (kg)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.weightKg ?? ''}
+            <TextField
+              label="Weight (kg)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.weightKg ?? ""}
               onChange={(e) => {
-                const weight = parseFloat(e.target.value)
-                const bmi = patientDetails.heightCm && weight ? +(weight / Math.pow(patientDetails.heightCm/100,2)).toFixed(2) : undefined
-                setPatientDetails({ ...patientDetails, weightKg: isNaN(weight)? undefined: weight, bmi })
+                const weight = parseFloat(e.target.value);
+                const bmi =
+                  patientDetails.heightCm && weight
+                    ? +(
+                        weight / Math.pow(patientDetails.heightCm / 100, 2)
+                      ).toFixed(2)
+                    : undefined;
+                setPatientDetails({
+                  ...patientDetails,
+                  weightKg: isNaN(weight) ? undefined : weight,
+                  bmi,
+                });
               }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="BMI" type="number" fullWidth value={patientDetails.bmi ?? ''} disabled />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField label="Body Fat %" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.bodyFatPercent ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, bodyFatPercent: parseFloat(e.target.value) })}
+            <TextField
+              label="BMI"
+              type="number"
+              fullWidth
+              value={patientDetails.bmi ?? ""}
+              disabled
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Waist (cm)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.waistCm ?? ''}
+            <TextField
+              label="Body Fat %"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.bodyFatPercent ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  bodyFatPercent: parseFloat(e.target.value),
+                })
+              }
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              label="Waist (cm)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.waistCm ?? ""}
               onChange={(e) => {
-                const waist = parseFloat(e.target.value)
-                const whr = patientDetails.hipCm && waist ? +(waist / patientDetails.hipCm).toFixed(2) : undefined
-                setPatientDetails({ ...patientDetails, waistCm: isNaN(waist)? undefined: waist, whr })
+                const waist = parseFloat(e.target.value);
+                const whr =
+                  patientDetails.hipCm && waist
+                    ? +(waist / patientDetails.hipCm).toFixed(2)
+                    : undefined;
+                setPatientDetails({
+                  ...patientDetails,
+                  waistCm: isNaN(waist) ? undefined : waist,
+                  whr,
+                });
               }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Hip (cm)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.hipCm ?? ''}
+            <TextField
+              label="Hip (cm)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.hipCm ?? ""}
               onChange={(e) => {
-                const hip = parseFloat(e.target.value)
-                const whr = patientDetails.waistCm && hip ? +(patientDetails.waistCm / hip).toFixed(2) : undefined
-                setPatientDetails({ ...patientDetails, hipCm: isNaN(hip)? undefined: hip, whr })
+                const hip = parseFloat(e.target.value);
+                const whr =
+                  patientDetails.waistCm && hip
+                    ? +(patientDetails.waistCm / hip).toFixed(2)
+                    : undefined;
+                setPatientDetails({
+                  ...patientDetails,
+                  hipCm: isNaN(hip) ? undefined : hip,
+                  whr,
+                });
               }}
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="WHR" type="number" fullWidth value={patientDetails.whr ?? ''} disabled />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField label="MUAC (cm)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.muacCm ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, muacCm: parseFloat(e.target.value) })}
+            <TextField
+              label="WHR"
+              type="number"
+              fullWidth
+              value={patientDetails.whr ?? ""}
+              disabled
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Head Circumference (cm)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.headCircumferenceCm ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, headCircumferenceCm: parseFloat(e.target.value) })}
+            <TextField
+              label="MUAC (cm)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.muacCm ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  muacCm: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Chest Expansion (cm)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.chestExpansionCm ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, chestExpansionCm: parseFloat(e.target.value) })}
+            <TextField
+              label="Head Circumference (cm)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.headCircumferenceCm ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  headCircumferenceCm: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Sitting Height (cm)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.sittingHeightCm ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, sittingHeightCm: parseFloat(e.target.value) })}
+            <TextField
+              label="Chest Expansion (cm)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.chestExpansionCm ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  chestExpansionCm: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Standing Height (cm)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.standingHeightCm ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, standingHeightCm: parseFloat(e.target.value) })}
+            <TextField
+              label="Sitting Height (cm)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.sittingHeightCm ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  sittingHeightCm: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Arm Span (cm)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.armSpanCm ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, armSpanCm: parseFloat(e.target.value) })}
+            <TextField
+              label="Standing Height (cm)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.standingHeightCm ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  standingHeightCm: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="BP Systolic (mmHg)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.bpSystolic ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, bpSystolic: parseFloat(e.target.value) })}
+            <TextField
+              label="Arm Span (cm)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.armSpanCm ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  armSpanCm: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="BP Diastolic (mmHg)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.bpDiastolic ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, bpDiastolic: parseFloat(e.target.value) })}
+            <TextField
+              label="BP Systolic (mmHg)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.bpSystolic ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  bpSystolic: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Pulse (/min)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.pulsePerMin ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, pulsePerMin: parseFloat(e.target.value) })}
+            <TextField
+              label="BP Diastolic (mmHg)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.bpDiastolic ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  bpDiastolic: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Resp Rate (/min)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.respRatePerMin ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, respRatePerMin: parseFloat(e.target.value) })}
+            <TextField
+              label="Pulse (/min)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.pulsePerMin ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  pulsePerMin: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField label="Temperature (°C)" type="number" fullWidth disabled={isViewMode}
-              value={patientDetails.temperatureC ?? ''}
-              onChange={(e) => setPatientDetails({ ...patientDetails, temperatureC: parseFloat(e.target.value) })}
+            <TextField
+              label="Resp Rate (/min)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.respRatePerMin ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  respRatePerMin: parseFloat(e.target.value),
+                })
+              }
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              label="Temperature (°C)"
+              type="number"
+              fullWidth
+              disabled={isViewMode}
+              value={patientDetails.temperatureC ?? ""}
+              onChange={(e) =>
+                setPatientDetails({
+                  ...patientDetails,
+                  temperatureC: parseFloat(e.target.value),
+                })
+              }
             />
           </Grid>
         </Grid>
       </MotionPaper>
 
       {/* Complaints */}
-      <MotionPaper 
+      <MotionPaper
         sx={{ p: 4, mb: 3 }}
         initial="hidden"
         animate="visible"
         variants={sectionVariants}
       >
-        <Typography variant="h5" gutterBottom>
-          [SICK] Chief Complaints (C/o) - Duration Only
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <TextField fullWidth label="Complaint" disabled={isViewMode}
-              value={''}
-              onChange={() => {}}
-              placeholder="e.g., Fever"
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <TextField fullWidth label="Duration" disabled={isViewMode} placeholder="e.g., 3 days" />
-          </Grid>
-          {!isViewMode && (
-            <Grid item xs={12} md={2}>
-              <Button variant="contained" onClick={() => {
-                const complaintInput = (document.querySelector('input[placeholder="e.g., Fever"]') as HTMLInputElement)?.value || ''
-                const durationInput = (document.querySelector('input[placeholder="e.g., 3 days"]') as HTMLInputElement)?.value || ''
-                if (!complaintInput || !durationInput) return
-                setPatientDetails({
-                  ...patientDetails,
-                  chiefComplaints: [...(patientDetails.chiefComplaints||[]), { complaint: complaintInput, duration: durationInput }]
-                })
-              }}>Add</Button>
-            </Grid>
-          )}
-        </Grid>
-        <Box sx={{ mt: 2 }}>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-            <AnimatePresence>
-              {(patientDetails.chiefComplaints||[]).map((c, idx) => (
-                <motion.div
-                  key={idx}
-                  variants={chipVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  layout
-                >
-                  <Chip label={`${c.complaint} - ${c.duration}`} onDelete={isViewMode? undefined: () => {
-                    const next = [...(patientDetails.chiefComplaints||[])]
-                    next.splice(idx,1)
-                    setPatientDetails({ ...patientDetails, chiefComplaints: next })
-                  }} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </Stack>
-        </Box>
+        <ComplaintSelector
+          complaints={patientDetails.chiefComplaints || []}
+          onChange={(complaints) =>
+            setPatientDetails({
+              ...patientDetails,
+              chiefComplaints: complaints,
+            })
+          }
+        />
       </MotionPaper>
 
       {/* Present History */}
-      <MotionPaper 
+      <MotionPaper
         sx={{ p: 4, mb: 3 }}
         initial="hidden"
         animate="visible"
@@ -938,59 +1221,151 @@ const PatientIntake: React.FC = () => {
           [LIST] Present History - Structured Complaints
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Add complaints with association, relieving, aggravating factors and duration. Items are maintained in chronological order.
+          Add complaints with association, relieving, aggravating factors and
+          duration. Items are maintained in chronological order.
         </Typography>
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <TextField fullWidth label="Complaint Title" disabled={isViewMode} placeholder="e.g., Cough" id="ph-title" />
+            <TextField
+              fullWidth
+              label="Complaint Title"
+              disabled={isViewMode}
+              placeholder="e.g., Cough"
+              id="ph-title"
+            />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField fullWidth label="Duration" disabled={isViewMode} placeholder="e.g., 2 weeks" id="ph-duration" />
+            <TextField
+              fullWidth
+              label="Duration"
+              disabled={isViewMode}
+              placeholder="e.g., 2 weeks"
+              id="ph-duration"
+            />
           </Grid>
           <Grid item xs={12}>
-            <Autocomplete multiple freeSolo disabled={isViewMode}
-              options={['Fever','Chest pain','Shortness of breath','Palpitations','Nausea']}
-              onChange={(_, v) => (document.getElementById('ph-assoc') as HTMLInputElement).value = JSON.stringify(v)}
-              renderInput={(params) => <TextField {...params} label="Association Factors" placeholder="Select or type" />}
+            <Autocomplete
+              multiple
+              freeSolo
+              disabled={isViewMode}
+              options={[
+                "Fever",
+                "Chest pain",
+                "Shortness of breath",
+                "Palpitations",
+                "Nausea",
+              ]}
+              onChange={(_, v) =>
+                ((
+                  document.getElementById("ph-assoc") as HTMLInputElement
+                ).value = JSON.stringify(v))
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Association Factors"
+                  placeholder="Select or type"
+                />
+              )}
             />
             <input id="ph-assoc" type="hidden" />
           </Grid>
           <Grid item xs={12}>
-            <Autocomplete multiple freeSolo disabled={isViewMode}
-              options={['Rest','Hydration','Analgesics','Antipyretics']}
-              onChange={(_, v) => (document.getElementById('ph-relieve') as HTMLInputElement).value = JSON.stringify(v)}
-              renderInput={(params) => <TextField {...params} label="Relieving Factors" placeholder="Select or type" />}
+            <Autocomplete
+              multiple
+              freeSolo
+              disabled={isViewMode}
+              options={["Rest", "Hydration", "Analgesics", "Antipyretics"]}
+              onChange={(_, v) =>
+                ((
+                  document.getElementById("ph-relieve") as HTMLInputElement
+                ).value = JSON.stringify(v))
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Relieving Factors"
+                  placeholder="Select or type"
+                />
+              )}
             />
             <input id="ph-relieve" type="hidden" />
           </Grid>
           <Grid item xs={12}>
-            <Autocomplete multiple freeSolo disabled={isViewMode}
-              options={['Exercise','Cold air','Dust','Spicy food']}
-              onChange={(_, v) => (document.getElementById('ph-aggravate') as HTMLInputElement).value = JSON.stringify(v)}
-              renderInput={(params) => <TextField {...params} label="Aggravating Factors" placeholder="Select or type" />}
+            <Autocomplete
+              multiple
+              freeSolo
+              disabled={isViewMode}
+              options={["Exercise", "Cold air", "Dust", "Spicy food"]}
+              onChange={(_, v) =>
+                ((
+                  document.getElementById("ph-aggravate") as HTMLInputElement
+                ).value = JSON.stringify(v))
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Aggravating Factors"
+                  placeholder="Select or type"
+                />
+              )}
             />
             <input id="ph-aggravate" type="hidden" />
           </Grid>
           {!isViewMode && (
             <Grid item xs={12}>
-              <Button variant="contained" onClick={() => {
-                const title = (document.getElementById('ph-title') as HTMLInputElement)?.value || ''
-                const duration = (document.getElementById('ph-duration') as HTMLInputElement)?.value || ''
-                const assoc = JSON.parse((document.getElementById('ph-assoc') as HTMLInputElement)?.value || '[]')
-                const relieve = JSON.parse((document.getElementById('ph-relieve') as HTMLInputElement)?.value || '[]')
-                const aggravate = JSON.parse((document.getElementById('ph-aggravate') as HTMLInputElement)?.value || '[]')
-                if (!title) return
-                const newItem = { id: Date.now().toString(), title, duration, associationFactors: assoc, relievingFactors: relieve, aggravatingFactors: aggravate }
-                const next = [...(patientDetails.presentHistory||[]), newItem]
-                setPatientDetails({ ...patientDetails, presentHistory: next })
-              }}>Add Complaint</Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  const title =
+                    (document.getElementById("ph-title") as HTMLInputElement)
+                      ?.value || "";
+                  const duration =
+                    (document.getElementById("ph-duration") as HTMLInputElement)
+                      ?.value || "";
+                  const assoc = JSON.parse(
+                    (document.getElementById("ph-assoc") as HTMLInputElement)
+                      ?.value || "[]"
+                  );
+                  const relieve = JSON.parse(
+                    (document.getElementById("ph-relieve") as HTMLInputElement)
+                      ?.value || "[]"
+                  );
+                  const aggravate = JSON.parse(
+                    (
+                      document.getElementById(
+                        "ph-aggravate"
+                      ) as HTMLInputElement
+                    )?.value || "[]"
+                  );
+                  if (!title) return;
+                  const newItem = {
+                    id: Date.now().toString(),
+                    title,
+                    duration,
+                    associationFactors: assoc,
+                    relievingFactors: relieve,
+                    aggravatingFactors: aggravate,
+                  };
+                  const next = [
+                    ...(patientDetails.presentHistory || []),
+                    newItem,
+                  ];
+                  setPatientDetails({
+                    ...patientDetails,
+                    presentHistory: next,
+                  });
+                }}
+              >
+                Add Complaint
+              </Button>
             </Grid>
           )}
         </Grid>
         <Divider sx={{ my: 2 }} />
         <Grid container spacing={2}>
           <AnimatePresence>
-            {(patientDetails.presentHistory||[]).map((item) => (
+            {(patientDetails.presentHistory || []).map((item) => (
               <Grid item xs={12} key={item.id}>
                 <motion.div
                   variants={cardVariants}
@@ -1001,33 +1376,86 @@ const PatientIntake: React.FC = () => {
                 >
                   <Card variant="outlined">
                     <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                        }}
+                      >
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="h6">{item.title} <Typography component="span" variant="body2" color="text.secondary">({item.duration})</Typography></Typography>
-                          <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
+                          <Typography variant="h6">
+                            {item.title}{" "}
+                            <Typography
+                              component="span"
+                              variant="body2"
+                              color="text.secondary"
+                            >
+                              ({item.duration})
+                            </Typography>
+                          </Typography>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            sx={{ mt: 1, flexWrap: "wrap", gap: 1 }}
+                          >
                             <AnimatePresence>
                               {item.associationFactors.map((f, i) => (
-                                <motion.div key={`a-${i}`} variants={chipVariants} initial="hidden" animate="visible" exit="exit">
+                                <motion.div
+                                  key={`a-${i}`}
+                                  variants={chipVariants}
+                                  initial="hidden"
+                                  animate="visible"
+                                  exit="exit"
+                                >
                                   <Chip label={`Assoc: ${f}`} size="small" />
                                 </motion.div>
                               ))}
                               {item.relievingFactors.map((f, i) => (
-                                <motion.div key={`r-${i}`} variants={chipVariants} initial="hidden" animate="visible" exit="exit">
-                                  <Chip label={`Relieve: ${f}`} size="small" color="success" />
+                                <motion.div
+                                  key={`r-${i}`}
+                                  variants={chipVariants}
+                                  initial="hidden"
+                                  animate="visible"
+                                  exit="exit"
+                                >
+                                  <Chip
+                                    label={`Relieve: ${f}`}
+                                    size="small"
+                                    color="success"
+                                  />
                                 </motion.div>
                               ))}
                               {item.aggravatingFactors.map((f, i) => (
-                                <motion.div key={`g-${i}`} variants={chipVariants} initial="hidden" animate="visible" exit="exit">
-                                  <Chip label={`Aggravate: ${f}`} size="small" color="warning" />
+                                <motion.div
+                                  key={`g-${i}`}
+                                  variants={chipVariants}
+                                  initial="hidden"
+                                  animate="visible"
+                                  exit="exit"
+                                >
+                                  <Chip
+                                    label={`Aggravate: ${f}`}
+                                    size="small"
+                                    color="warning"
+                                  />
                                 </motion.div>
                               ))}
                             </AnimatePresence>
                           </Stack>
                         </Box>
                         {!isViewMode && (
-                          <IconButton color="error" onClick={() => {
-                            setPatientDetails({ ...patientDetails, presentHistory: (patientDetails.presentHistory||[]).filter(ph => ph.id !== item.id) })
-                          }}>
+                          <IconButton
+                            color="error"
+                            onClick={() => {
+                              setPatientDetails({
+                                ...patientDetails,
+                                presentHistory: (
+                                  patientDetails.presentHistory || []
+                                ).filter((ph) => ph.id !== item.id),
+                              });
+                            }}
+                          >
                             <DeleteIcon />
                           </IconButton>
                         )}
@@ -1063,7 +1491,7 @@ const PatientIntake: React.FC = () => {
       )}
 
       {/* Action Buttons */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
         {isViewMode ? (
           <>
             <Button
@@ -1071,17 +1499,19 @@ const PatientIntake: React.FC = () => {
               startIcon={<ReportIcon />}
               onClick={handleGenerateReport}
               size="large"
-              sx={{ color: '#10b981', borderColor: '#10b981' }}
+              sx={{ color: "#10b981", borderColor: "#10b981" }}
               disabled={generatingReport}
             >
-              {generatingReport ? 'Generating...' : 'Download Report'}
+              {generatingReport ? "Generating..." : "Download Report"}
             </Button>
             <Button
               variant="outlined"
               startIcon={<AssessmentIcon />}
-              onClick={() => window.open(`/diagnosis?patientId=${intakeId}`, '_blank')}
+              onClick={() =>
+                window.open(`/diagnosis?patientId=${intakeId}`, "_blank")
+              }
               size="large"
-              sx={{ color: '#667eea', borderColor: '#667eea' }}
+              sx={{ color: "#667eea", borderColor: "#667eea" }}
             >
               Start Diagnosis
             </Button>
@@ -1096,24 +1526,45 @@ const PatientIntake: React.FC = () => {
           </>
         ) : (
           <>
-            <Button variant="outlined" startIcon={<Clear />} onClick={handleClear} size="large" disabled={saving}>
+            <Button
+              variant="outlined"
+              startIcon={<Clear />}
+              onClick={handleClear}
+              size="large"
+              disabled={saving}
+            >
               Clear All
             </Button>
             <Button
               variant="contained"
-              startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <Save />}
+              startIcon={
+                saving ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  <Save />
+                )
+              }
               onClick={handleSave}
               size="large"
               disabled={saving}
             >
-              {saving ? 'Saving...' : intakeId ? 'Update Patient Details' : 'Save Patient Details'}
+              {saving
+                ? "Saving..."
+                : intakeId
+                ? "Update Patient Details"
+                : "Save Patient Details"}
             </Button>
           </>
         )}
       </Box>
 
       {/* Travel Dialog */}
-      <Dialog open={showTravelDialog} onClose={() => setShowTravelDialog(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={showTravelDialog}
+        onClose={() => setShowTravelDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>Add Travel History</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
@@ -1122,12 +1573,20 @@ const PatientIntake: React.FC = () => {
                 <Autocomplete
                   freeSolo
                   options={commonDestinations}
-                  value={currentTravel.destination || ''}
+                  value={currentTravel.destination || ""}
                   onChange={(_, newValue) =>
-                    setCurrentTravel({ ...currentTravel, destination: newValue || '' })
+                    setCurrentTravel({
+                      ...currentTravel,
+                      destination: newValue || "",
+                    })
                   }
                   renderInput={(params) => (
-                    <TextField {...params} label="Destination" required fullWidth />
+                    <TextField
+                      {...params}
+                      label="Destination"
+                      required
+                      fullWidth
+                    />
                   )}
                 />
               </Grid>
@@ -1137,8 +1596,13 @@ const PatientIntake: React.FC = () => {
                   label="Departure Date"
                   type="date"
                   InputLabelProps={{ shrink: true }}
-                  value={currentTravel.departureDate || ''}
-                  onChange={(e) => setCurrentTravel({ ...currentTravel, departureDate: e.target.value })}
+                  value={currentTravel.departureDate || ""}
+                  onChange={(e) =>
+                    setCurrentTravel({
+                      ...currentTravel,
+                      departureDate: e.target.value,
+                    })
+                  }
                   required
                 />
               </Grid>
@@ -1148,8 +1612,13 @@ const PatientIntake: React.FC = () => {
                   label="Return Date"
                   type="date"
                   InputLabelProps={{ shrink: true }}
-                  value={currentTravel.returnDate || ''}
-                  onChange={(e) => setCurrentTravel({ ...currentTravel, returnDate: e.target.value })}
+                  value={currentTravel.returnDate || ""}
+                  onChange={(e) =>
+                    setCurrentTravel({
+                      ...currentTravel,
+                      returnDate: e.target.value,
+                    })
+                  }
                   required
                 />
               </Grid>
@@ -1168,9 +1637,14 @@ const PatientIntake: React.FC = () => {
                 <FormControl fullWidth>
                   <InputLabel>Purpose</InputLabel>
                   <Select
-                    value={currentTravel.purpose || ''}
+                    value={currentTravel.purpose || ""}
                     label="Purpose"
-                    onChange={(e) => setCurrentTravel({ ...currentTravel, purpose: e.target.value })}
+                    onChange={(e) =>
+                      setCurrentTravel({
+                        ...currentTravel,
+                        purpose: e.target.value,
+                      })
+                    }
                   >
                     {travelPurposes.map((purpose) => (
                       <MenuItem key={purpose} value={purpose}>
@@ -1185,9 +1659,15 @@ const PatientIntake: React.FC = () => {
                   multiple
                   options={travelActivities}
                   value={currentTravel.activities || []}
-                  onChange={(_, newValue) => setCurrentTravel({ ...currentTravel, activities: newValue })}
+                  onChange={(_, newValue) =>
+                    setCurrentTravel({ ...currentTravel, activities: newValue })
+                  }
                   renderInput={(params) => (
-                    <TextField {...params} label="Activities During Travel" placeholder="Select activities" />
+                    <TextField
+                      {...params}
+                      label="Activities During Travel"
+                      placeholder="Select activities"
+                    />
                   )}
                 />
               </Grid>
@@ -1203,7 +1683,12 @@ const PatientIntake: React.FC = () => {
       </Dialog>
 
       {/* Family History Dialog */}
-      <Dialog open={showFamilyDialog} onClose={() => setShowFamilyDialog(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={showFamilyDialog}
+        onClose={() => setShowFamilyDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>Add Family Medical History</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
@@ -1212,12 +1697,20 @@ const PatientIntake: React.FC = () => {
                 <Autocomplete
                   freeSolo
                   options={familyRelationships}
-                  value={currentFamily.relationship || ''}
+                  value={currentFamily.relationship || ""}
                   onChange={(_, newValue) =>
-                    setCurrentFamily({ ...currentFamily, relationship: newValue || '' })
+                    setCurrentFamily({
+                      ...currentFamily,
+                      relationship: newValue || "",
+                    })
                   }
                   renderInput={(params) => (
-                    <TextField {...params} label="Relationship" required fullWidth />
+                    <TextField
+                      {...params}
+                      label="Relationship"
+                      required
+                      fullWidth
+                    />
                   )}
                 />
               </Grid>
@@ -1225,9 +1718,21 @@ const PatientIntake: React.FC = () => {
                 <Autocomplete
                   freeSolo
                   options={commonConditions}
-                  value={currentFamily.condition || ''}
-                  onChange={(_, newValue) => setCurrentFamily({ ...currentFamily, condition: newValue || '' })}
-                  renderInput={(params) => <TextField {...params} label="Condition" required fullWidth />}
+                  value={currentFamily.condition || ""}
+                  onChange={(_, newValue) =>
+                    setCurrentFamily({
+                      ...currentFamily,
+                      condition: newValue || "",
+                    })
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Condition"
+                      required
+                      fullWidth
+                    />
+                  )}
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -1235,8 +1740,13 @@ const PatientIntake: React.FC = () => {
                   fullWidth
                   label="Age of Onset"
                   placeholder="e.g., 45 years"
-                  value={currentFamily.ageOfOnset || ''}
-                  onChange={(e) => setCurrentFamily({ ...currentFamily, ageOfOnset: e.target.value })}
+                  value={currentFamily.ageOfOnset || ""}
+                  onChange={(e) =>
+                    setCurrentFamily({
+                      ...currentFamily,
+                      ageOfOnset: e.target.value,
+                    })
+                  }
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -1244,20 +1754,28 @@ const PatientIntake: React.FC = () => {
                   fullWidth
                   label="Duration"
                   placeholder="e.g., 10 years"
-                  value={currentFamily.duration || ''}
-                  onChange={(e) => setCurrentFamily({ ...currentFamily, duration: e.target.value })}
+                  value={currentFamily.duration || ""}
+                  onChange={(e) =>
+                    setCurrentFamily({
+                      ...currentFamily,
+                      duration: e.target.value,
+                    })
+                  }
                 />
               </Grid>
               <Grid item xs={12} md={4}>
                 <FormControl fullWidth>
                   <InputLabel>Status</InputLabel>
                   <Select
-                    value={currentFamily.status || 'ongoing'}
+                    value={currentFamily.status || "ongoing"}
                     label="Status"
                     onChange={(e) =>
                       setCurrentFamily({
                         ...currentFamily,
-                        status: e.target.value as 'ongoing' | 'resolved' | 'deceased',
+                        status: e.target.value as
+                          | "ongoing"
+                          | "resolved"
+                          | "deceased",
                       })
                     }
                   >
@@ -1273,8 +1791,13 @@ const PatientIntake: React.FC = () => {
                   label="Additional Notes"
                   multiline
                   rows={3}
-                  value={currentFamily.notes || ''}
-                  onChange={(e) => setCurrentFamily({ ...currentFamily, notes: e.target.value })}
+                  value={currentFamily.notes || ""}
+                  onChange={(e) =>
+                    setCurrentFamily({
+                      ...currentFamily,
+                      notes: e.target.value,
+                    })
+                  }
                 />
               </Grid>
             </Grid>
@@ -1293,14 +1816,18 @@ const PatientIntake: React.FC = () => {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
     </Container>
-  )
-}
+  );
+};
 
-export default PatientIntake
+export default PatientIntake;

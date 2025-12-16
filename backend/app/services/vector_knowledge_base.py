@@ -244,6 +244,66 @@ class VectorKnowledgeBase:
         
         return chunks_added
     
+    def add_chunks_batch(
+        self,
+        chunks: List[str],
+        metadata: Dict[str, Any]
+    ) -> int:
+        """
+        Add pre-chunked text to knowledge base in batch (optimized for parallel processing).
+        
+        This is used by PDF processor for fast batch chunk insertion with shared embeddings.
+        
+        Args:
+            chunks: List of pre-chunked text
+            metadata: Document metadata to attach to all chunks
+            
+        Returns:
+            Number of chunks added
+        """
+        if not FAISS_AVAILABLE or not self.openai_client:
+            logger.warning("FAISS or OpenAI not available, cannot add chunks")
+            return 0
+        
+        if not chunks:
+            return 0
+        
+        # PERFORMANCE: Generate embeddings in batch (25x texts per API call)
+        logger.debug(f"Generating embeddings for {len(chunks)} pre-chunked texts in batch...")
+        embeddings_batch = self._get_embeddings_batch(chunks, batch_size=100)
+        
+        if len(embeddings_batch) != len(chunks):
+            logger.warning(f"Only got {len(embeddings_batch)}/{len(chunks)} embeddings")
+        
+        chunks_added = 0
+        documents_batch = []
+        
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings_batch)):
+            # Store chunk with metadata
+            chunk_metadata = metadata.copy()
+            chunk_metadata.update({
+                'chunk_index': i,
+                'chunk_text': chunk,
+                'added_at': datetime.utcnow().isoformat()
+            })
+            
+            documents_batch.append(chunk_metadata)
+            chunks_added += 1
+        
+        # Add all to FAISS index at once
+        if embeddings_batch:
+            embeddings_array = np.array(embeddings_batch, dtype='float32')
+            self.index.add(embeddings_array)
+            self.documents.extend(documents_batch)
+            self.document_count += 1
+            
+            # Save index
+            self._save_index()
+            
+            logger.debug(f"Added batch of {chunks_added} chunks")
+        
+        return chunks_added
+    
     def _chunk_text(
         self,
         text: str,

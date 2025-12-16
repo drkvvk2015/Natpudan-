@@ -192,8 +192,8 @@ class LocalVectorKnowledgeBase:
                 batch_size=128,  # Increased for maximum speed (no data loss)
                 show_progress_bar=True,
                 convert_to_numpy=True,
-                normalize_embeddings=True,  # Pre-normalize for faster search
-                num_workers=4  # Parallel processing within batches
+                normalize_embeddings=True  # Pre-normalize for faster search
+                # Note: num_workers removed - not supported in newer sentence-transformers
             )
             logger.info(f"[OK] Generated {len(embeddings)} local embeddings (no API cost)")
             return [emb.astype('float32') for emb in embeddings]

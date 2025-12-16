@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Backend API
   backend:
@@ -84,7 +82,52 @@ services:
       timeout: 3s
       retries: 5
 
-  # Nginx reverse proxy (optional)
+  # Celery Worker (Background Tasks)
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: physician-ai-celery
+    command: celery -A app.celery_config worker --loglevel=info --concurrency=4 -E
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=False
+      - DATABASE_URL=postgresql://physician_user:secure_password@db:5432/physician_ai
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+    depends_on:
+      - db
+      - redis
+      - backend
+    restart: unless-stopped
+    networks:
+      - physician-ai-network
+
+  # Flower (Task Monitoring Dashboard)
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: physician-ai-flower
+    command: celery -A app.celery_config flower --port=5555 --basic_auth=admin:changeme
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - celery
+    restart: unless-stopped
+    networks:
+      - physician-ai-network
+
+  # Nginx reverse proxy
   nginx:
     image: nginx:alpine
     container_name: physician-ai-nginx

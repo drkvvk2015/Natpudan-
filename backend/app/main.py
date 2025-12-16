@@ -54,6 +54,7 @@ from app.api.analytics import router as analytics_router
 from app.api.fhir import router as fhir_router
 from app.api.health import router as health_router
 from app.api.knowledge_base import router as knowledge_router
+from app.api.patient_intake import router as patient_intake_router
 from app.database import init_db
 
 # Track application start time for uptime calculation
@@ -924,6 +925,7 @@ api_router.include_router(analytics_router, prefix="/analytics", tags=["analytic
 api_router.include_router(fhir_router, prefix="/fhir", tags=["fhir"])
 api_router.include_router(health_router, tags=["health"])
 api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
+api_router.include_router(patient_intake_router, prefix="/medical", tags=["patient-intake"])
 # Background task for processing upload queue
 _last_queue_process = 0
 _queue_process_interval = 10  # Process queue every 10 seconds

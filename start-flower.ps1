@@ -35,9 +35,16 @@ try {
     Write-Host "Logs will appear below:" -ForegroundColor Gray
     Write-Host "----------------------------------------`n" -ForegroundColor Gray
     
-    # Set Celery broker and result backend for SQLite
-    $env:CELERY_BROKER_URL = 'sqla+sqlite:///./celery_broker.db'
-    $env:CELERY_RESULT_BACKEND = 'db+sqlite:///./celery_results.db'
+    # Prefer Redis if REDIS_URL is configured; otherwise abort with friendly message
+    $useRedis = $env:REDIS_URL -and $env:REDIS_URL.Trim() -ne ''
+    if (-not $useRedis) {
+        Write-Host "[ERROR] Flower requires a Redis or RabbitMQ broker. The SQLAlchemy/SQLite broker is not supported by Flower." -ForegroundColor Red
+        Write-Host "        To fix: start Redis and set REDIS_URL, then re-run this script." -ForegroundColor Yellow
+        Write-Host "        Example: REDIS_URL=redis://localhost:6379/0" -ForegroundColor Yellow
+        Write-Host "        Tip: run .\start-redis.ps1 to launch a local Redis in Docker." -ForegroundColor Yellow
+        Pop-Location
+        exit 2
+    }
     
     # Start Flower
     python -m celery -A app.celery_config flower `

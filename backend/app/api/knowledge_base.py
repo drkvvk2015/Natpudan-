@@ -783,11 +783,19 @@ async def get_statistics():
         finally:
             db_status.close()
 
+        # Use FAISS count as primary (batch processor populates FAISS, not DB)
+        faiss_doc_count = int(local_stats.get('total_documents', 0))
+        faiss_chunk_count = int(local_stats.get('total_chunks', 0))
+        
+        # Use whichever is higher (FAISS or DB)
+        effective_doc_count = max(faiss_doc_count, db_doc_count)
+        effective_chunk_count = max(faiss_chunk_count, db_total_chunks, total_chunks)
+        
         return {
             'status': 'ready',
-            'total_documents': db_doc_count,  # Documents from database
-            'local_faiss_documents': int(local_stats.get('total_documents', 0)),  # FAISS index count
-            'total_chunks': db_total_chunks,  # Chunks from database
+            'total_documents': effective_doc_count,  # Use FAISS count (primary) or DB count
+            'local_faiss_documents': faiss_doc_count,  # FAISS index count
+            'total_chunks': effective_chunk_count,  # Use FAISS chunks or DB chunks
             'categories': list(db_categories),  # List of unique categories
             'categories_count': len(db_categories),  # Count of unique categories
             'knowledge_level': knowledge_level.upper(),
@@ -2062,4 +2070,259 @@ async def get_queue_status(db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get queue status: {str(e)}"
+        )
+
+
+# ==================== PDF Processing with Pause/Resume ====================
+
+@router.post("/pdf/pause/{processing_id}")
+async def pause_pdf_processing(
+    processing_id: int,
+    current_user: User = Depends(require_kb_management_role),
+    db: Session = Depends(get_db),
+):
+    """Pause an active PDF processing job."""
+    try:
+        from app.services.pdf_processing_manager import pdf_processor_with_resume
+        from app.models import PDFProcessing
+        
+        # Check if processing exists and belongs to user
+        processing = db.query(PDFProcessing).filter(
+            PDFProcessing.id == processing_id,
+            PDFProcessing.user_id == current_user.id
+        ).first()
+        
+        if not processing:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Processing job {processing_id} not found"
+            )
+        
+        success = await pdf_processor_with_resume.pause_processing(processing_id, db)
+        
+        if success:
+            logger.info(f"User {current_user.email} paused PDF processing {processing_id}")
+            return {
+                "status": "paused",
+                "processing_id": processing_id,
+                "message": "PDF processing paused successfully"
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot pause processing in status: {processing.status}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error pausing processing: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to pause processing: {str(e)}"
+        )
+
+
+@router.post("/pdf/resume/{processing_id}")
+async def resume_pdf_processing(
+    processing_id: int,
+    current_user: User = Depends(require_kb_management_role),
+    db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
+    """Resume a paused PDF processing job."""
+    try:
+        from app.services.pdf_processing_manager import pdf_processor_with_resume
+        from app.models import PDFProcessing, PDFFile
+        
+        # Check if processing exists and belongs to user
+        processing = db.query(PDFProcessing).filter(
+            PDFProcessing.id == processing_id,
+            PDFProcessing.user_id == current_user.id
+        ).first()
+        
+        if not processing:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Processing job {processing_id} not found"
+            )
+        
+        # Get the PDF file
+        pdf_file = db.query(PDFFile).filter(
+            PDFFile.id == processing.pdf_file_id
+        ).first()
+        
+        if not pdf_file:
+            raise HTTPException(
+                status_code=404,
+                detail=f"PDF file not found"
+            )
+        
+        success = await pdf_processor_with_resume.resume_processing(processing_id, db)
+        
+        if success:
+            # Start background processing
+            background_tasks.add_task(
+                pdf_processor_with_resume.process_pdf_with_checkpoint,
+                processing_id,
+                pdf_file.file_path,
+                db,
+            )
+            
+            logger.info(f"User {current_user.email} resumed PDF processing {processing_id}")
+            return {
+                "status": "resumed",
+                "processing_id": processing_id,
+                "message": "PDF processing resumed successfully"
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot resume processing in status: {processing.status}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resuming processing: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to resume processing: {str(e)}"
+        )
+
+
+@router.get("/pdf/status/{processing_id}")
+async def get_pdf_processing_status(
+    processing_id: int,
+    current_user: User = Depends(require_kb_management_role),
+    db: Session = Depends(get_db),
+):
+    """Get status of a PDF processing job."""
+    try:
+        from app.services.pdf_processing_manager import pdf_processor_with_resume
+        from app.models import PDFProcessing
+        
+        # Check if processing exists and belongs to user
+        processing = db.query(PDFProcessing).filter(
+            PDFProcessing.id == processing_id,
+            PDFProcessing.user_id == current_user.id
+        ).first()
+        
+        if not processing:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Processing job {processing_id} not found"
+            )
+        
+        status = pdf_processor_with_resume.get_processing_status(processing_id, db)
+        
+        if status:
+            return {
+                "success": True,
+                "data": status
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to retrieve status"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting processing status: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get status: {str(e)}"
+        )
+
+
+@router.post("/pdf/cancel/{processing_id}")
+async def cancel_pdf_processing(
+    processing_id: int,
+    current_user: User = Depends(require_kb_management_role),
+    db: Session = Depends(get_db),
+):
+    """Cancel a PDF processing job."""
+    try:
+        from app.services.pdf_processing_manager import pdf_processor_with_resume
+        from app.models import PDFProcessing
+        
+        # Check if processing exists and belongs to user
+        processing = db.query(PDFProcessing).filter(
+            PDFProcessing.id == processing_id,
+            PDFProcessing.user_id == current_user.id
+        ).first()
+        
+        if not processing:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Processing job {processing_id} not found"
+            )
+        
+        success = await pdf_processor_with_resume.cancel_processing(processing_id, db)
+        
+        if success:
+            logger.info(f"User {current_user.email} cancelled PDF processing {processing_id}")
+            return {
+                "status": "cancelled",
+                "processing_id": processing_id,
+                "message": "PDF processing cancelled successfully"
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot cancel processing in status: {processing.status}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cancelling processing: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to cancel processing: {str(e)}"
+        )
+
+
+@router.get("/pdf/processing-list")
+async def get_user_processing_jobs(
+    current_user: User = Depends(require_kb_management_role),
+    db: Session = Depends(get_db),
+):
+    """Get all PDF processing jobs for current user."""
+    try:
+        from app.models import PDFProcessing
+        
+        processing_jobs = db.query(PDFProcessing).filter(
+            PDFProcessing.user_id == current_user.id
+        ).order_by(PDFProcessing.created_at.desc()).all()
+        
+        jobs = []
+        for job in processing_jobs:
+            jobs.append({
+                "id": job.id,
+                "pdf_name": job.pdf_name,
+                "status": job.status,
+                "progress_percentage": job.progress_percentage,
+                "pages_processed": job.pages_processed,
+                "total_pages": job.total_pages,
+                "embeddings_created": job.embeddings_created,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "started_at": job.started_at.isoformat() if job.started_at else None,
+                "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                "error_message": job.error_message
+            })
+        
+        return {
+            "success": True,
+            "total": len(jobs),
+            "data": jobs
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting processing list: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get processing list: {str(e)}"
         )

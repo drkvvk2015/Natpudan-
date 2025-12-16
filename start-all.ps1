@@ -40,28 +40,36 @@ Start-Process powershell -ArgumentList @('-NoExit', '-Command', $backendCmd)
 Start-Sleep -Seconds 5
 
 # 2. Celery Worker
-Write-Host "[2/5] Starting Celery Worker (SQLite broker)..." -ForegroundColor Green
+Write-Host "[2/5] Starting Celery Worker..." -ForegroundColor Green
 $celeryCmd = @'
 cd "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend"
 & "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend\venv\Scripts\Activate.ps1"
-$env:CELERY_BROKER_URL = 'sqla+sqlite:///./celery_broker.db'
-$env:CELERY_RESULT_BACKEND = 'db+sqlite:///./celery_results.db'
-python -m celery -A app.celery_config worker --loglevel=info --pool=solo --max-tasks-per-child=1000
+$useRedis = $env:REDIS_URL -and $env:REDIS_URL.Trim() -ne ''
+if (-not $useRedis) {
+    # Fallback to SQLite transport for local dev if Redis is not configured
+    $env:CELERY_BROKER_URL = 'sqla+sqlite:///./celery_broker.db'
+    $env:CELERY_RESULT_BACKEND = 'db+sqlite:///./celery_results.db'
+}
+python -m celery -A app.celery_config worker --loglevel=info --pool=solo --max-tasks-per-child=1000 -E
 '@
 Start-Process powershell -ArgumentList @('-NoExit', '-Command', $celeryCmd)
 Start-Sleep -Seconds 3
 
-# 3. Flower Dashboard
-Write-Host "[3/5] Starting Flower Dashboard..." -ForegroundColor Green
-$flowerCmd = @'
+# 3. Flower Dashboard (only if using Redis/RabbitMQ broker)
+$useRedis = $env:REDIS_URL -and $env:REDIS_URL.Trim() -ne ''
+if ($useRedis) {
+    Write-Host "[3/5] Starting Flower Dashboard..." -ForegroundColor Green
+    $flowerCmd = @'
 cd "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend"
 & "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend\venv\Scripts\Activate.ps1"
-$env:CELERY_BROKER_URL = 'sqla+sqlite:///./celery_broker.db'
-$env:CELERY_RESULT_BACKEND = 'db+sqlite:///./celery_results.db'
 python -m celery -A app.celery_config flower --port=5555 --basic_auth=admin:admin
 '@
-Start-Process powershell -ArgumentList @('-NoExit', '-Command', $flowerCmd)
-Start-Sleep -Seconds 3
+    Start-Process powershell -ArgumentList @('-NoExit', '-Command', $flowerCmd)
+    Start-Sleep -Seconds 3
+} else {
+    Write-Host "[3/5] Skipping Flower: requires Redis or RabbitMQ broker (set REDIS_URL)." -ForegroundColor Yellow
+    Write-Host "      Tip: .\\start-redis.ps1 then set REDIS_URL=redis://localhost:6379/0" -ForegroundColor DarkYellow
+}
 
 # 4. Frontend
 Write-Host "[4/5] Starting React Frontend..." -ForegroundColor Green
