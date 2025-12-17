@@ -31,10 +31,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
     """
-    Validate and sanitize incoming requests
+    Validate and sanitize incoming requests.
+    Now supports larger payloads (e.g., >50MB PDF uploads for KB ingestion).
+    The limit is configurable via the MAX_CONTENT_LENGTH_BYTES environment variable,
+    defaulting to 1GB to avoid blocking large medical textbooks.
     """
     
-    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB
+    import os
+    try:
+        MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH_BYTES", str(1024 * 1024 * 1024)))
+    except ValueError:
+        MAX_CONTENT_LENGTH = 1024 * 1024 * 1024  # Fallback to 1GB if env is invalid
     
     async def dispatch(self, request: Request, call_next):
         # Check content length

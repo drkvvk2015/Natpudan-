@@ -6,6 +6,7 @@ Supports: Multiple PDF uploads, Full text extraction, Intelligent chunking
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
+from collections import defaultdict
 from pydantic import BaseModel
 import os
 import logging
@@ -144,58 +145,78 @@ async def upload_pdfs(
     # Validate file count
     if len(files) > 20:
         raise HTTPException(status_code=400, detail="Maximum 20 files allowed per upload")
-    
-    # Validate file types and sizes
+
+    # Stream files to disk while computing size and hash to avoid double reads on large uploads
     total_size = 0
+    prepared_files = []
     for file in files:
-        # Check extension
         file_ext = Path(file.filename).suffix.lower()
         if file_ext not in ALLOWED_EXTENSIONS:
             raise HTTPException(
                 status_code=400,
                 detail=f"File {file.filename} has unsupported type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
             )
-        
-        # Read file to check size
-        content = await file.read()
-        file_size = len(content)
-        
-        if file_size > MAX_FILE_SIZE:
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_filename = f"{timestamp}_{file.filename}"
+        file_path = UPLOAD_DIR / safe_filename
+
+        hasher = hashlib.sha256()
+        file_size = 0
+        try:
+            with open(file_path, "wb") as f:
+                while chunk := await file.read(4 * 1024 * 1024):  # 4MB chunks for faster disk writes
+                    file_size += len(chunk)
+                    if file_size > MAX_FILE_SIZE:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"File {file.filename} exceeds maximum size of {MAX_FILE_SIZE / 1024 / 1024:.0f}MB"
+                        )
+                    hasher.update(chunk)
+                    f.write(chunk)
+        except HTTPException:
+            if file_path.exists():
+                file_path.unlink()
+            raise
+        except Exception as e:
+            if file_path.exists():
+                file_path.unlink()
+            raise HTTPException(status_code=500, detail=f"Failed to save {file.filename}: {str(e)}")
+
+        if file_size == 0:
+            if file_path.exists():
+                file_path.unlink()
+            raise HTTPException(status_code=400, detail=f"File {file.filename} appears to be empty")
+
+        total_size += file_size
+        if total_size > MAX_TOTAL_SIZE:
+            file_path.unlink(missing_ok=True)
             raise HTTPException(
                 status_code=400,
-                detail=f"File {file.filename} exceeds maximum size of {MAX_FILE_SIZE / 1024 / 1024:.0f}MB"
+                detail=f"Total upload size ({total_size / 1024 / 1024:.2f}MB) exceeds maximum of {MAX_TOTAL_SIZE / 1024 / 1024 / 1024:.1f}GB"
             )
-        
-        total_size += file_size
-        
-        # Reset file pointer
-        await file.seek(0)
-    
-    if total_size > MAX_TOTAL_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Total upload size ({total_size / 1024 / 1024:.2f}MB) exceeds maximum of {MAX_TOTAL_SIZE / 1024 / 1024 / 1024:.1f}GB"
-        )
-    
+
+        prepared_files.append({
+            "file": file,
+            "file_ext": file_ext,
+            "file_path": file_path,
+            "file_size": file_size,
+            "file_hash": hasher.hexdigest(),
+            "safe_filename": safe_filename
+        })
+
     # Process files
     results = []
     knowledge_base = get_knowledge_base()
     
-    for file in files:
+    for prepared in prepared_files:
+        file = prepared["file"]
+        file_ext = prepared["file_ext"]
+        file_path = prepared["file_path"]
+        file_size = prepared["file_size"]
+        file_hash = prepared["file_hash"]
         try:
             logger.info(f"Processing file: {file.filename}")
-            
-            # Save file temporarily
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_filename = f"{timestamp}_{file.filename}"
-            file_path = UPLOAD_DIR / safe_filename
-            
-            content = await file.read()
-            with open(file_path, "wb") as f:
-                f.write(content)
-            
-            # Calculate file hash for deduplication
-            file_hash = hashlib.sha256(content).hexdigest()
             
             # Check if document already exists
             existing_doc = db.query(KnowledgeDocument).filter(
@@ -236,7 +257,7 @@ async def upload_pdfs(
                 
                 logger.info(f"[EXTRACT] {file.filename}: {len(text_content)} chars, {len(extracted_images)} images, method={extraction_method}")
             elif file_ext == ".txt":
-                text_content = content.decode('utf-8', errors='ignore')
+                text_content = file_path.read_bytes().decode('utf-8', errors='ignore')
             elif file_ext in [".doc", ".docx"]:
                 text_content = await extract_word_text(file_path)
             else:
@@ -249,7 +270,7 @@ async def upload_pdfs(
                     "error": "No text content extracted - PDF may be image-based or encrypted. Try using OCR or saving as text-based PDF.",
                     "chunks": 0,
                     "characters": 0,
-                    "file_size_mb": len(content) / 1024 / 1024
+                    "file_size_mb": file_size / 1024 / 1024
                 })
                 continue
             
@@ -261,7 +282,7 @@ async def upload_pdfs(
                     "error": f"Insufficient text extracted ({len(text_content)} chars). PDF appears to be image-based. OCR required.",
                     "chunks": 0,
                     "characters": len(text_content),
-                    "file_size_mb": len(content) / 1024 / 1024
+                    "file_size_mb": file_size / 1024 / 1024
                 })
                 continue
             
@@ -291,7 +312,7 @@ async def upload_pdfs(
                     filename=file.filename,
                     file_path=str(file_path),
                     file_hash=file_hash,
-                    file_size=len(content),
+                    file_size=file_size,
                     extension=file_ext,
                     text_length=len(text_content),
                     chunk_count=1,
@@ -309,7 +330,7 @@ async def upload_pdfs(
                     "document_id": doc_uuid,
                     "chunks": 1,
                     "characters": len(text_content),
-                    "size_mb": len(content) / 1024 / 1024,
+                    "size_mb": file_size / 1024 / 1024,
                     "images_extracted": len(extracted_images),
                     "extraction_method": extraction_method,
                     "embedding_status": "queued_for_background_processing",
@@ -346,7 +367,7 @@ async def upload_pdfs(
                     filename=file.filename,
                     file_path=str(file_path),
                     file_hash=file_hash,
-                    file_size=len(content),
+                    file_size=file_size,
                     extension=file_ext,
                     text_length=len(text_content),
                     chunk_count=len(chunks),
@@ -366,7 +387,7 @@ async def upload_pdfs(
                     "chunks": len(chunks),
                     "characters": len(text_content),
                     "avg_chunk_size": len(text_content) // len(chunks) if chunks else 0,
-                    "size_mb": len(content) / 1024 / 1024,
+                    "size_mb": file_size / 1024 / 1024,
                     "images_extracted": len(extracted_images),
                     "extraction_method": extraction_method,
                     "embedding_status": "queued_for_background_processing",
@@ -390,7 +411,7 @@ async def upload_pdfs(
                 "error": full_error,
                 "chunks": 0,
                 "characters": 0,
-                "file_size_mb": len(content) / 1024 / 1024 if 'content' in locals() else 0
+                "file_size_mb": file_size / 1024 / 1024 if 'file_size' in locals() else 0
             })
     
     # Summary
@@ -875,6 +896,64 @@ async def get_pending_status():
     }
 
 
+def organize_search_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Lightweight organizer to sit between raw search hits and the KB consumer.
+    - Deduplicates by document/chunk
+    - Normalizes metadata fields for safer downstream use
+    - Groups results by document for cleaner answers/citations
+    """
+    dedup_map = {}
+    issues = []
+
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        metadata = (r.get("metadata") or {}).copy()
+        filename = metadata.get("filename") or metadata.get("source") or "unknown"
+        document_id = metadata.get("document_id") or metadata.get("document_uuid") or filename
+        chunk_idx = metadata.get("chunk_index")
+
+        if not metadata.get("document_id"):
+            issues.append(f"Missing document_id for {filename}")
+
+        # Normalize minimal metadata for downstream consumers
+        metadata.setdefault("document_id", document_id)
+        metadata.setdefault("filename", filename)
+        metadata.setdefault("category", metadata.get("category") or "medical_pdf")
+        metadata.setdefault("section", metadata.get("section") or "general")
+
+        key = (document_id, chunk_idx)
+        candidate = {**r, "metadata": metadata}
+
+        existing = dedup_map.get(key)
+        if existing is None or existing.get("score", 0) < candidate.get("score", 0):
+            dedup_map[key] = candidate
+
+    deduped = sorted(dedup_map.values(), key=lambda x: x.get("score", 0), reverse=True)
+
+    grouped = defaultdict(list)
+    for item in deduped:
+        grouped[item["metadata"].get("document_id")].append(item)
+
+    document_groups = []
+    for doc_id, items in grouped.items():
+        ordered = sorted(items, key=lambda x: x.get("score", 0), reverse=True)
+        document_groups.append({
+            "document_id": doc_id,
+            "top_chunk": ordered[0],
+            "chunks": len(ordered),
+            "max_score": ordered[0].get("score", 0),
+            "filenames": list({i["metadata"].get("filename") for i in ordered})
+        })
+
+    return {
+        "deduped": deduped,
+        "document_groups": document_groups,
+        "issues": list({*issues})
+    }
+
+
 @router.post("/search")
 async def search_knowledge_base(request: SearchRequest):
     """Search knowledge base with local + hybrid + OpenAI fallback"""
@@ -978,14 +1057,19 @@ async def search_knowledge_base(request: SearchRequest):
 
         filtered_results = [r for r in results if r.get("score", 0) >= request.min_score]
         final_results = filtered_results[: request.top_k]
-        
+
+        organized = organize_search_results(final_results)
+        organized_results = organized.get("deduped", [])
+        document_groups = organized.get("document_groups", [])
+        data_issues = organized.get("issues", [])
+
         # Synthesize answer if requested
         answer = None
-        if request.synthesize_answer and final_results:
+        if request.synthesize_answer and organized_results:
             try:
                 # Prepare context
                 context_parts = []
-                for i, r in enumerate(final_results):
+                for i, r in enumerate(organized_results):
                     source = r.get("citation", {}).get("filename", "Unknown")
                     text = r.get("text", "").strip()
                     context_parts.append(f"[{i+1}] Source: {source}\n{text}")
@@ -1017,7 +1101,10 @@ async def search_knowledge_base(request: SearchRequest):
 
         return {
             "query": request.query,
-            "results": final_results,
+            "results": organized_results,
+            "raw_results": final_results,
+            "document_groups": document_groups,
+            "data_quality_flags": data_issues,
             "answer": answer,
             "total_results": len(filtered_results),
             "top_k": request.top_k,

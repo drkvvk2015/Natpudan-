@@ -125,47 +125,70 @@ async def lifespan(app: FastAPI):
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
-        from app.tasks import update_knowledge_base
         
         scheduler = BackgroundScheduler()
         
+        # KB Update Job: 2 AM UTC daily
         def schedule_kb_update():
-            """Submit KB update task to Celery queue"""
+            """Daily KB update task"""
             try:
-                logger.info("[SCHEDULER] Submitting KB update task to Celery...")
-                # Send task to Celery worker
-                task = update_knowledge_base.delay(
-                    topics=[
-                        "diabetes mellitus",
-                        "hypertension",
-                        "heart disease",
-                        "cancer",
-                        "pneumonia",
-                        "COVID-19",
-                        "depression",
-                        "arthritis"
-                    ],
-                    papers_per_topic=5,
-                    days_back=7
-                )
-
-                logger.info(f"[SCHEDULER] ✅ KB update task queued (Task ID: {task.id})")
+                logger.info("[SCHEDULER] Starting automated KB refresh...")
+                from app.services.automated_kb_manager import get_automated_kb_manager
+                manager = get_automated_kb_manager()
+                
+                # Run async in sync context
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result = loop.run_until_complete(manager.run_daily_refresh())
+                    logger.info(f"[SCHEDULER] ✅ KB refresh completed: {result.get('operations', {}).keys()}")
+                finally:
+                    loop.close()
             except Exception as e:
-                logger.error(f"[SCHEDULER] ❌ Error submitting task: {e}")
+                logger.error(f"[SCHEDULER] ❌ KB refresh failed: {e}")
         
-        # Schedule KB update: Daily at 2 AM UTC
+        # Schedule KB daily refresh at 2 PM UTC
         scheduler.add_job(
             schedule_kb_update,
-            CronTrigger(hour=2, minute=0),
-            id="kb_daily_update",
-            name="Daily Knowledge Base Update",
+            CronTrigger(hour=14, minute=0),
+            id="kb_daily_refresh",
+            name="Daily Knowledge Base Refresh & PubMed Sync",
+            replace_existing=True
+        )
+        
+        # Index Integrity Check Job: 1 AM UTC daily
+        def schedule_index_check():
+            """Daily index integrity check"""
+            try:
+                logger.info("[SCHEDULER] Running KB index integrity check...")
+                from app.services.automated_kb_manager import get_automated_kb_manager
+                manager = get_automated_kb_manager()
+                
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result = loop.run_until_complete(manager.check_index_integrity())
+                    if result.get("status") != "ok":
+                        logger.warning(f"[SCHEDULER] Index issues detected: {result.get('issues', [])}")
+                finally:
+                    loop.close()
+            except Exception as e:
+                logger.error(f"[SCHEDULER] Index check failed: {e}")
+        
+        scheduler.add_job(
+            schedule_index_check,
+            CronTrigger(hour=12, minute=0),
+            id="kb_index_check",
+            name="KB Index Integrity Check",
             replace_existing=True
         )
         
         scheduler.start()
-        logger.info("[OK] APScheduler started - KB updates scheduled for 2:00 AM UTC daily")
+        logger.info("[OK] APScheduler started - KB automation jobs scheduled")
     except Exception as e:
-        logger.warning(f"[WARNING] APScheduler initialization failed (Celery updates disabled): {e}")
+        logger.warning(f"[WARNING] APScheduler initialization failed: {e}")
         scheduler = None
     
     logger.info(f"[STARTED] Application started - Services: DB={service_health['database']}, OpenAI={service_health['openai']}, KB={service_health['knowledge_base']}")
@@ -945,6 +968,14 @@ api_router.include_router(fhir_router, prefix="/fhir", tags=["fhir"])
 api_router.include_router(health_router, tags=["health"])
 api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
 api_router.include_router(patient_intake_router, prefix="/medical", tags=["patient-intake"])
+
+# KB Automation routes (scheduled syncing, feedback, integrity checks)
+from app.api.kb_automation import router as kb_automation_router
+api_router.include_router(kb_automation_router, prefix="/kb-automation", tags=["kb-automation"])
+
+# Phase 2 & 3: Advanced Features (MIMIC-III, BiomedBERT, NER, reranking, fairness, validation)
+from app.api.phase_advanced import router as phase_advanced_router
+api_router.include_router(phase_advanced_router, prefix="/phase-advanced", tags=["phase-advanced"])
 # Background task for processing upload queue
 _last_queue_process = 0
 _queue_process_interval = 10  # Process queue every 10 seconds

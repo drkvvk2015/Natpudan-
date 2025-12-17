@@ -10,8 +10,9 @@
     "build:ios": "cd frontend && npm run build:ios",
     "build:windows": "cd frontend && npm run build:windows",
     "build:linux": "cd frontend && npm run build:linux",
-    "start": "cd frontend && npm run dev",
-    "dev": "cd frontend && npm run dev",
+    "start": "cd frontend && npm run dev:5173",
+    "dev": "cd frontend && npm run dev:5173",
+    "dev:force5173": "cd frontend && npm run dev:force5173",
     "lint": "cd frontend && npm run lint",
     "test": "cd frontend && npm test"
   },
