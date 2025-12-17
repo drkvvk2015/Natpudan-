@@ -82,17 +82,25 @@ async def lifespan(app: FastAPI):
         logger.error(f"[ERROR] Database initialization failed: {e}")
         error_corrector.log_error(e, {"operation": "database_init"})
     
-    # Check OpenAI API
+    # Check OpenAI API - STRICT validation
     try:
         import os
         api_key = os.getenv("OPENAI_API_KEY")
-        if api_key and not api_key.startswith("sk-your"):
-            service_health["openai"] = True
-            logger.info("[OK] OpenAI API configured")
+        if not api_key:
+            logger.error("[CRITICAL] OPENAI_API_KEY not set in .env - AI features unavailable")
+            service_health["openai"] = False
+        elif not api_key.startswith("sk-"):
+            logger.error(f"[CRITICAL] Invalid OPENAI_API_KEY format - must start with 'sk-' (got: {api_key[:10]}...)")
+            service_health["openai"] = False
+        elif api_key.startswith("sk-your"):
+            logger.error("[CRITICAL] OPENAI_API_KEY is still set to placeholder - AI features unavailable")
+            service_health["openai"] = False
         else:
-            logger.warning("[WARNING] OpenAI API key not configured - AI features will be limited")
+            service_health["openai"] = True
+            logger.info("[OK] OpenAI API configured and validated")
     except Exception as e:
-        logger.error(f"[ERROR] OpenAI check failed: {e}")
+        logger.error(f"[ERROR] OpenAI validation failed: {e}")
+        service_health["openai"] = False
     
     # Pre-load knowledge base (optional)
     try:
@@ -236,22 +244,33 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
-# CORS middleware - allow frontend origins
+# CORS middleware - environment-based configuration
+import os
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+CORS_ORIGINS_STR = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:3000")
+CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS_STR.split(",")]
+
+# Validate CORS configuration for production
+if ENVIRONMENT == "production":
+    if any("localhost" in origin or "127.0.0.1" in origin for origin in CORS_ORIGINS):
+        logger.error("[CRITICAL] localhost/127.0.0.1 in CORS_ORIGINS for production environment!")
+        raise ValueError("CORS configuration error: localhost not allowed in production")
+    logger.info(f"[OK] Production CORS origins validated: {CORS_ORIGINS}")
+else:
+    logger.info(f"[DEV] CORS origins: {CORS_ORIGINS}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:3000"
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"]
 )
+
+# Global error handler middleware
+from app.middleware.error_handler import ErrorHandlerMiddleware
+app.add_middleware(ErrorHandlerMiddleware)
 
 @app.get("/")
 def root() -> Dict[str, Any]:
