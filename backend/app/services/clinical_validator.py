@@ -258,12 +258,12 @@ class ClinicalValidator:
         
         # Primary: first-line treatment
         if is_first_line:
-            confidence = 0.95 if not caveats else 0.85
+            confidence = 0.95 if caveat_count == 0 else 0.85
             return ValidationStatus.APPROVED, confidence
         
         # Secondary: second-line treatment
         if is_second_line:
-            confidence = 0.75 if not caveats else 0.65
+            confidence = 0.75 if caveat_count == 0 else 0.65
             return ValidationStatus.CONDITIONAL, confidence
         
         # Unknown treatment

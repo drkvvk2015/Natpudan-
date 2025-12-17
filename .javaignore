@@ -1,0 +1,7 @@
+# Exclude node_modules from Java Language Server scanning to prevent Gradle errors
+node_modules/
+frontend/node_modules/
+.venv/
+frontend/android/
+android/
+Natpudan-/

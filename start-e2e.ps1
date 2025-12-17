@@ -25,7 +25,7 @@ function Test-PortUsed {
   return ($null -ne $c)
 }
 
-function Free-Port {
+function Remove-PortByNumber {
   param([int]$Port)
   $procs = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
   foreach($p in $procs){
@@ -52,7 +52,7 @@ Write-Status "[SETUP] Root: $root" 'Info'
 Write-Status "[SETUP] Backend: $backend" 'Info'
 Write-Status "[SETUP] Python: $python" 'Info'
 Write-Status "[STEP] Ensuring port :$Port is free" 'Info'
-if (Test-PortUsed -Port $Port) { Free-Port -Port $Port }
+if (Test-PortUsed -Port $Port) { Remove-PortByNumber -Port $Port }
 
 # Start backend in background job
 Write-Status '[STEP] Starting backend...' 'Info'
