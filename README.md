@@ -13,6 +13,7 @@ A production-ready FastAPI + React application for medical professionals with AI
 - [EMOJI] **Analytics Dashboard** - Demographics, disease trends, treatment outcomes
 -  **FHIR Integration** - Healthcare data interoperability
 -  **Medical Timeline** - Comprehensive patient event tracking
+- [EMOJI] **Optimized Knowledge Base Ingestion** - Batch FAISS embeddings + duplicate filtering to keep the KB fast and clean
 
 ## [EMOJI] Quick Start
 
@@ -46,6 +47,27 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Backend will be available at: `http://localhost:8000`
+
+### Knowledge Base Batch Processor (FAISS)
+
+Use the fast batch processor to embed pending knowledge-base chunks into the local FAISS index. This script runs on the server/CLI (not via the API) and is now optimized for batching, duplicate filtering, and status-aware cleanup.
+
+```powershell
+# From repo root (venv activated)
+cd backend
+python batch_process_kb.py                      # process completed pending files
+python batch_process_kb.py --include-incomplete # also process files still marked processing
+
+# Safety/utility flags
+--dry-run           # scan and report only (no writes, no deletions)
+--limit 200         # process at most N pending files
+--keep-files        # do not delete processed pending files
+```
+
+Notes:
+- Pending files live in `backend/data/knowledge_base/pending/`.
+- Outputs: `backend/data/knowledge_base/local_faiss_index.bin` and `local_metadata.pkl`.
+- Duplicate detection (by content hash) prevents double-embedding across runs.
 
 ### Frontend Setup (React + Vite)
 
@@ -147,6 +169,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 - **Models**: User, Conversation, Message, DischargeSummary
 - **Authentication**: JWT + OAuth2 with bcrypt password hashing
 - **AI Integration**: OpenAI GPT-4 for medical assistance
+- **Vector Search**: FAISS-based local index with batch embeddings for the medical knowledge base
 - **API Structure**:
   - `/api/auth/*` - Authentication endpoints
   - `/api/chat/*` - AI chat with conversation history
