@@ -23,7 +23,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'phase_4_001'
-down_revision = None  # Update this with your latest migration ID
+down_revision = 'b8d27bb73385'  # Points to previous migration head
 branch_labels = None
 depends_on = None
 

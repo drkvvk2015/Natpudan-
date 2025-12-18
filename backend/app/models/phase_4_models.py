@@ -7,8 +7,6 @@ Extends the existing models.py with new tables for:
 - Patient outcomes
 - Generated reports
 - Population analytics
-
-Add these to backend/app/models.py
 """
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, JSON, LargeBinary, ForeignKey, Enum, Text
@@ -17,8 +15,8 @@ from sqlalchemy.sql import func
 from datetime import datetime
 import enum
 
-# NOTE: Add these imports to models.py:
-# from enum import Enum as PyEnum
+# Import Base from database/base.py (single source of truth)
+from app.database.base import Base
 
 # ============================================================================
 # Phase 4: Medical Image Analysis Models
