@@ -56,6 +56,7 @@ from app.api.health import router as health_router
 from app.api.knowledge_base import router as knowledge_router
 from app.api.patient_intake import router as patient_intake_router
 from app.api.phase_4_api import router as phase_4_router
+from app.api.phase_5_api import router as phase_5_router
 from app.database import init_db
 
 # Track application start time for uptime calculation
@@ -980,6 +981,10 @@ api_router.include_router(phase_advanced_router, prefix="/phase-advanced", tags=
 
 # Phase 4: Medical Image Analysis & Population Health
 api_router.include_router(phase_4_router)
+
+# Phase 5: Local Vision Models & Self-Reliance
+api_router.include_router(phase_5_router)
+
 # Background task for processing upload queue
 _last_queue_process = 0
 _queue_process_interval = 10  # Process queue every 10 seconds
