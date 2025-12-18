@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   TextField,
@@ -7,12 +7,12 @@ import {
   Paper,
   CircularProgress,
   Alert,
-} from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
-import { sendChatMessage, getConversationMessages } from '../services/api';
+} from "@mui/material";
+import SendIcon from "@mui/icons-material/Send";
+import { sendChatMessage, getConversationMessages } from "../services/api";
 
 interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp?: string;
 }
@@ -23,13 +23,13 @@ interface ChatWindowProps {
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
+  const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -51,8 +51,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       setMessages(conversation.messages || []);
       setError(null);
     } catch (err) {
-      console.error('Failed to load chat history:', err);
-      setError('Failed to load chat history');
+      console.error("Failed to load chat history:", err);
+      setError("Failed to load chat history");
     } finally {
       setLoading(false);
     }
@@ -62,35 +62,69 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     if (!inputMessage.trim()) return;
 
     const userMessage: ChatMessage = {
-      role: 'user',
+      role: "user",
       content: inputMessage,
       timestamp: new Date().toISOString(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInputMessage('');
+    setInputMessage("");
     setLoading(true);
     setError(null);
 
     try {
-      const response = await sendChatMessage(inputMessage, conversationId || undefined);
+      console.log("[Chat] Sending message:", inputMessage);
+      console.log("[Chat] Conversation ID:", conversationId);
+
+      const response = await sendChatMessage(
+        inputMessage,
+        conversationId || undefined
+      );
+
+      console.log("[Chat] Response received:", response);
+
+      // Check if response has message content
+      if (!response || !response.message) {
+        throw new Error("Empty response from server");
+      }
 
       const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: response.message?.content || 'No response from assistant',
+        role: "assistant",
+        content: response.message?.content || "No response from assistant",
         timestamp: new Date().toISOString(),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
-      console.error('Failed to send message:', err);
-      const errorMsg = err?.response?.data?.detail || 'Failed to send message. Please try again.';
+      console.error("[Chat] Error details:", {
+        message: err?.message,
+        response: err?.response?.data,
+        status: err?.response?.status,
+        fullError: err,
+      });
+
+      let errorMsg = "Failed to send message. Please check:";
+
+      if (err?.response?.status === 401) {
+        errorMsg = "Authentication failed. Please log in again.";
+      } else if (err?.response?.status === 500) {
+        errorMsg =
+          "Server error. Please check if the backend is running and OpenAI API key is configured.";
+      } else if (err?.message?.includes("Network Error")) {
+        errorMsg =
+          "Network error. Please check if the backend is running on http://localhost:8000";
+      } else if (err?.response?.data?.detail) {
+        errorMsg = err.response.data.detail;
+      }
+
       setError(errorMsg);
-      
-      // Optionally add error message to chat
+
+      // Add detailed error message to chat
       const errorMessage: ChatMessage = {
-        role: 'system',
-        content: `Error: ${errorMsg}`,
+        role: "system",
+        content: `[ERROR] ${errorMsg}\n\nDebug Info:\n- Status: ${
+          err?.response?.status || "N/A"
+        }\n- Endpoint: /api/chat/message\n- Time: ${new Date().toLocaleString()}`,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -100,7 +134,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -109,15 +143,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   return (
     <Box
       sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
         p: 2,
       }}
     >
       {/* Header */}
       <Typography variant="h6" gutterBottom>
-        {conversationId ? `Conversation #${conversationId}` : 'AI Medical Assistant'}
+        {conversationId
+          ? `Conversation #${conversationId}`
+          : "AI Medical Assistant"}
       </Typography>
 
       {error && (
@@ -130,20 +166,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       <Box
         sx={{
           flex: 1,
-          overflowY: 'auto',
+          overflowY: "auto",
           mb: 2,
-          display: 'flex',
-          flexDirection: 'column',
+          display: "flex",
+          flexDirection: "column",
           gap: 2,
         }}
       >
         {messages.length === 0 && !loading && (
           <Box
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
             }}
           >
             <Typography variant="body2" color="text.secondary">
@@ -156,33 +192,36 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
           <Box
             key={index}
             sx={{
-              display: 'flex',
-              justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              display: "flex",
+              justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
             }}
           >
             <Paper
               sx={{
                 p: 2,
-                maxWidth: '70%',
+                maxWidth: "70%",
                 backgroundColor:
-                  msg.role === 'user'
-                    ? 'primary.main'
-                    : msg.role === 'system'
-                    ? 'error.light'
-                    : 'grey.100',
+                  msg.role === "user"
+                    ? "primary.main"
+                    : msg.role === "system"
+                    ? "error.light"
+                    : "grey.100",
                 color:
-                  msg.role === 'user'
-                    ? 'primary.contrastText'
-                    : msg.role === 'system'
-                    ? 'error.contrastText'
-                    : 'text.primary',
+                  msg.role === "user"
+                    ? "primary.contrastText"
+                    : msg.role === "system"
+                    ? "error.contrastText"
+                    : "text.primary",
               }}
             >
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+              <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
                 {msg.content}
               </Typography>
               {msg.timestamp && (
-                <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.7 }}>
+                <Typography
+                  variant="caption"
+                  sx={{ display: "block", mt: 0.5, opacity: 0.7 }}
+                >
                   {new Date(msg.timestamp).toLocaleTimeString()}
                 </Typography>
               )}
@@ -191,8 +230,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
         ))}
 
         {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <Paper sx={{ p: 2, backgroundColor: 'grey.100' }}>
+          <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+            <Paper sx={{ p: 2, backgroundColor: "grey.100" }}>
               <CircularProgress size={20} />
             </Paper>
           </Box>
@@ -202,7 +241,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       </Box>
 
       {/* Input Area */}
-      <Box sx={{ display: 'flex', gap: 1 }}>
+      <Box sx={{ display: "flex", gap: 1 }}>
         <TextField
           fullWidth
           multiline

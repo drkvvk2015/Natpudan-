@@ -84,6 +84,7 @@ const KnowledgeBaseUpload: React.FC = () => {
   const [chunkSize, setChunkSize] = useState(1000);
   const [uploadResults, setUploadResults] = useState<any>(null);
   const [statistics, setStatistics] = useState<any>(null);
+  const [statisticsLoading, setStatisticsLoading] = useState(true);
   const [currentUploadingFile, setCurrentUploadingFile] = useState<string>('');
   const [uploadedDocumentIds, setUploadedDocumentIds] = useState<string[]>([]);
   const [pollingActive, setPollingActive] = useState(false);
@@ -147,10 +148,13 @@ const KnowledgeBaseUpload: React.FC = () => {
 
   const loadStatistics = async () => {
     try {
+      setStatisticsLoading(true);
       const response = await apiClient.get('/api/medical/knowledge/statistics');
       setStatistics(response.data);
     } catch (error) {
       console.error('Failed to load statistics:', error);
+    } finally {
+      setStatisticsLoading(false);
     }
   };
 
@@ -378,7 +382,18 @@ const KnowledgeBaseUpload: React.FC = () => {
       </Typography>
 
       {/* Statistics Card */}
-      {statistics && (
+      {statisticsLoading ? (
+        <Card sx={{ mb: 3, bgcolor: 'grey.50' }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 3 }}>
+              <CircularProgress size={40} sx={{ mr: 2 }} />
+              <Typography variant="body1" color="text.secondary">
+                Loading knowledge base status...
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      ) : statistics && (
         <Card sx={{ mb: 3, bgcolor: 'primary.50' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -411,6 +426,10 @@ const KnowledgeBaseUpload: React.FC = () => {
             </Grid>
           </CardContent>
         </Card>
+      ) : !statisticsLoading && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          No statistics available. Upload some documents to get started.
+        </Alert>
       )}
 
       {/* Upload Settings */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Container,
@@ -18,7 +18,7 @@ import {
   MenuItem,
   Card,
   CardContent,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Mic,
   Stop,
@@ -27,8 +27,8 @@ import {
   Print,
   ContentCopy,
   CheckCircle,
-} from '@mui/icons-material';
-import { sendChatMessage } from '../services/api';
+} from "@mui/icons-material";
+import { sendChatMessage } from "../services/api";
 
 interface VoiceInputProps {
   value: string;
@@ -51,21 +51,23 @@ const VoiceTextField: React.FC<VoiceInputProps> = ({
   const [recognition, setRecognition] = useState<any>(null);
 
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+      const SpeechRecognition =
+        (window as any).webkitSpeechRecognition ||
+        (window as any).SpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
       recognitionInstance.continuous = true;
       recognitionInstance.interimResults = true;
-      recognitionInstance.lang = 'en-US';
+      recognitionInstance.lang = "en-US";
 
       recognitionInstance.onresult = (event: any) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
+        let interimTranscript = "";
+        let finalTranscript = "";
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += transcript + ' ';
+            finalTranscript += transcript + " ";
           } else {
             interimTranscript += transcript;
           }
@@ -77,7 +79,7 @@ const VoiceTextField: React.FC<VoiceInputProps> = ({
       };
 
       recognitionInstance.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
+        console.error("Speech recognition error:", event.error);
         setIsListening(false);
       };
 
@@ -91,7 +93,9 @@ const VoiceTextField: React.FC<VoiceInputProps> = ({
 
   const toggleListening = () => {
     if (!recognition) {
-      alert('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+      alert(
+        "Speech recognition is not supported in this browser. Please use Chrome or Edge."
+      );
       return;
     }
 
@@ -118,7 +122,7 @@ const VoiceTextField: React.FC<VoiceInputProps> = ({
         endAdornment: (
           <IconButton
             onClick={toggleListening}
-            color={isListening ? 'error' : 'primary'}
+            color={isListening ? "error" : "primary"}
             size="small"
           >
             {isListening ? <Stop /> : <Mic />}
@@ -131,58 +135,58 @@ const VoiceTextField: React.FC<VoiceInputProps> = ({
 
 const DischargeSummaryPage: React.FC = () => {
   // Patient Information
-  const [patientName, setPatientName] = useState('');
-  const [patientAge, setPatientAge] = useState('');
-  const [patientGender, setPatientGender] = useState('');
-  const [mrn, setMrn] = useState('');
-  const [admissionDate, setAdmissionDate] = useState('');
-  const [dischargeDate, setDischargeDate] = useState('');
+  const [patientName, setPatientName] = useState("");
+  const [patientAge, setPatientAge] = useState("");
+  const [patientGender, setPatientGender] = useState("");
+  const [mrn, setMrn] = useState("");
+  const [admissionDate, setAdmissionDate] = useState("");
+  const [dischargeDate, setDischargeDate] = useState("");
 
   // Clinical Information
-  const [chiefComplaint, setChiefComplaint] = useState('');
-  const [historyOfPresentIllness, setHistoryOfPresentIllness] = useState('');
-  const [pastMedicalHistory, setPastMedicalHistory] = useState('');
-  const [physicalExamination, setPhysicalExamination] = useState('');
-  const [diagnosis, setDiagnosis] = useState('');
-  const [hospitalCourse, setHospitalCourse] = useState('');
-  const [proceduresPerformed, setProceduresPerformed] = useState('');
-  const [medications, setMedications] = useState('');
-  const [dischargeMedications, setDischargeMedications] = useState('');
-  const [followUpInstructions, setFollowUpInstructions] = useState('');
-  const [dietRestrictions, setDietRestrictions] = useState('');
-  const [activityRestrictions, setActivityRestrictions] = useState('');
+  const [chiefComplaint, setChiefComplaint] = useState("");
+  const [historyOfPresentIllness, setHistoryOfPresentIllness] = useState("");
+  const [pastMedicalHistory, setPastMedicalHistory] = useState("");
+  const [physicalExamination, setPhysicalExamination] = useState("");
+  const [diagnosis, setDiagnosis] = useState("");
+  const [hospitalCourse, setHospitalCourse] = useState("");
+  const [proceduresPerformed, setProceduresPerformed] = useState("");
+  const [medications, setMedications] = useState("");
+  const [dischargeMedications, setDischargeMedications] = useState("");
+  const [followUpInstructions, setFollowUpInstructions] = useState("");
+  const [dietRestrictions, setDietRestrictions] = useState("");
+  const [activityRestrictions, setActivityRestrictions] = useState("");
 
   // UI States
   const [isGenerating, setIsGenerating] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState('');
+  const [aiSuggestion, setAiSuggestion] = useState("");
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const generateAISummary = async () => {
     setIsGenerating(true);
-    setErrorMessage('');
+    setErrorMessage("");
     setShowAiSuggestion(false);
 
     try {
       const context = `
 Patient Information:
-- Name: ${patientName || 'Not provided'}
-- Age: ${patientAge || 'Not provided'}
-- Gender: ${patientGender || 'Not provided'}
-- MRN: ${mrn || 'Not provided'}
-- Admission Date: ${admissionDate || 'Not provided'}
-- Discharge Date: ${dischargeDate || 'Not provided'}
+- Name: ${patientName || "Not provided"}
+- Age: ${patientAge || "Not provided"}
+- Gender: ${patientGender || "Not provided"}
+- MRN: ${mrn || "Not provided"}
+- Admission Date: ${admissionDate || "Not provided"}
+- Discharge Date: ${dischargeDate || "Not provided"}
 
 Clinical Details:
-- Chief Complaint: ${chiefComplaint || 'Not provided'}
-- History of Present Illness: ${historyOfPresentIllness || 'Not provided'}
-- Past Medical History: ${pastMedicalHistory || 'Not provided'}
-- Physical Examination: ${physicalExamination || 'Not provided'}
-- Diagnosis: ${diagnosis || 'Not provided'}
-- Hospital Course: ${hospitalCourse || 'Not provided'}
-- Procedures: ${proceduresPerformed || 'Not provided'}
-- Medications During Stay: ${medications || 'Not provided'}
+- Chief Complaint: ${chiefComplaint || "Not provided"}
+- History of Present Illness: ${historyOfPresentIllness || "Not provided"}
+- Past Medical History: ${pastMedicalHistory || "Not provided"}
+- Physical Examination: ${physicalExamination || "Not provided"}
+- Diagnosis: ${diagnosis || "Not provided"}
+- Hospital Course: ${hospitalCourse || "Not provided"}
+- Procedures: ${proceduresPerformed || "Not provided"}
+- Medications During Stay: ${medications || "Not provided"}
 
 Please generate a comprehensive discharge summary based on the above information. Include:
 1. A concise summary of the hospital course
@@ -198,7 +202,9 @@ Format the response as a complete discharge summary.
       setAiSuggestion(response.message.content);
       setShowAiSuggestion(true);
     } catch (error: any) {
-      setErrorMessage(error.response?.data?.detail || 'Failed to generate AI summary');
+      setErrorMessage(
+        error.response?.data?.detail || "Failed to generate AI summary"
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -208,35 +214,41 @@ Format the response as a complete discharge summary.
     // Parse AI suggestion and auto-fill fields
     // This is a simple implementation - you can enhance with better parsing
     const suggestion = aiSuggestion;
-    
-    if (suggestion.includes('Discharge Medications:')) {
-      const medsSection = suggestion.split('Discharge Medications:')[1]?.split('\n\n')[0];
+
+    if (suggestion.includes("Discharge Medications:")) {
+      const medsSection = suggestion
+        .split("Discharge Medications:")[1]
+        ?.split("\n\n")[0];
       if (medsSection) setDischargeMedications(medsSection.trim());
     }
-    
-    if (suggestion.includes('Follow-up Instructions:')) {
-      const followUpSection = suggestion.split('Follow-up Instructions:')[1]?.split('\n\n')[0];
+
+    if (suggestion.includes("Follow-up Instructions:")) {
+      const followUpSection = suggestion
+        .split("Follow-up Instructions:")[1]
+        ?.split("\n\n")[0];
       if (followUpSection) setFollowUpInstructions(followUpSection.trim());
     }
 
-    if (suggestion.includes('Diet:')) {
-      const dietSection = suggestion.split('Diet:')[1]?.split('\n\n')[0];
+    if (suggestion.includes("Diet:")) {
+      const dietSection = suggestion.split("Diet:")[1]?.split("\n\n")[0];
       if (dietSection) setDietRestrictions(dietSection.trim());
     }
 
-    if (suggestion.includes('Activity:')) {
-      const activitySection = suggestion.split('Activity:')[1]?.split('\n\n')[0];
+    if (suggestion.includes("Activity:")) {
+      const activitySection = suggestion
+        .split("Activity:")[1]
+        ?.split("\n\n")[0];
       if (activitySection) setActivityRestrictions(activitySection.trim());
     }
 
-    setSuccessMessage('AI suggestions applied successfully!');
-    setTimeout(() => setSuccessMessage(''), 3000);
+    setSuccessMessage("AI suggestions applied successfully!");
+    setTimeout(() => setSuccessMessage(""), 3000);
   };
 
   const handleSave = () => {
     // Implement save logic here
-    setSuccessMessage('Discharge summary saved successfully!');
-    setTimeout(() => setSuccessMessage(''), 3000);
+    setSuccessMessage("Discharge summary saved successfully!");
+    setTimeout(() => setSuccessMessage(""), 3000);
   };
 
   const handlePrint = () => {
@@ -292,33 +304,73 @@ ${activityRestrictions}
     `;
 
     navigator.clipboard.writeText(summary);
-    setSuccessMessage('Discharge summary copied to clipboard!');
-    setTimeout(() => setSuccessMessage(''), 3000);
+    setSuccessMessage("Discharge summary copied to clipboard!");
+    setTimeout(() => setSuccessMessage(""), 3000);
   };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Paper
+        elevation={3}
+        sx={{
+          p: 4,
+          "@media print": {
+            boxShadow: "none",
+            padding: 2,
+            maxHeight: "none !important",
+            overflow: "visible !important",
+            "& *": {
+              maxHeight: "none !important",
+              overflow: "visible !important",
+            },
+          },
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 3,
+          }}
+        >
           <Typography variant="h4" gutterBottom>
             Discharge Summary
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box
+            sx={{
+              display: "flex",
+              gap: 1,
+              "@media print": { display: "none" },
+            }}
+          >
             <Button
               variant="contained"
               startIcon={<AutoAwesome />}
               onClick={generateAISummary}
               disabled={isGenerating}
             >
-              {isGenerating ? <CircularProgress size={24} /> : 'AI Assist'}
+              {isGenerating ? <CircularProgress size={24} /> : "AI Assist"}
             </Button>
-            <Button variant="outlined" startIcon={<Save />} onClick={handleSave}>
+            <Button
+              variant="outlined"
+              startIcon={<Save />}
+              onClick={handleSave}
+            >
               Save
             </Button>
-            <Button variant="outlined" startIcon={<Print />} onClick={handlePrint}>
+            <Button
+              variant="outlined"
+              startIcon={<Print />}
+              onClick={handlePrint}
+            >
               Print
             </Button>
-            <Button variant="outlined" startIcon={<ContentCopy />} onClick={handleCopy}>
+            <Button
+              variant="outlined"
+              startIcon={<ContentCopy />}
+              onClick={handleCopy}
+            >
               Copy
             </Button>
           </Box>
@@ -338,11 +390,25 @@ ${activityRestrictions}
 
         {/* AI Suggestion Card */}
         {showAiSuggestion && (
-          <Card sx={{ mb: 3, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+          <Card
+            sx={{
+              mb: 3,
+              bgcolor: "primary.light",
+              color: "primary.contrastText",
+              "@media print": { display: "none" },
+            }}
+          >
             <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
                 <Typography variant="h6">
-                  <AutoAwesome sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  <AutoAwesome sx={{ mr: 1, verticalAlign: "middle" }} />
                   AI Generated Summary
                 </Typography>
                 <Button
@@ -357,13 +423,13 @@ ${activityRestrictions}
               <Typography
                 variant="body2"
                 sx={{
-                  whiteSpace: 'pre-wrap',
-                  bgcolor: 'background.paper',
-                  color: 'text.primary',
+                  whiteSpace: "pre-wrap",
+                  bgcolor: "background.paper",
+                  color: "text.primary",
                   p: 2,
                   borderRadius: 1,
                   maxHeight: 400,
-                  overflow: 'auto',
+                  overflow: "auto",
                 }}
               >
                 {aiSuggestion}
@@ -372,8 +438,17 @@ ${activityRestrictions}
           </Card>
         )}
 
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          <Chip icon={<Mic />} label="Click microphone icons to use voice typing" size="small" sx={{ mr: 1 }} />
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mb: 3, "@media print": { display: "none" } }}
+        >
+          <Chip
+            icon={<Mic />}
+            label="Click microphone icons to use voice typing"
+            size="small"
+            sx={{ mr: 1 }}
+          />
           Voice typing is available for all text fields
         </Typography>
 
@@ -579,11 +654,24 @@ ${activityRestrictions}
           </Grid>
         </Grid>
 
-        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+        <Box
+          sx={{
+            mt: 4,
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 2,
+            "@media print": { display: "none" },
+          }}
+        >
           <Button variant="outlined" size="large">
             Cancel
           </Button>
-          <Button variant="contained" size="large" startIcon={<Save />} onClick={handleSave}>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<Save />}
+            onClick={handleSave}
+          >
             Save Discharge Summary
           </Button>
         </Box>
