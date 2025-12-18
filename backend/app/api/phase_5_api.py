@@ -21,19 +21,25 @@ router = APIRouter(prefix="/phase-5", tags=["Phase 5 - Local Vision"])
 
 @router.get("/health")
 async def health_check():
-    """Health check for Phase 5 services."""
-    local_analyzer = LocalVisionAnalyzer()
-    model_manager = VisionModelManager()
-    
-    info = model_manager.get_current_model_info()
-    phase = "5B - MedSAM active" if info.get('model_id', '').startswith('medsam') else "5A - Rule-based foundation"
-    return {
-        "status": "healthy",
-        "phase": phase,
-        "local_analyzer": local_analyzer.get_statistics(),
-        "model_manager": info,
-        "message": "Phase 5 services operational. Local vision models active."
-    }
+    """Health check for Phase 5 services - lightweight, no heavy initialization"""
+    try:
+        model_manager = VisionModelManager()
+        info = model_manager.get_current_model_info()
+        phase = "5B - MedSAM active" if info.get('model_id', '').startswith('medsam') else "5A - Rule-based foundation"
+        return {
+            "status": "healthy",
+            "phase": phase,
+            "model": info.get('model_id', 'unknown'),
+            "message": "Phase 5 services operational."
+        }
+    except Exception as e:
+        logger.error(f"Error in Phase 5 health check: {e}")
+        return {
+            "status": "error",
+            "phase": "5A - Rule-based foundation",
+            "error": str(e),
+            "message": "Phase 5 health check failed"
+        }
 
 
 @router.post("/image/analyze-local-only")

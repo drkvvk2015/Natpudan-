@@ -49,7 +49,21 @@ class MedSAMWrapper:
                 arch = 'vit_b'
 
             self.device = device if torch.cuda.is_available() and device.startswith('cuda') else 'cpu'
-            model = sam_model_registry[arch](checkpoint=checkpoint_path)  # type: ignore[index]
+            
+            # Load with map_location to handle CUDA checkpoints on CPU
+            # Monkey-patch torch.load temporarily to add map_location
+            original_torch_load = torch.load
+            def patched_load(f, *args, **kwargs):
+                if 'map_location' not in kwargs and self.device == 'cpu':
+                    kwargs['map_location'] = 'cpu'
+                return original_torch_load(f, *args, **kwargs)
+            
+            try:
+                torch.load = patched_load
+                model = sam_model_registry[arch](checkpoint=checkpoint_path)  # type: ignore[index]
+            finally:
+                torch.load = original_torch_load
+            
             model.to(device=self.device)
             model.eval()
             self.model = model
