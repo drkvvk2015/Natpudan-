@@ -45,11 +45,10 @@ Write-Host "[INFO] Verifying Python environment..." -ForegroundColor Yellow
 Push-Location $backendRoot
 . .\venv\Scripts\Activate.ps1 2>$null
 try {
-    python - << 'PY'
-import os
-import sys
+    $py = @'
+import os, sys
 print("Python:", sys.version)
-ckpt = os.getenv('PHASE5_MEDSAM_CHECKPOINT')
+ckpt = os.getenv("PHASE5_MEDSAM_CHECKPOINT")
 print("PHASE5_MEDSAM_CHECKPOINT:", ckpt)
 try:
     import torch
@@ -61,7 +60,11 @@ try:
     print("segment_anything available")
 except Exception as e:
     print("[WARN] segment_anything not available (install optional):", e)
-PY
+'@
+    $tmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.IO.Path]::GetRandomFileName() + '.py')
+    Set-Content -Path $tmp -Value $py -Encoding UTF8
+    python $tmp
+    Remove-Item $tmp -Force -ErrorAction SilentlyContinue
 } finally {
     Pop-Location
 }

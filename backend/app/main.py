@@ -130,65 +130,69 @@ async def lifespan(app: FastAPI):
         
         scheduler = BackgroundScheduler()
         
-        # KB Update Job: 2 AM UTC daily
-        def schedule_kb_update():
-            """Daily KB update task"""
-            try:
-                logger.info("[SCHEDULER] Starting automated KB refresh...")
-                from app.services.automated_kb_manager import get_automated_kb_manager
-                manager = get_automated_kb_manager()
-                
-                # Run async in sync context
-                import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+        if scheduler:  # Only add jobs if scheduler is enabled
+            # KB Update Job: 2 AM UTC daily
+            def schedule_kb_update():
+                """Daily KB update task"""
                 try:
-                    result = loop.run_until_complete(manager.run_daily_refresh())
-                    logger.info(f"[SCHEDULER] ✅ KB refresh completed: {result.get('operations', {}).keys()}")
-                finally:
-                    loop.close()
-            except Exception as e:
-                logger.error(f"[SCHEDULER] ❌ KB refresh failed: {e}")
-        
-        # Schedule KB daily refresh at 2 PM UTC
-        scheduler.add_job(
-            schedule_kb_update,
-            CronTrigger(hour=14, minute=0),
-            id="kb_daily_refresh",
-            name="Daily Knowledge Base Refresh & PubMed Sync",
-            replace_existing=True
-        )
-        
-        # Index Integrity Check Job: 1 AM UTC daily
-        def schedule_index_check():
-            """Daily index integrity check"""
-            try:
-                logger.info("[SCHEDULER] Running KB index integrity check...")
-                from app.services.automated_kb_manager import get_automated_kb_manager
-                manager = get_automated_kb_manager()
-                
-                import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                    logger.info("[SCHEDULER] Starting automated KB refresh...")
+                    from app.services.automated_kb_manager import get_automated_kb_manager
+                    manager = get_automated_kb_manager()
+                    
+                    # Run async in sync context
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        result = loop.run_until_complete(manager.run_daily_refresh())
+                        logger.info(f"[SCHEDULER] ✅ KB refresh completed: {result.get('operations', {}).keys()}")
+                    finally:
+                        loop.close()
+                except Exception as e:
+                    logger.error(f"[SCHEDULER] ❌ KB refresh failed: {e}")
+            
+            # Schedule KB daily refresh at 2 PM UTC
+            from apscheduler.triggers.cron import CronTrigger
+            scheduler.add_job(
+                schedule_kb_update,
+                CronTrigger(hour=14, minute=0),
+                id="kb_daily_refresh",
+                name="Daily Knowledge Base Refresh & PubMed Sync",
+                replace_existing=True
+            )
+            
+            # Index Integrity Check Job: 1 AM UTC daily
+            def schedule_index_check():
+                """Daily index integrity check"""
                 try:
-                    result = loop.run_until_complete(manager.check_index_integrity())
-                    if result.get("status") != "ok":
-                        logger.warning(f"[SCHEDULER] Index issues detected: {result.get('issues', [])}")
-                finally:
-                    loop.close()
-            except Exception as e:
-                logger.error(f"[SCHEDULER] Index check failed: {e}")
-        
-        scheduler.add_job(
-            schedule_index_check,
-            CronTrigger(hour=12, minute=0),
-            id="kb_index_check",
-            name="KB Index Integrity Check",
-            replace_existing=True
-        )
-        
-        scheduler.start()
-        logger.info("[OK] APScheduler started - KB automation jobs scheduled")
+                    logger.info("[SCHEDULER] Running KB index integrity check...")
+                    from app.services.automated_kb_manager import get_automated_kb_manager
+                    manager = get_automated_kb_manager()
+                    
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        result = loop.run_until_complete(manager.check_index_integrity())
+                        if result.get("status") != "ok":
+                            logger.warning(f"[SCHEDULER] Index issues detected: {result.get('issues', [])}")
+                    finally:
+                        loop.close()
+                except Exception as e:
+                    logger.error(f"[SCHEDULER] Index check failed: {e}")
+            
+            scheduler.add_job(
+                schedule_index_check,
+                CronTrigger(hour=12, minute=0),
+                id="kb_index_check",
+                name="KB Index Integrity Check",
+                replace_existing=True
+            )
+            
+            scheduler.start()
+            logger.info("[OK] APScheduler started - KB automation jobs scheduled")
+        else:
+            logger.info("[INFO] APScheduler disabled for debugging")
     except Exception as e:
         logger.warning(f"[WARNING] APScheduler initialization failed: {e}")
         scheduler = None
@@ -299,6 +303,7 @@ app.add_middleware(ErrorHandlerMiddleware)
 
 @app.get("/")
 def root() -> Dict[str, Any]:
+    logger.info("[DEBUG] Root endpoint called")
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
 
 # Quiet favicon 404s in dev: serve empty response
@@ -308,6 +313,7 @@ def favicon():
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
+    logger.info("[DEBUG] /health endpoint called")
     return {
         "status": "healthy" if service_health["database"] else "degraded",
         "service": "api",
