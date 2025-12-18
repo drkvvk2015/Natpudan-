@@ -21,6 +21,9 @@ from app.crud import (
 )
 from app.models import User
 
+# Setup logger first
+logger = logging.getLogger(__name__)
+
 # Load environment once at startup - not at import time
 try:
     load_dotenv()
@@ -29,7 +32,6 @@ except Exception as e:
     pass  # Continue with environment variables
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-logger = logging.getLogger(__name__)
 
 # JWT Configuration from environment - ENFORCE in production
 SECRET_KEY = os.getenv("SECRET_KEY")
