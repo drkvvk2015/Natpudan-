@@ -25,11 +25,13 @@ async def health_check():
     local_analyzer = LocalVisionAnalyzer()
     model_manager = VisionModelManager()
     
+    info = model_manager.get_current_model_info()
+    phase = "5B - MedSAM active" if info.get('model_id', '').startswith('medsam') else "5A - Rule-based foundation"
     return {
         "status": "healthy",
-        "phase": "5A - Rule-based foundation",
+        "phase": phase,
         "local_analyzer": local_analyzer.get_statistics(),
-        "model_manager": model_manager.get_current_model_info(),
+        "model_manager": info,
         "message": "Phase 5 services operational. Local vision models active."
     }
 
@@ -198,10 +200,16 @@ async def switch_model(model_id: str):
             "current_model": model_manager.get_current_model_info()
         }
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Model {model_id} not found. Use /models/available to see options."
-        )
+        # Differentiate between not found vs load failure
+        available = model_manager.list_available_models().get('available_models', {})
+        if model_id in available:
+            err = available[model_id].get('load_error') or f"Failed to load {model_id}. Ensure required files and env vars are set."
+            raise HTTPException(status_code=400, detail=err)
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Model {model_id} not found. Use /models/available to see options."
+            )
 
 
 @router.get("/statistics")
@@ -210,12 +218,13 @@ async def get_phase_5_statistics():
     local_analyzer = LocalVisionAnalyzer()
     model_manager = VisionModelManager()
     
+    phase = "5B - MedSAM active" if model_manager.get_current_model_info().get('model_id', '').startswith('medsam') else "5A - Rule-based foundation"
     return {
-        "phase": "5A - Rule-based foundation",
+        "phase": phase,
         "analyzer_stats": local_analyzer.get_statistics(),
         "model_stats": model_manager.get_model_statistics(),
         "next_steps": {
-            "phase_5b": "Integrate MedSAM or MONAI",
+            "phase_5b": "MedSAM integrated" if phase.startswith('5B') else "Integrate MedSAM or MONAI",
             "phase_5c": "Fine-tune on your patient cases",
             "phase_6": "Add local LLM (Ollama + LLaMA)",
             "phase_7": "Enable self-learning engine"
@@ -251,15 +260,14 @@ async def get_phase_5_roadmap():
             ]
         },
         "phase_5b": {
-            "status": "📋 NEXT (Week 1-2)",
-            "description": "Integrate actual ML models",
+            "status": "🚀 ACTIVE (MedSAM registered)",
+            "description": "MedSAM model integrated with lazy loading and analysis pipeline",
             "tasks": [
-                "Install MedSAM or MONAI",
-                "Load pre-trained medical vision model",
-                "Replace rule-based logic with ML inference",
-                "Validate accuracy vs Claude Vision"
+                "Place checkpoint and set PHASE5_MEDSAM_CHECKPOINT",
+                "Switch to medsam_v1 via /models/switch",
+                "Run hybrid validation on clinical images"
             ],
-            "estimated_time": "1-2 weeks"
+            "estimated_time": "1-2 weeks for accuracy tuning"
         },
         "phase_5c": {
             "status": "📋 LATER (Week 3-4)",

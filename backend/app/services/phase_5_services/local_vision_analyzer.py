@@ -17,6 +17,8 @@ from typing import Dict, List, Optional, Tuple
 from PIL import Image
 import numpy as np
 
+from .vision_model_manager import VisionModelManager
+
 logger = logging.getLogger(__name__)
 
 
@@ -102,13 +104,46 @@ class LocalVisionAnalyzer:
             logger.error(f"Failed to load image: {e}")
             return self._error_response(str(e))
         
-        # 3. Analyze based on image type
-        findings = self._analyze_by_type(
-            image_array=image_array,
-            image_type=image_type,
-            clinical_context=clinical_context,
-            image_stats=image_stats
-        )
+        # 3. Analyze based on current active model (Phase 5B aware)
+        model_manager = VisionModelManager()
+        active_type = model_manager.get_active_model_type()
+        model_used = 'local_rule_based_v1'
+        if active_type == 'ml' and model_manager.current_model.startswith('medsam'):
+            model = model_manager.get_active_model_instance()
+            if model is not None:
+                try:
+                    ml_out = model.analyze(image_array, image_type=image_type, clinical_context=clinical_context)
+                    findings = {
+                        'summary': ml_out.get('summary', 'MedSAM analysis'),
+                        'severity': ml_out.get('severity', 'MODERATE'),
+                        'confidence': ml_out.get('confidence', 0.6),
+                        'rois': ml_out.get('rois', []),
+                        'differentials': ml_out.get('differentials', []),
+                        'recommendations': ml_out.get('recommendations', [])
+                    }
+                    model_used = 'medsam_v1'
+                except Exception as e:
+                    logger.warning(f"MedSAM analyze failed, falling back to rule-based: {e}")
+                    findings = self._analyze_by_type(
+                        image_array=image_array,
+                        image_type=image_type,
+                        clinical_context=clinical_context,
+                        image_stats=image_stats
+                    )
+            else:
+                findings = self._analyze_by_type(
+                    image_array=image_array,
+                    image_type=image_type,
+                    clinical_context=clinical_context,
+                    image_stats=image_stats
+                )
+        else:
+            findings = self._analyze_by_type(
+                image_array=image_array,
+                image_type=image_type,
+                clinical_context=clinical_context,
+                image_stats=image_stats
+            )
         
         # 4. Calculate processing time
         processing_time = (time.time() - start_time) * 1000
@@ -120,7 +155,7 @@ class LocalVisionAnalyzer:
             'regions_of_interest': findings.get('rois', []),
             'differential_diagnoses': findings.get('differentials', []),
             'recommendations': findings.get('recommendations', []),
-            'model': 'local_rule_based_v1',
+            'model': model_used,
             'processing_time_ms': processing_time,
             'cache_used': False,
             'timestamp': datetime.utcnow().isoformat(),
@@ -346,14 +381,15 @@ class LocalVisionAnalyzer:
         avg_time = self.total_processing_time / self.analysis_count if self.analysis_count > 0 else 0
         cache_hit_rate = self.cache_hits / self.analysis_count if self.analysis_count > 0 else 0
         
+        model_manager = VisionModelManager()
         return {
             'total_analyses': self.analysis_count,
             'cache_hits': self.cache_hits,
             'cache_hit_rate': f'{cache_hit_rate * 100:.1f}%',
             'average_processing_time_ms': f'{avg_time:.1f}',
             'cache_size': len(self.cache),
-            'model_version': 'local_rule_based_v1',
-            'phase': '5A (Rule-based foundation)'
+            'model_version': model_manager.current_model,
+            'phase': '5B (MedSAM active)' if model_manager.get_active_model_type() == 'ml' else '5A (Rule-based foundation)'
         }
     
     def clear_cache(self):
