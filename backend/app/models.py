@@ -560,3 +560,21 @@ class PDFProcessing(Base):
         if self.total_pages == 0:
             return 0.0
         return (self.pages_processed / self.total_pages) * 100
+
+
+# ============================================================================
+# PHASE 4 MODELS - Medical Image Analysis & Population Health
+# ============================================================================
+# Import Phase 4 models to register them with SQLAlchemy Base
+from app.models.phase_4_models import (
+    MedicalImage,
+    MedicalReport,
+    PatientOutcome,
+    RiskScore,
+    ProgressionPrediction,
+    CohortAnalytics,
+    DiseasePrevalence,
+    ComorbidityAssociation,
+    TreatmentEffectiveness,
+    HealthEquityMetric
+)

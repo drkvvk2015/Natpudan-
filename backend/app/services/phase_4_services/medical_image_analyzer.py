@@ -189,25 +189,85 @@ class MedicalImageAnalyzer:
         image_type: ImageType
     ) -> Dict[str, Any]:
         """
-        Call Claude Vision API
+        Call Claude Vision API using Anthropic SDK
         
-        TODO: Implement actual Claude API call
-        - Use Anthropic SDK
-        - Handle rate limiting
-        - Track API costs
+        Args:
+            image_base64: Base64-encoded image data
+            prompt: Analysis prompt
+            image_type: Type of medical image
+            
+        Returns:
+            Structured analysis results from Claude
         """
-        # Placeholder: This will be implemented with actual API call
-        logger.info(f"Analyzing {image_type.value} image with Claude Vision API")
-        
-        # Mock response for now
-        return {
-            "findings": ["Normal chest X-ray"],
-            "confidence": 0.92,
-            "severity": "NORMAL",
-            "differential_diagnoses": [],
-            "recommendations": ["Follow-up in 6 months"],
-            "clinical_significance": "No acute findings"
-        }
+        try:
+            import anthropic
+            import os
+            
+            # Get API key
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                logger.warning("ANTHROPIC_API_KEY not set, using fallback")
+                return self._fallback_rule_based_analysis(image_type)
+            
+            # Initialize client
+            client = anthropic.Anthropic(api_key=api_key)
+            
+            logger.info(f"Analyzing {image_type.value} image with Claude Vision API")
+            
+            # Determine media type
+            media_type = "image/jpeg"  # Default
+            if image_base64.startswith("iVBOR"):  # PNG signature in base64
+                media_type = "image/png"
+            elif image_base64.startswith("R0lG"):  # GIF signature
+                media_type = "image/gif"
+            
+            # Call Claude Vision API
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=2048,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": image_base64,
+                                },
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
+                        ],
+                    }
+                ],
+            )
+            
+            # Extract response text
+            response_text = message.content[0].text
+            
+            # Parse response into structured format
+            result = self._structure_findings(response_text, image_type)
+            
+            # Add API metadata
+            result["api_metadata"] = {
+                "model": message.model,
+                "input_tokens": message.usage.input_tokens,
+                "output_tokens": message.usage.output_tokens
+            }
+            
+            logger.info(f"Claude analysis complete: {result['severity']}")
+            return result
+            
+        except ImportError:
+            logger.error("anthropic package not installed. Run: pip install anthropic")
+            return self._fallback_rule_based_analysis(image_type)
+        except Exception as e:
+            logger.error(f"Claude Vision API failed: {str(e)}")
+            return self._fallback_rule_based_analysis(image_type)
     
     def _fallback_rule_based_analysis(
         self,
