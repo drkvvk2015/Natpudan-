@@ -27,8 +27,8 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-# Create router with Phase 4 prefix
-router = APIRouter(prefix="/api/phase-4", tags=["Phase 4"])
+# Create router with Phase 4 prefix (will be included in api_router without prefix)
+router = APIRouter(prefix="/phase-4", tags=["Phase 4"])
 
 
 # ============================================================================

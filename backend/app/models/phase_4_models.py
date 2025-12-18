@@ -27,7 +27,7 @@ class MedicalImage(Base):
     __tablename__ = "medical_images"
     
     id = Column(Integer, primary_key=True)
-    patient_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Image metadata
     image_type = Column(String, nullable=False)  # xray, ecg, ultrasound, pathology, mri, ct
@@ -43,7 +43,7 @@ class MedicalImage(Base):
     ai_recommendations = Column(JSON)  # List of recommendations
     
     # Radiologist Verification
-    verified_by = Column(Integer, ForeignKey("user.id"), nullable=True)
+    verified_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     verification_status = Column(String)  # approved, amended, rejected
     verification_date = Column(DateTime, nullable=True)
     radiologist_notes = Column(Text)
@@ -62,11 +62,11 @@ class MedicalReport(Base):
     __tablename__ = "medical_reports"
     
     id = Column(Integer, primary_key=True)
-    patient_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Report metadata
     report_type = Column(String, nullable=False)  # discharge, progress, treatment_plan, follow_up
-    generated_by = Column(Integer, ForeignKey("user.id"), nullable=False)
+    generated_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Content
     content = Column(JSON)  # {"summary": "...", "diagnoses": [...], "medications": [...]}
@@ -77,7 +77,7 @@ class MedicalReport(Base):
     pdf_generated_at = Column(DateTime, nullable=True)
     
     # Digital signature
-    signed_by = Column(Integer, ForeignKey("user.id"), nullable=True)
+    signed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     signature = Column(String, nullable=True)  # JWT signature token
     signature_date = Column(DateTime, nullable=True)
     
@@ -103,7 +103,7 @@ class PatientOutcome(Base):
     __tablename__ = "patient_outcomes"
     
     id = Column(Integer, primary_key=True)
-    patient_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Outcome details
     visit_date = Column(DateTime, nullable=False)
@@ -135,7 +135,7 @@ class RiskScore(Base):
     __tablename__ = "risk_scores"
     
     id = Column(Integer, primary_key=True)
-    patient_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Risk metrics
     hospitalization_risk = Column(Float)  # 0-1
@@ -164,7 +164,7 @@ class ProgressionPrediction(Base):
     __tablename__ = "progression_predictions"
     
     id = Column(Integer, primary_key=True)
-    patient_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Condition being predicted
     condition = Column(String)  # Type 2 Diabetes, Hypertension, etc.
