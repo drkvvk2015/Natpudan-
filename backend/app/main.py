@@ -124,6 +124,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"[ERROR] Queue processor initialization failed: {e}")
     
+    # Initialize Self-Healing System
+    try:
+        from app.services.self_healing_system import get_self_healing_system
+        healing_system = get_self_healing_system()
+        service_health["self_healing"] = True
+        logger.info("[OK] Self-healing system initialized and learning from past errors")
+        
+        # Run initial health check
+        health_report = healing_system.prevention_engine.check_system_health()
+        if health_report['status'] != 'healthy':
+            logger.warning(f"[WARNING] System health: {health_report['status']} - {len(health_report['warnings'])} warnings detected")
+    except Exception as e:
+        logger.error(f"[ERROR] Self-healing system initialization failed: {e}")
+    
     # Initialize APScheduler for scheduled tasks
     scheduler = None
     try:
@@ -191,8 +205,28 @@ async def lifespan(app: FastAPI):
                 replace_existing=True
             )
             
+            # Self-Healing Preventive Maintenance: Every 6 hours
+            def schedule_preventive_maintenance():
+                """Preventive maintenance to avoid errors"""
+                try:
+                    logger.info("[SCHEDULER] Running preventive maintenance...")
+                    from app.services.self_healing_system import get_self_healing_system
+                    healing_system = get_self_healing_system()
+                    healing_system.run_preventive_maintenance()
+                    logger.info("[SCHEDULER] ✅ Preventive maintenance completed")
+                except Exception as e:
+                    logger.error(f"[SCHEDULER] ❌ Preventive maintenance failed: {e}")
+            
+            scheduler.add_job(
+                schedule_preventive_maintenance,
+                CronTrigger(hour='*/6'),  # Every 6 hours
+                id="preventive_maintenance",
+                name="Self-Healing Preventive Maintenance",
+                replace_existing=True
+            )
+            
             scheduler.start()
-            logger.info("[OK] APScheduler started - KB automation jobs scheduled")
+            logger.info("[OK] APScheduler started - KB automation + Self-healing jobs scheduled")
         else:
             logger.info("[INFO] APScheduler disabled for debugging")
     except Exception as e:
@@ -998,6 +1032,10 @@ api_router.include_router(phase_5c_router)
 
 # Phase 6: Local LLM Integration
 api_router.include_router(phase_6_router)
+
+# Self-Healing System API
+from app.api.self_healing_api import router as self_healing_router
+api_router.include_router(self_healing_router)
 
 # Background task for processing upload queue
 _last_queue_process = 0
