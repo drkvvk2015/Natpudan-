@@ -57,6 +57,8 @@ from app.api.knowledge_base import router as knowledge_router
 from app.api.patient_intake import router as patient_intake_router
 from app.api.phase_4_api import router as phase_4_router
 from app.api.phase_5_api import router as phase_5_router
+from app.api.phase_5c_api import router as phase_5c_router
+from app.api.phase_6_api import router as phase_6_router
 from app.database import init_db
 
 # Track application start time for uptime calculation
@@ -990,6 +992,12 @@ api_router.include_router(phase_4_router)
 
 # Phase 5: Local Vision Models & Self-Reliance
 api_router.include_router(phase_5_router)
+
+# Phase 5C: Fine-tuning & Model Optimization
+api_router.include_router(phase_5c_router)
+
+# Phase 6: Local LLM Integration
+api_router.include_router(phase_6_router)
 
 # Background task for processing upload queue
 _last_queue_process = 0
