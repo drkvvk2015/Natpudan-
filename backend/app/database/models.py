@@ -44,6 +44,7 @@ class User(Base):
 
 class Conversation(Base):
     __tablename__ = "conversations"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
@@ -55,6 +56,7 @@ class Conversation(Base):
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     conversation_id = Column(Integer, ForeignKey("conversations.id"))
@@ -69,6 +71,7 @@ class ChatMessage(Base):
 class PatientIntake(Base):
     """Patient intake information model"""
     __tablename__ = "patient_intakes"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     intake_id = Column(String(50), unique=True, index=True, nullable=False)
@@ -91,6 +94,7 @@ class PatientIntake(Base):
 class TravelHistory(Base):
     """Travel history model"""
     __tablename__ = "travel_history"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     patient_intake_id = Column(Integer, ForeignKey("patient_intakes.id", ondelete="CASCADE"))
@@ -112,6 +116,7 @@ class TravelHistory(Base):
 class FamilyHistory(Base):
     """Family medical history model"""
     __tablename__ = "family_history"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     patient_intake_id = Column(Integer, ForeignKey("patient_intakes.id", ondelete="CASCADE"))
@@ -175,6 +180,7 @@ class FollowUpStatus(str, enum.Enum):
 
 class TreatmentPlan(Base):
     __tablename__ = "treatment_plans"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     plan_id = Column(String, unique=True, index=True, nullable=False)
@@ -208,6 +214,7 @@ class TreatmentPlan(Base):
 
 class Medication(Base):
     __tablename__ = "medications"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     treatment_plan_id = Column(Integer, ForeignKey("treatment_plans.id"), nullable=False)
@@ -246,6 +253,7 @@ class Medication(Base):
 
 class FollowUp(Base):
     __tablename__ = "follow_ups"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     treatment_plan_id = Column(Integer, ForeignKey("treatment_plans.id"), nullable=False)
@@ -279,6 +287,7 @@ class FollowUp(Base):
 
 class MonitoringRecord(Base):
     __tablename__ = "monitoring_records"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     treatment_plan_id = Column(Integer, ForeignKey("treatment_plans.id"), nullable=False)
@@ -336,6 +345,7 @@ class ModelType(str, enum.Enum):
 class ValidatedCase(Base):
     """Validated medical cases for training data"""
     __tablename__ = "validated_cases"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     case_id = Column(String(50), unique=True, index=True, nullable=False)
@@ -385,6 +395,7 @@ class ValidatedCase(Base):
 class ModelPerformance(Base):
     """Model performance metrics over time"""
     __tablename__ = "model_performance"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     
@@ -438,6 +449,7 @@ class ModelPerformance(Base):
 class TrainingJob(Base):
     """Training job tracking and management"""
     __tablename__ = "training_jobs"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(String(50), unique=True, index=True, nullable=False)

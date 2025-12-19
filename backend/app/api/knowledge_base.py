@@ -14,8 +14,10 @@ from pathlib import Path
 import shutil
 from datetime import datetime
 
-from app.services.enhanced_knowledge_base import get_knowledge_base
-from app.services.local_vector_kb import get_local_knowledge_base
+# Lazy import to avoid scipy/sklearn initialization errors with Python 3.14
+# These will be imported only when actually needed
+# from app.services.enhanced_knowledge_base import get_knowledge_base
+# from app.services.local_vector_kb import get_local_knowledge_base
 from app.services.vector_knowledge_base import get_vector_knowledge_base
 from app.api.auth_new import get_current_user
 from app.models import User, KnowledgeDocument, UserRole
@@ -207,6 +209,8 @@ async def upload_pdfs(
 
     # Process files
     results = []
+    # Lazy import to avoid scipy/sklearn initialization errors
+    from app.services.enhanced_knowledge_base import get_knowledge_base
     knowledge_base = get_knowledge_base()
     
     for prepared in prepared_files:
@@ -701,6 +705,7 @@ async def get_statistics():
     try:
         # Local vector KB (sentence-transformers + FAISS, no API cost)
         logger.info("About to call get_local_knowledge_base()...")
+        from app.services.local_vector_kb import get_local_knowledge_base
         local_kb = get_local_knowledge_base()
         logger.info("Successfully got local KB instance")
         local_stats = local_kb.get_statistics()
@@ -726,6 +731,7 @@ async def get_statistics():
             db.close()
         
         # Enhanced KB (medical database, optional re-ranking) - keep for capabilities
+        from app.services.enhanced_knowledge_base import get_knowledge_base
         enhanced_kb = get_knowledge_base()
         enhanced_stats = enhanced_kb.get_statistics()
         
@@ -980,6 +986,7 @@ async def search_knowledge_base(request: SearchRequest):
         return True
 
     try:
+        from app.services.local_vector_kb import get_local_knowledge_base
         local_kb = get_local_knowledge_base()
         use_bm25 = mode != "openai" and mode != "local"
         results = []
@@ -1123,6 +1130,7 @@ async def evaluate_search(request: EvaluationRequest):
 
     Expects list of runs with query + expected_terms and returns hit@k + matches.
     """
+    from app.services.local_vector_kb import get_local_knowledge_base
     local_kb = get_local_knowledge_base()
     results = []
     for run in request.runs:
@@ -1376,6 +1384,7 @@ async def upload_large_pdf(
                         task_db.commit()
 
                 processor = get_large_pdf_processor()
+                from app.services.enhanced_knowledge_base import get_knowledge_base
                 knowledge_base = get_knowledge_base()
 
                 # Progress callback wrapper
@@ -1517,6 +1526,7 @@ async def clear_all_documents(
         db.commit()
         
         # Clear vector store
+        from app.services.enhanced_knowledge_base import get_knowledge_base
         knowledge_base = get_knowledge_base()
         if hasattr(knowledge_base, 'clear_all'):
             knowledge_base.clear_all()
@@ -1830,6 +1840,7 @@ async def enhanced_search(
         from app.services.enhanced_kb_processor import EnhancedKBProcessor, enhance_kb_search
         
         # Get KB services
+        from app.services.local_vector_kb import get_local_knowledge_base
         kb_service = get_local_knowledge_base()
         processor = EnhancedKBProcessor()
         

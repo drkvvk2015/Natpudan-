@@ -27,7 +27,8 @@ from ..database.models import (
 )
 from ..services.phase_7_services.data_collector import DataCollector
 
-router = APIRouter(prefix="/api/phase-7", tags=["Phase 7 - Self-Learning"])
+# No /api prefix here - it's already in main.py's api_router
+router = APIRouter(prefix="/phase-7", tags=["Phase 7 - Self-Learning"])
 logger = logging.getLogger(__name__)
 
 
