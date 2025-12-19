@@ -1,16 +1,24 @@
-// Natpudan AI - Service Worker
-// Provides offline support, caching, and background sync
+// Natpudan AI - Service Worker v2.0
+// Provides offline support, intelligent caching, and background sync
+// Optimized for medical application with AI features
 
-const CACHE_VERSION = 'v1.0.0';
+const CACHE_VERSION = 'v2.0.0';
 const CACHE_NAME = `natpudan-ai-${CACHE_VERSION}`;
+const CACHE_NAME_STATIC = `${CACHE_NAME}-static`;
+const CACHE_NAME_DYNAMIC = `${CACHE_NAME}-dynamic`;
+const CACHE_NAME_API = `${CACHE_NAME}-api`;
+const MAX_CACHE_SIZE = 100; // Maximum items in dynamic cache
+const MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
-// Assets to cache immediately on install
+// Assets to cache immediately on install (critical path)
 const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
+  '/logo-icon.svg',
+  '/favicon.svg'
 ];
 
 // Install event - cache essential assets

@@ -1,13 +1,26 @@
 {
   "name": "Natpudan AI - Medical Assistant",
   "short_name": "Natpudan AI",
-  "description": "AI-Powered Physician Assistant with Advanced Medical Knowledge Base",
+  "description": "AI-Powered Physician Assistant with Advanced Medical Knowledge Base, Diagnosis, Prescriptions, and Patient Management",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1976d2",
   "orientation": "portrait-primary",
   "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
     {
       "src": "/logo-icon.svg",
       "sizes": "any",
@@ -15,5 +28,68 @@
       "purpose": "any"
     }
   ],
-  "categories": ["medical", "health", "productivity"]
+  "screenshots": [
+    {
+      "src": "/screenshots/dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard with Analytics"
+    },
+    {
+      "src": "/screenshots/diagnosis.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "AI Diagnosis Assistant"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Diagnosis",
+      "short_name": "Diagnose",
+      "description": "Start AI-powered diagnosis",
+      "url": "/diagnosis",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Patient Intake",
+      "short_name": "Intake",
+      "description": "Register new patient",
+      "url": "/patient-intake",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Knowledge Base",
+      "short_name": "KB Search",
+      "description": "Search medical knowledge",
+      "url": "/knowledge-base",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Chat Assistant",
+      "short_name": "Chat",
+      "description": "AI medical chat",
+      "url": "/chat",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["medical", "health", "productivity", "business"],
+  "prefer_related_applications": false,
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "media",
+          "accept": ["image/*", "application/pdf", "text/*"]
+        }
+      ]
+    }
+  },
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }

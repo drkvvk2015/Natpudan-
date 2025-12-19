@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback } from "react";
 import {
   Box,
   Paper,
@@ -19,17 +19,17 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
-} from '@mui/material';
-import { keyframes } from '@mui/system';
+} from "@mui/material";
+import { keyframes } from "@mui/system";
 import {
   CloudUpload as UploadIcon,
   Delete as DeleteIcon,
   Article as ArticleIcon,
   CheckCircle as SuccessIcon,
   Error as ErrorIcon,
-} from '@mui/icons-material';
-import { useDropzone } from 'react-dropzone';
-import apiClient from '../services/apiClient';
+} from "@mui/icons-material";
+import { useDropzone } from "react-dropzone";
+import apiClient from "../services/apiClient";
 
 // Futuristic animations
 const gradientShift = keyframes`
@@ -61,7 +61,7 @@ const shake = keyframes`
 
 interface UploadedFile {
   file: File;
-  status: 'pending' | 'uploading' | 'processing' | 'success' | 'error';
+  status: "pending" | "uploading" | "processing" | "success" | "error";
   progress: number;
   error?: string;
   chunks?: number;
@@ -85,7 +85,7 @@ const KnowledgeBaseUpload: React.FC = () => {
   const [uploadResults, setUploadResults] = useState<any>(null);
   const [statistics, setStatistics] = useState<any>(null);
   const [statisticsLoading, setStatisticsLoading] = useState(true);
-  const [currentUploadingFile, setCurrentUploadingFile] = useState<string>('');
+  const [currentUploadingFile, setCurrentUploadingFile] = useState<string>("");
   const [uploadedDocumentIds, setUploadedDocumentIds] = useState<string[]>([]);
   const [pollingActive, setPollingActive] = useState(false);
 
@@ -100,12 +100,16 @@ const KnowledgeBaseUpload: React.FC = () => {
 
     const pollStatus = async () => {
       try {
-        const response = await apiClient.get('/api/medical/knowledge/upload-status');
+        const response = await apiClient.get(
+          "/api/medical/knowledge/upload-status"
+        );
         const queuedDocs = response.data.documents || [];
 
         setFiles((prev) =>
           prev.map((fileData) => {
-            const doc = queuedDocs.find((d: any) => d.document_id === fileData.documentId);
+            const doc = queuedDocs.find(
+              (d: any) => d.document_id === fileData.documentId
+            );
             if (doc) {
               return {
                 ...fileData,
@@ -118,16 +122,20 @@ const KnowledgeBaseUpload: React.FC = () => {
                 },
                 progress: Math.max(fileData.progress, doc.progress_percent),
                 statusMessage:
-                  doc.status === 'completed'
-                    ? '[OK] Processing completed and indexed'
-                    : `[${doc.status.toUpperCase()}] ${doc.progress_percent}% complete (${doc.current_chunk}/${doc.total_chunks} chunks)`,
+                  doc.status === "completed"
+                    ? "[OK] Processing completed and indexed"
+                    : `[${doc.status.toUpperCase()}] ${
+                        doc.progress_percent
+                      }% complete (${doc.current_chunk}/${
+                        doc.total_chunks
+                      } chunks)`,
               };
             }
             return fileData;
           })
         );
       } catch (error) {
-        console.error('Failed to poll processing status:', error);
+        console.error("Failed to poll processing status:", error);
       }
     };
 
@@ -138,8 +146,11 @@ const KnowledgeBaseUpload: React.FC = () => {
   // Stop polling when all documents are completed
   React.useEffect(() => {
     const allCompleted = files
-      .filter((f) => uploadedDocumentIds.includes(f.documentId || ''))
-      .every((f) => f.processingStatus?.status === 'completed' || f.status === 'success');
+      .filter((f) => uploadedDocumentIds.includes(f.documentId || ""))
+      .every(
+        (f) =>
+          f.processingStatus?.status === "completed" || f.status === "success"
+      );
 
     if (allCompleted && uploadedDocumentIds.length > 0) {
       setPollingActive(false);
@@ -149,10 +160,10 @@ const KnowledgeBaseUpload: React.FC = () => {
   const loadStatistics = async () => {
     try {
       setStatisticsLoading(true);
-      const response = await apiClient.get('/api/medical/knowledge/statistics');
+      const response = await apiClient.get("/api/medical/knowledge/statistics");
       setStatistics(response.data);
     } catch (error) {
-      console.error('Failed to load statistics:', error);
+      console.error("Failed to load statistics:", error);
     } finally {
       setStatisticsLoading(false);
     }
@@ -161,7 +172,7 @@ const KnowledgeBaseUpload: React.FC = () => {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles: UploadedFile[] = acceptedFiles.map((file) => ({
       file,
-      status: 'pending',
+      status: "pending",
       progress: 0,
     }));
     setFiles((prev) => [...prev, ...newFiles]);
@@ -177,10 +188,11 @@ const KnowledgeBaseUpload: React.FC = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'application/pdf': ['.pdf'],
-      'text/plain': ['.txt'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      "application/pdf": [".pdf"],
+      "text/plain": [".txt"],
+      "application/msword": [".doc"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        [".docx"],
     },
     maxSize: MAX_FILE_BYTES,
     multiple: true,
@@ -198,108 +210,168 @@ const KnowledgeBaseUpload: React.FC = () => {
 
     try {
       // Split files into large (>50MB) and standard
-      const standardFiles = files.filter(f => f.file.size <= LARGE_FILE_THRESHOLD);
-      const largeFiles = files.filter(f => f.file.size > LARGE_FILE_THRESHOLD);
+      const standardFiles = files.filter(
+        (f) => f.file.size <= LARGE_FILE_THRESHOLD
+      );
+      const largeFiles = files.filter(
+        (f) => f.file.size > LARGE_FILE_THRESHOLD
+      );
 
-    let standardResults = { results: [] };
-    let largeFileResults: any[] = [];
+      let standardResults = { results: [] };
+      let largeFileResults: any[] = [];
 
-    // 1. Process Standard Files (Batch)
-    if (standardFiles.length > 0) {
+      // 1. Process Standard Files (Batch)
+      if (standardFiles.length > 0) {
         const formData = new FormData();
         standardFiles.forEach((fileData) => {
-           formData.append('files', fileData.file);
+          formData.append("files", fileData.file);
         });
-        formData.append('use_full_content', String(useFullContent));
-        formData.append('chunk_size', String(chunkSize));
+        formData.append("use_full_content", String(useFullContent));
+        formData.append("chunk_size", String(chunkSize));
 
         // Update status for standard files
-        setFiles(prev => prev.map(f => {
-            if (standardFiles.some(sf => sf.file === f.file)) {
-                return { ...f, status: 'uploading', progress: 10, statusMessage: '[UP] Uploading standard file...' };
+        setFiles((prev) =>
+          prev.map((f) => {
+            if (standardFiles.some((sf) => sf.file === f.file)) {
+              return {
+                ...f,
+                status: "uploading",
+                progress: 10,
+                statusMessage: "[UP] Uploading standard file...",
+              };
             }
             return f;
-        }));
+          })
+        );
 
         try {
-            const response = await apiClient.post('/api/medical/knowledge/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-                onUploadProgress: (progressEvent) => {
-                    const percent = progressEvent.total ? Math.round((progressEvent.loaded * 100) / progressEvent.total) : 0;
-                    setFiles(prev => prev.map(f => {
-                         if (standardFiles.some(sf => sf.file === f.file)) {
-                             return { ...f, progress: percent };
-                         }
-                         return f;
-                    }));
-                }
-            });
-            standardResults = response.data;
+          const response = await apiClient.post(
+            "/api/medical/knowledge/upload",
+            formData,
+            {
+              headers: { "Content-Type": "multipart/form-data" },
+              onUploadProgress: (progressEvent) => {
+                const percent = progressEvent.total
+                  ? Math.round(
+                      (progressEvent.loaded * 100) / progressEvent.total
+                    )
+                  : 0;
+                setFiles((prev) =>
+                  prev.map((f) => {
+                    if (standardFiles.some((sf) => sf.file === f.file)) {
+                      return { ...f, progress: percent };
+                    }
+                    return f;
+                  })
+                );
+              },
+            }
+          );
+          standardResults = response.data;
         } catch (error: any) {
-            console.error("Standard upload failed", error);
-            // Mark standard files as error
-             setFiles(prev => prev.map(f => {
-                 if (standardFiles.some(sf => sf.file === f.file)) {
-                     return { ...f, status: 'error', error: 'Batch upload failed', statusMessage: '[ERROR] Upload failed' };
-                 }
-                 return f;
-             }));
+          console.error("Standard upload failed", error);
+          // Mark standard files as error
+          setFiles((prev) =>
+            prev.map((f) => {
+              if (standardFiles.some((sf) => sf.file === f.file)) {
+                return {
+                  ...f,
+                  status: "error",
+                  error: "Batch upload failed",
+                  statusMessage: "[ERROR] Upload failed",
+                };
+              }
+              return f;
+            })
+          );
         }
       }
 
       // 2. Process Large Files (Individually)
       for (const largeFile of largeFiles) {
-          try {
-             setFiles(prev => prev.map(f => {
-                 if (f.file === largeFile.file) {
-                     return { ...f, status: 'uploading' as const, progress: 1, statusMessage: '[UP] Uploading large file (this may take time)...' };
-                 }
-                 return f;
-             }));
+        try {
+          setFiles((prev) =>
+            prev.map((f) => {
+              if (f.file === largeFile.file) {
+                return {
+                  ...f,
+                  status: "uploading" as const,
+                  progress: 1,
+                  statusMessage:
+                    "[UP] Uploading large file (this may take time)...",
+                };
+              }
+              return f;
+            })
+          );
 
-             const formData = new FormData();
-             formData.append('file', largeFile.file);
-             
-             const response = await apiClient.post('/api/medical/knowledge/upload-large', formData, {
-               headers: { 'Content-Type': 'multipart/form-data' },
-               // Allow very long uploads for large textbooks (e.g., 300MB+)
-               timeout: 20 * 60 * 1000, // 20 minutes
-                 onUploadProgress: (progressEvent) => {
-                     const percent = progressEvent.total ? Math.round((progressEvent.loaded * 100) / progressEvent.total) : 0;
-                     setFiles(prev => prev.map(f => {
-                         if (f.file === largeFile.file) {
-                             return { ...f, progress: percent };
-                         }
-                         return f;
-                     }));
-                 }
-             });
-             
-             if (response.data.results && response.data.results[0]) {
-                 largeFileResults.push(response.data.results[0]);
-             }
-          } catch (error: any) {
-             console.error(`Large file upload failed: ${largeFile.file.name}`, error);
-             setFiles(prev => prev.map(f => {
-                 if (f.file === largeFile.file) {
-                     return { ...f, status: 'error', error: 'Large file upload failed', statusMessage: '[ERROR] Server timeout or error' };
-                 }
-                 return f;
-             }));
+          const formData = new FormData();
+          formData.append("file", largeFile.file);
+
+          const response = await apiClient.post(
+            "/api/medical/knowledge/upload-large",
+            formData,
+            {
+              headers: { "Content-Type": "multipart/form-data" },
+              // Allow very long uploads for large textbooks (e.g., 300MB+)
+              timeout: 20 * 60 * 1000, // 20 minutes
+              onUploadProgress: (progressEvent) => {
+                const percent = progressEvent.total
+                  ? Math.round(
+                      (progressEvent.loaded * 100) / progressEvent.total
+                    )
+                  : 0;
+                setFiles((prev) =>
+                  prev.map((f) => {
+                    if (f.file === largeFile.file) {
+                      return { ...f, progress: percent };
+                    }
+                    return f;
+                  })
+                );
+              },
+            }
+          );
+
+          if (response.data.results && response.data.results[0]) {
+            largeFileResults.push(response.data.results[0]);
           }
+        } catch (error: any) {
+          console.error(
+            `Large file upload failed: ${largeFile.file.name}`,
+            error
+          );
+          setFiles((prev) =>
+            prev.map((f) => {
+              if (f.file === largeFile.file) {
+                return {
+                  ...f,
+                  status: "error",
+                  error: "Large file upload failed",
+                  statusMessage: "[ERROR] Server timeout or error",
+                };
+              }
+              return f;
+            })
+          );
+        }
       }
 
       // Merge results
-      const allResults = [...(standardResults.results || []), ...largeFileResults];
+      const allResults = [
+        ...(standardResults.results || []),
+        ...largeFileResults,
+      ];
       const mergedResponse = {
-          message: `Processed ${allResults.length} files`,
-          results: allResults,
-          summary: {
-              successful: allResults.filter((r: any) => r.status === 'success').length,
-              failed: allResults.filter((r: any) => r.status === 'error').length,
-              total_chunks_created: 0, // Simplified
-              total_size_mb: 0
-          }
+        message: `Processed ${allResults.length} files`,
+        results: allResults,
+        summary: {
+          successful: allResults.filter((r: any) => r.status === "success")
+            .length,
+          failed: allResults.filter((r: any) => r.status === "error").length,
+          total_chunks_created: 0, // Simplified
+          total_size_mb: 0,
+        },
       };
 
       setUploadResults(mergedResponse);
@@ -307,13 +379,13 @@ const KnowledgeBaseUpload: React.FC = () => {
       // Extract document IDs and start polling
       const docIds: string[] = [];
       allResults.forEach((result: any) => {
-        if (result.status === 'success' && result.document_id) {
+        if (result.status === "success" && result.document_id) {
           docIds.push(result.document_id);
         }
       });
-      
+
       if (docIds.length > 0) {
-        setUploadedDocumentIds(prev => [...prev, ...docIds]);
+        setUploadedDocumentIds((prev) => [...prev, ...docIds]);
         setPollingActive(true);
       }
 
@@ -321,42 +393,44 @@ const KnowledgeBaseUpload: React.FC = () => {
       setFiles((prev) =>
         prev.map((fileData) => {
           // Match result by filename
-          const result = allResults.find((r: any) => r.filename === fileData.file.name);
-          
+          const result = allResults.find(
+            (r: any) => r.filename === fileData.file.name
+          );
+
           if (!result) return fileData; // Keep existing status if not in this batch (or error handled above)
 
-          const info = result.info ? `\n${result.info}` : '';
-          
+          const info = result.info ? `\n${result.info}` : "";
+
           const updatedFile: UploadedFile = {
             ...fileData,
-            status: result.status === 'success' ? 'success' : 'error',
+            status: result.status === "success" ? "success" : "error",
             progress: 100,
             error: result.error,
             chunks: result.chunks,
             characters: result.characters,
             documentId: result.document_id,
-            statusMessage: result.status === 'success' 
-              ? `[OK] Queued for processing${info}` 
-              : result.status === 'skipped'
-                ? `[INFO] ${result.reason || 'Document already uploaded'}`
-                : `[ERROR] ${result.error || 'Unknown error'}`,
+            statusMessage:
+              result.status === "success"
+                ? `[OK] Queued for processing${info}`
+                : result.status === "skipped"
+                ? `[INFO] ${result.reason || "Document already uploaded"}`
+                : `[ERROR] ${result.error || "Unknown error"}`,
           };
-          
-          if (result.status === 'skipped') updatedFile.status = 'success';
-          
+
+          if (result.status === "skipped") updatedFile.status = "success";
+
           return updatedFile;
         })
       );
 
       // Reload statistics
       await loadStatistics();
-
     } catch (error: any) {
-        // Global error handler (fallback)
-      console.error('Upload error:', error);
+      // Global error handler (fallback)
+      console.error("Upload error:", error);
     } finally {
       setUploading(false);
-      setCurrentUploadingFile('');
+      setCurrentUploadingFile("");
     }
   };
 
@@ -377,15 +451,23 @@ const KnowledgeBaseUpload: React.FC = () => {
         [BOOKS] Knowledge Base - PDF Upload
       </Typography>
       <Typography variant="body1" color="text.secondary" paragraph>
-        Upload medical PDFs, documents, and textbooks to enhance the AI knowledge base.
-        Supports multiple file uploads with intelligent text extraction.
+        Upload medical PDFs, documents, and textbooks to enhance the AI
+        knowledge base. Supports multiple file uploads with intelligent text
+        extraction.
       </Typography>
 
       {/* Statistics Card */}
       {statisticsLoading ? (
-        <Card sx={{ mb: 3, bgcolor: 'grey.50' }}>
+        <Card sx={{ mb: 3, bgcolor: "grey.50" }}>
           <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 3 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                py: 3,
+              }}
+            >
               <CircularProgress size={40} sx={{ mr: 2 }} />
               <Typography variant="body1" color="text.secondary">
                 Loading knowledge base status...
@@ -393,8 +475,8 @@ const KnowledgeBaseUpload: React.FC = () => {
             </Box>
           </CardContent>
         </Card>
-      ) : statistics && (
-        <Card sx={{ mb: 3, bgcolor: 'primary.50' }}>
+      ) : statistics ? (
+        <Card sx={{ mb: 3, bgcolor: "primary.50" }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
               Current Knowledge Base Statistics
@@ -412,7 +494,9 @@ const KnowledgeBaseUpload: React.FC = () => {
                 <Typography variant="body2" color="text.secondary">
                   Total Chunks
                 </Typography>
-                <Typography variant="h5">{statistics.total_chunks || 0}</Typography>
+                <Typography variant="h5">
+                  {statistics.total_chunks || 0}
+                </Typography>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
                 <Typography variant="body2" color="text.secondary">
@@ -422,11 +506,10 @@ const KnowledgeBaseUpload: React.FC = () => {
                   {statistics.categories_count || 0}
                 </Typography>
               </Grid>
-
             </Grid>
           </CardContent>
         </Card>
-      ) : !statisticsLoading && (
+      ) : (
         <Alert severity="info" sx={{ mb: 3 }}>
           No statistics available. Upload some documents to get started.
         </Alert>
@@ -448,13 +531,11 @@ const KnowledgeBaseUpload: React.FC = () => {
             }
             label={
               <Box>
-                <Typography variant="body1">
-                  Use Full PDF Content
-                </Typography>
+                <Typography variant="body1">Use Full PDF Content</Typography>
                 <Typography variant="caption" color="text.secondary">
                   {useFullContent
-                    ? 'Entire document will be processed as one piece (preserves context)'
-                    : 'Document will be split into intelligent chunks (better for large files)'}
+                    ? "Entire document will be processed as one piece (preserves context)"
+                    : "Document will be split into intelligent chunks (better for large files)"}
                 </Typography>
               </Box>
             }
@@ -480,34 +561,44 @@ const KnowledgeBaseUpload: React.FC = () => {
         sx={{
           p: 4,
           mb: 3,
-          border: '2px dashed',
-          borderColor: isDragActive ? 'primary.main' : 'grey.300',
-          bgcolor: isDragActive ? 'primary.50' : 'grey.50',
-          cursor: 'pointer',
-          transition: 'all 0.3s',
-          '&:hover': {
-            borderColor: 'primary.main',
-            bgcolor: 'primary.50',
+          border: "2px dashed",
+          borderColor: isDragActive ? "primary.main" : "grey.300",
+          bgcolor: isDragActive ? "primary.50" : "grey.50",
+          cursor: "pointer",
+          transition: "all 0.3s",
+          "&:hover": {
+            borderColor: "primary.main",
+            bgcolor: "primary.50",
           },
         }}
       >
         <input {...getInputProps()} />
-        <Box sx={{ textAlign: 'center' }}>
-          <UploadIcon sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
+        <Box sx={{ textAlign: "center" }}>
+          <UploadIcon sx={{ fontSize: 64, color: "primary.main", mb: 2 }} />
           <Typography variant="h6" gutterBottom>
-            {isDragActive ? 'Drop files here...' : 'Drag & drop files here'}
+            {isDragActive ? "Drop files here..." : "Drag & drop files here"}
           </Typography>
           <Typography variant="body2" color="text.secondary" paragraph>
             or click to select files
           </Typography>
-          <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent="center"
+            flexWrap="wrap"
+          >
             <Chip label="PDF" size="small" />
             <Chip label="TXT" size="small" />
             <Chip label="DOC" size="small" />
             <Chip label="DOCX" size="small" />
           </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-            Max 1GB per file (PDF/TXT/DOC/DOCX) · Max 20 files · Max 5GB total. Files over 50MB are queued for background processing.
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 2, display: "block" }}
+          >
+            Max 1GB per file (PDF/TXT/DOC/DOCX) · Max 20 files · Max 5GB total.
+            Files over 50MB are queued for background processing.
           </Typography>
         </Box>
       </Paper>
@@ -515,7 +606,14 @@ const KnowledgeBaseUpload: React.FC = () => {
       {/* File List */}
       {files.length > 0 && (
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 2,
+            }}
+          >
             <Typography variant="h6">
               Selected Files ({files.length})
             </Typography>
@@ -531,144 +629,184 @@ const KnowledgeBaseUpload: React.FC = () => {
               <ListItem
                 key={index}
                 sx={{
-                  bgcolor: 'grey.50',
+                  bgcolor: "grey.50",
                   mb: 1,
                   borderRadius: 1,
                 }}
               >
-                <ArticleIcon sx={{ mr: 2, color: 'primary.main' }} />
+                <ArticleIcon sx={{ mr: 2, color: "primary.main" }} />
                 <ListItemText
                   primary={fileData.file.name}
                   secondary={
                     <span>
-                      <Typography variant="caption" component="span" display="block">
+                      <Typography
+                        variant="caption"
+                        component="span"
+                        display="block"
+                      >
                         {formatFileSize(fileData.file.size)}
                       </Typography>
-                      {(fileData.status === 'uploading' || fileData.status === 'processing') && (
+                      {(fileData.status === "uploading" ||
+                        fileData.status === "processing") && (
                         <Box sx={{ mt: 1 }}>
-                          <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                            <Typography 
-                              variant="caption" 
+                          <Box
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            mb={0.5}
+                          >
+                            <Typography
+                              variant="caption"
                               sx={{
                                 fontWeight: 600,
-                                background: fileData.status === 'processing' 
-                                  ? 'linear-gradient(90deg, #00f5ff 0%, #00d4ff 50%, #0099ff 100%)'
-                                  : 'linear-gradient(90deg, #4CAF50 0%, #81C784 100%)',
-                                backgroundSize: '200% 100%',
-                                animation: fileData.status === 'processing' 
-                                  ? `${gradientShift} 3s ease infinite`
-                                  : 'none',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text',
+                                background:
+                                  fileData.status === "processing"
+                                    ? "linear-gradient(90deg, #00f5ff 0%, #00d4ff 50%, #0099ff 100%)"
+                                    : "linear-gradient(90deg, #4CAF50 0%, #81C784 100%)",
+                                backgroundSize: "200% 100%",
+                                animation:
+                                  fileData.status === "processing"
+                                    ? `${gradientShift} 3s ease infinite`
+                                    : "none",
+                                WebkitBackgroundClip: "text",
+                                WebkitTextFillColor: "transparent",
+                                backgroundClip: "text",
                               }}
                             >
-                              {fileData.statusMessage || 'Processing...'}
+                              {fileData.statusMessage || "Processing..."}
                             </Typography>
-                            <Chip 
+                            <Chip
                               label={`${fileData.progress}%`}
                               size="small"
                               sx={{
-                                bgcolor: fileData.status === 'processing' ? '#00d4ff' : '#4CAF50',
-                                color: 'white',
-                                fontWeight: 'bold',
-                                animation: fileData.status === 'processing'
-                                  ? `${pulse} 2s ease-in-out infinite`
-                                  : 'none',
+                                bgcolor:
+                                  fileData.status === "processing"
+                                    ? "#00d4ff"
+                                    : "#4CAF50",
+                                color: "white",
+                                fontWeight: "bold",
+                                animation:
+                                  fileData.status === "processing"
+                                    ? `${pulse} 2s ease-in-out infinite`
+                                    : "none",
                               }}
                             />
                           </Box>
                           <LinearProgress
                             variant="determinate"
                             value={fileData.progress}
-                            sx={{ 
-                              height: 8, 
+                            sx={{
+                              height: 8,
                               borderRadius: 4,
-                              background: 'linear-gradient(90deg, #f0f0f0 0%, #e0e0e0 100%)',
-                              '& .MuiLinearProgress-bar': {
-                                background: fileData.status === 'processing'
-                                  ? 'linear-gradient(90deg, #00f5ff 0%, #00d4ff 50%, #0099ff 100%)'
-                                  : 'linear-gradient(90deg, #4CAF50 0%, #81C784 100%)',
-                                backgroundSize: '200% 100%',
-                                animation: fileData.status === 'processing'
-                                  ? `${progressGlow} 2s linear infinite`
-                                  : 'none',
+                              background:
+                                "linear-gradient(90deg, #f0f0f0 0%, #e0e0e0 100%)",
+                              "& .MuiLinearProgress-bar": {
+                                background:
+                                  fileData.status === "processing"
+                                    ? "linear-gradient(90deg, #00f5ff 0%, #00d4ff 50%, #0099ff 100%)"
+                                    : "linear-gradient(90deg, #4CAF50 0%, #81C784 100%)",
+                                backgroundSize: "200% 100%",
+                                animation:
+                                  fileData.status === "processing"
+                                    ? `${progressGlow} 2s linear infinite`
+                                    : "none",
                                 borderRadius: 4,
-                                boxShadow: fileData.status === 'processing'
-                                  ? '0 0 10px rgba(0, 212, 255, 0.5)'
-                                  : '0 0 10px rgba(76, 175, 80, 0.3)',
-                              }
+                                boxShadow:
+                                  fileData.status === "processing"
+                                    ? "0 0 10px rgba(0, 212, 255, 0.5)"
+                                    : "0 0 10px rgba(76, 175, 80, 0.3)",
+                              },
                             }}
                           />
                         </Box>
                       )}
-                      {fileData.status === 'success' && (
-                        <Alert 
-                          severity="success" 
-                          sx={{ 
-                            mt: 1, 
-                            display: 'block',
-                            background: 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
-                            border: '2px solid #4CAF50',
+                      {fileData.status === "success" && (
+                        <Alert
+                          severity="success"
+                          sx={{
+                            mt: 1,
+                            display: "block",
+                            background:
+                              "linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)",
+                            border: "2px solid #4CAF50",
                             animation: `${fadeIn} 0.5s ease-out`,
-                          }} 
-                          icon={<SuccessIcon sx={{ color: '#2E7D32' }} />}
+                          }}
+                          icon={<SuccessIcon sx={{ color: "#2E7D32" }} />}
                         >
-                          <Typography variant="caption" display="block" fontWeight={600} sx={{ color: '#1B5E20' }}>
+                          <Typography
+                            variant="caption"
+                            display="block"
+                            fontWeight={600}
+                            sx={{ color: "#1B5E20" }}
+                          >
                             ✅ {fileData.statusMessage}
                           </Typography>
-                          <Typography variant="caption" display="block" sx={{ color: '#2E7D32' }}>
-                            {fileData.chunks} chunks - {fileData.characters?.toLocaleString()} characters
+                          <Typography
+                            variant="caption"
+                            display="block"
+                            sx={{ color: "#2E7D32" }}
+                          >
+                            {fileData.chunks} chunks -{" "}
+                            {fileData.characters?.toLocaleString()} characters
                           </Typography>
                         </Alert>
                       )}
-                      {fileData.status === 'error' && (
+                      {fileData.status === "error" && (
                         <Box sx={{ mt: 1 }}>
-                          <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                            <Typography 
-                              variant="caption" 
+                          <Box
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            mb={0.5}
+                          >
+                            <Typography
+                              variant="caption"
                               sx={{
                                 fontWeight: 600,
-                                color: '#d32f2f',
+                                color: "#d32f2f",
                               }}
                             >
                               ❌ Upload Failed
                             </Typography>
-                            <Chip 
+                            <Chip
                               label="0%"
                               size="small"
                               sx={{
-                                bgcolor: '#d32f2f',
-                                color: 'white',
-                                fontWeight: 'bold',
+                                bgcolor: "#d32f2f",
+                                color: "white",
+                                fontWeight: "bold",
                               }}
                             />
                           </Box>
                           <LinearProgress
                             variant="determinate"
                             value={0}
-                            sx={{ 
-                              height: 8, 
+                            sx={{
+                              height: 8,
                               borderRadius: 4,
-                              background: '#ffebee',
-                              '& .MuiLinearProgress-bar': {
-                                background: '#d32f2f',
+                              background: "#ffebee",
+                              "& .MuiLinearProgress-bar": {
+                                background: "#d32f2f",
                                 borderRadius: 4,
-                              }
+                              },
                             }}
                           />
-                          <Alert 
-                            severity="error" 
-                            sx={{ 
+                          <Alert
+                            severity="error"
+                            sx={{
                               mt: 1,
-                              display: 'block',
-                              background: 'linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%)',
-                              border: '2px solid #d32f2f',
+                              display: "block",
+                              background:
+                                "linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%)",
+                              border: "2px solid #d32f2f",
                               animation: `${shake} 0.6s ease`,
-                            }} 
-                            icon={<ErrorIcon sx={{ color: '#c62828' }} />}
+                            }}
+                            icon={<ErrorIcon sx={{ color: "#c62828" }} />}
                           >
-                            <Typography variant="caption" sx={{ color: '#b71c1c', fontWeight: 600 }}>
+                            <Typography
+                              variant="caption"
+                              sx={{ color: "#b71c1c", fontWeight: 600 }}
+                            >
                               {fileData.statusMessage || fileData.error}
                             </Typography>
                           </Alert>
@@ -678,28 +816,30 @@ const KnowledgeBaseUpload: React.FC = () => {
                   }
                 />
                 <ListItemSecondaryAction>
-                  {fileData.status === 'pending' && (
+                  {fileData.status === "pending" && (
                     <IconButton edge="end" onClick={() => removeFile(index)}>
                       <DeleteIcon />
                     </IconButton>
                   )}
-                  {fileData.status === 'success' && <SuccessIcon color="success" />}
-                  {fileData.status === 'error' && <ErrorIcon color="error" />}
+                  {fileData.status === "success" && (
+                    <SuccessIcon color="success" />
+                  )}
+                  {fileData.status === "error" && <ErrorIcon color="error" />}
                 </ListItemSecondaryAction>
               </ListItem>
             ))}
           </List>
 
-          <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+          <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
             <Button
               variant="contained"
               size="large"
               startIcon={<UploadIcon />}
               onClick={uploadFiles}
-              disabled={uploading || files.every((f) => f.status !== 'pending')}
+              disabled={uploading || files.every((f) => f.status !== "pending")}
               fullWidth
             >
-              {uploading ? 'Uploading...' : `Upload ${files.length} File(s)`}
+              {uploading ? "Uploading..." : `Upload ${files.length} File(s)`}
             </Button>
           </Box>
         </Paper>
@@ -708,7 +848,7 @@ const KnowledgeBaseUpload: React.FC = () => {
       {/* Upload Results */}
       {uploadResults && (
         <Alert
-          severity={uploadResults.summary.failed === 0 ? 'success' : 'warning'}
+          severity={uploadResults.summary.failed === 0 ? "success" : "warning"}
           sx={{ mb: 3 }}
         >
           <Typography variant="body1" gutterBottom>
@@ -716,12 +856,12 @@ const KnowledgeBaseUpload: React.FC = () => {
           </Typography>
           <Typography variant="body2">
             - Successful: {uploadResults.summary.successful}
-            <br />
-            - Failed: {uploadResults.summary.failed}
-            <br />
-            - Total Chunks: {uploadResults.summary.total_chunks_created}
-            <br />
-            - Total Size: {uploadResults.summary.total_size_mb.toFixed(2)} MB
+            <br />- Failed: {uploadResults.summary.failed}
+            <br />- Total Chunks: {uploadResults.summary.total_chunks_created}
+            <br />- Total Size: {uploadResults.summary.total_size_mb.toFixed(
+              2
+            )}{" "}
+            MB
           </Typography>
         </Alert>
       )}

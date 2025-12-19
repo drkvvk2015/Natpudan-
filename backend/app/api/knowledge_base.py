@@ -1087,7 +1087,7 @@ async def search_knowledge_base(request: SearchRequest):
                 
                 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
                 response = client.chat.completions.create(
-                    model="gpt-4", # Or gpt-3.5-turbo
+                    model="gpt-4o-mini",  # Using gpt-4o-mini for better compatibility and lower cost
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
