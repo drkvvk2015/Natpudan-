@@ -1033,6 +1033,10 @@ api_router.include_router(phase_5c_router)
 # Phase 6: Local LLM Integration
 api_router.include_router(phase_6_router)
 
+# Phase 7: Self-Learning Engine
+from app.api.phase_7_api import router as phase_7_router
+api_router.include_router(phase_7_router)
+
 # Self-Healing System API
 from app.api.self_healing_api import router as self_healing_router
 api_router.include_router(self_healing_router)
