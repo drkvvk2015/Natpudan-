@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host @"
+$banner = @"
 
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
@@ -20,7 +20,8 @@ Write-Host @"
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 
-"@ -ForegroundColor Cyan
+"@
+Write-Host $banner -ForegroundColor Cyan
 
 # Configuration
 $ROOT_DIR = $PSScriptRoot
@@ -39,7 +40,7 @@ function Test-Prerequisites {
         exit 1
     }
     $nodeVersion = node --version
-    Write-Host "  ✓ Node.js: $nodeVersion" -ForegroundColor Green
+    Write-Host "  [OK] Node.js: $nodeVersion" -ForegroundColor Green
     
     # Check npm
     if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
@@ -47,7 +48,7 @@ function Test-Prerequisites {
         exit 1
     }
     $npmVersion = npm --version
-    Write-Host "  ✓ npm: v$npmVersion" -ForegroundColor Green
+    Write-Host "  [OK] npm: v$npmVersion" -ForegroundColor Green
     
     # Check Python (for backend)
     if (-not $SkipBackend) {
@@ -55,11 +56,11 @@ function Test-Prerequisites {
             Write-Host "WARNING: Python not found. Backend deployment will be skipped." -ForegroundColor Yellow
         } else {
             $pythonVersion = python --version
-            Write-Host "  ✓ Python: $pythonVersion" -ForegroundColor Green
+            Write-Host "  [OK] Python: $pythonVersion" -ForegroundColor Green
         }
     }
     
-    Write-Host "  ✓ All prerequisites met" -ForegroundColor Green
+    Write-Host "  [OK] All prerequisites met" -ForegroundColor Green
 }
 
 # Clean previous builds
@@ -69,7 +70,7 @@ function Clear-BuildArtifacts {
     if (Test-Path $DIST_DIR) {
         Write-Host "  Removing old dist/ directory..." -ForegroundColor Gray
         Remove-Item -Path $DIST_DIR -Recurse -Force
-        Write-Host "  ✓ Cleaned frontend dist/" -ForegroundColor Green
+        Write-Host "  [OK] Cleaned frontend dist/" -ForegroundColor Green
     }
     
     # Clean node_modules/.vite cache
@@ -77,7 +78,7 @@ function Clear-BuildArtifacts {
     if (Test-Path $viteCache) {
         Write-Host "  Removing Vite cache..." -ForegroundColor Gray
         Remove-Item -Path $viteCache -Recurse -Force
-        Write-Host "  ✓ Cleaned Vite cache" -ForegroundColor Green
+        Write-Host "  [OK] Cleaned Vite cache" -ForegroundColor Green
     }
 }
 
@@ -88,11 +89,17 @@ function Install-Dependencies {
     Push-Location $FRONTEND_DIR
     try {
         Write-Host "  Running npm ci (clean install)..." -ForegroundColor Gray
-        npm ci --prefer-offline --no-audit 2>&1 | Out-Null
-        Write-Host "  ✓ Frontend dependencies installed" -ForegroundColor Green
+        if ($Verbose) {
+            npm ci --prefer-offline --no-audit
+        } else {
+            npm ci --prefer-offline --no-audit 2>&1 | Out-Null
+        }
+        Write-Host "  [OK] Frontend dependencies installed" -ForegroundColor Green
     } catch {
         Write-Host "ERROR: Failed to install frontend dependencies" -ForegroundColor Red
         Write-Host $_.Exception.Message -ForegroundColor Red
+        # Provide actionable hint: show npm log file if present
+        Write-Host "Check npm cache logs: %USERPROFILE%\\AppData\\Local\\npm-cache\\_logs" -ForegroundColor Yellow
         exit 1
     } finally {
         Pop-Location
@@ -102,7 +109,8 @@ function Install-Dependencies {
 # Run tests
 function Invoke-Tests {
     if ($SkipTests) {
-        Write-Host "`n[4/8] Tests Skipped (--SkipTests flag)" -ForegroundColor Yellow
+        # Note: Avoid "--" inside strings to prevent PowerShell parsing quirks on some environments
+        Write-Host "`n[4/8] Tests Skipped (-SkipTests used)" -ForegroundColor Yellow
         return
     }
     
@@ -115,12 +123,12 @@ function Invoke-Tests {
         if ($packageJson.scripts.test) {
             Write-Host "  Running npm test..." -ForegroundColor Gray
             npm test -- --passWithNoTests 2>&1 | Out-Null
-            Write-Host "  ✓ All tests passed" -ForegroundColor Green
+            Write-Host "  [OK] All tests passed" -ForegroundColor Green
         } else {
-            Write-Host "  ⚠ No test script found, skipping" -ForegroundColor Yellow
+            Write-Host "  [WARN] No test script found, skipping" -ForegroundColor Yellow
         }
     } catch {
-        Write-Host "  ⚠ Tests failed, continuing anyway..." -ForegroundColor Yellow
+        Write-Host "  [WARN] Tests failed, continuing anyway..." -ForegroundColor Yellow
     } finally {
         Pop-Location
     }
@@ -148,7 +156,7 @@ function Build-Frontend {
             npm run build 2>&1 | Out-Null
         }
         
-        Write-Host "  ✓ Frontend build completed" -ForegroundColor Green
+        Write-Host "  [OK] Frontend build completed" -ForegroundColor Green
         
         # Verify dist directory
         if (-not (Test-Path $DIST_DIR)) {
@@ -160,7 +168,7 @@ function Build-Frontend {
         foreach ($file in $criticalFiles) {
             $filePath = Join-Path $DIST_DIR $file
             if (-not (Test-Path $filePath)) {
-                Write-Host "  ⚠ Warning: $file not found in build output" -ForegroundColor Yellow
+                Write-Host "  [WARN] $file not found in build output" -ForegroundColor Yellow
             }
         }
         
@@ -200,7 +208,7 @@ function New-BuildMetadata {
     } | ConvertTo-Json -Depth 10
     
     $buildInfo | Set-Content -Path $BUILD_INFO_FILE -Encoding UTF8
-    Write-Host "  ✓ Build metadata saved to build-info.json" -ForegroundColor Green
+    Write-Host "  [OK] Build metadata saved to build-info.json" -ForegroundColor Green
 }
 
 # Analyze build size
@@ -229,9 +237,9 @@ function Show-BuildAnalysis {
     
     # Check if size is reasonable for PWA
     if ($totalSize -gt 10) {
-        Write-Host "`n  ⚠ WARNING: Build size exceeds 10 MB. Consider code splitting." -ForegroundColor Yellow
+        Write-Host "`n  WARNING: Build size exceeds 10 MB. Consider code splitting." -ForegroundColor Yellow
     } else {
-        Write-Host "`n  ✓ Build size is optimal for PWA deployment" -ForegroundColor Green
+        Write-Host "`n  [OK] Build size is optimal for PWA deployment" -ForegroundColor Green
     }
 }
 
@@ -239,16 +247,16 @@ function Show-BuildAnalysis {
 function Show-DeploymentInstructions {
     Write-Host "`n[8/8] Deployment Instructions" -ForegroundColor Yellow
     
-    Write-Host @"
+    $instructions = @"
 
 ╔═══════════════════════════════════════════════════════════╗
-║                   BUILD SUCCESSFUL! ✓                     ║
+║                   BUILD SUCCESSFUL!                       ║
 ╚═══════════════════════════════════════════════════════════╝
 
-📦 Build Output Location:
+Build Output Location:
    $DIST_DIR
 
-🚀 Deployment Options:
+Deployment Options:
 
 1. LOCAL PREVIEW (Test PWA Locally):
    cd frontend
@@ -300,23 +308,23 @@ function Show-DeploymentInstructions {
    ..\\.venv\\Scripts\\Activate.ps1  # Windows
    uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-📱 PWA Features Included:
-   ✓ Offline support with intelligent caching
-   ✓ Install prompt (Add to Home Screen)
-   ✓ Push notifications ready
-   ✓ Background sync for patient data
-   ✓ App shortcuts (Diagnosis, Intake, KB, Chat)
-   ✓ File sharing capability
-   ✓ Optimized for medical workflows
+PWA Features Included:
+    - Offline support with intelligent caching
+    - Install prompt (Add to Home Screen)
+    - Push notifications ready
+    - Background sync for patient data
+    - App shortcuts (Diagnosis, Intake, KB, Chat)
+    - File sharing capability
+    - Optimized for medical workflows
 
-⚙️  Environment Configuration:
+Environment Configuration:
    Create .env.production in backend/:
    - OPENAI_API_KEY=your_key_here
    - DATABASE_URL=postgresql://...
    - SECRET_KEY=your_secret_key
    - CORS_ORIGINS=https://your-domain.com
 
-🔒 Security Checklist:
+Security Checklist:
    [ ] HTTPS enabled (required for PWA)
    [ ] Environment variables secured
    [ ] CORS origins configured
@@ -324,20 +332,22 @@ function Show-DeploymentInstructions {
    [ ] Content Security Policy headers set
    [ ] Rate limiting enabled on API
 
-📊 Monitoring:
+Monitoring:
    - Service Worker: Chrome DevTools > Application > Service Workers
    - Cache: Application > Cache Storage
    - Manifest: Application > Manifest
    - Lighthouse: Run PWA audit
 
-💡 Tips:
+Tips:
    - Test PWA install on mobile device
    - Verify offline functionality works
    - Check notification permissions
    - Test all app shortcuts
    - Monitor service worker updates
 
-"@ -ForegroundColor White
+"@
+
+    Write-Host $instructions -ForegroundColor White
 
     Write-Host "Deployment artifacts ready at: $DIST_DIR`n" -ForegroundColor Green
 }
@@ -353,11 +363,11 @@ try {
     Show-BuildAnalysis
     Show-DeploymentInstructions
     
-    Write-Host "✨ PWA deployment preparation complete!" -ForegroundColor Green
+    Write-Host "PWA deployment preparation complete!" -ForegroundColor Green
     Write-Host "Next step: Deploy dist/ folder to your hosting provider`n" -ForegroundColor Cyan
     
 } catch {
-    Write-Host "`n❌ Deployment failed!" -ForegroundColor Red
+    Write-Host "`nERROR: Deployment failed!" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
     exit 1
 }

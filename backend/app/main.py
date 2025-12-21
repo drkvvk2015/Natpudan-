@@ -53,8 +53,8 @@ from app.api.timeline import router as timeline_router
 from app.api.analytics import router as analytics_router
 from app.api.fhir import router as fhir_router
 from app.api.health import router as health_router
-# Temporarily disabled due to scipy/Python 3.14 compatibility issue
-# from app.api.knowledge_base import router as knowledge_router
+# Re-enable knowledge base router now that we are on Python 3.12
+from app.api.knowledge_base import router as knowledge_router
 from app.api.patient_intake import router as patient_intake_router
 from app.api.phase_4_api import router as phase_4_router
 from app.api.phase_5_api import router as phase_5_router
@@ -1011,8 +1011,7 @@ api_router.include_router(timeline_router, prefix="/timeline", tags=["timeline"]
 api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(fhir_router, prefix="/fhir", tags=["fhir"])
 api_router.include_router(health_router, tags=["health"])
-# Temporarily disabled due to scipy/Python 3.14 compatibility issue  
-# api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
+api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
 api_router.include_router(patient_intake_router, prefix="/medical", tags=["patient-intake"])
 
 # KB Automation routes (scheduled syncing, feedback, integrity checks)

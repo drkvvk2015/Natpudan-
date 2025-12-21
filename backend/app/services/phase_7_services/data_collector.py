@@ -16,7 +16,9 @@ import re
 
 from ...database.models import (
     ValidatedCase, 
-    ValidationStatus,
+    ValidationStatus
+)
+from ...models import (
     PatientIntake,
     TreatmentPlan,
     User
@@ -285,25 +287,36 @@ class DataCollector:
                 ValidatedCase.used_in_training == True
             ).count()
             
-            avg_quality = self.db.query(
+            avg_quality_raw = self.db.query(
                 func.avg(ValidatedCase.data_quality_score)
             ).filter(
                 ValidatedCase.data_quality_score.isnot(None)
-            ).scalar() or 0
-            
+            ).scalar()
+
+            avg_quality = float(avg_quality_raw or 0.0)
+            collection_rate = float(round((validated_cases / total_cases * 100) if total_cases > 0 else 0, 2))
+
             return {
-                "total_cases": total_cases,
-                "validated_cases": validated_cases,
-                "pending_cases": pending_cases,
-                "anonymized_cases": anonymized_cases,
-                "used_in_training": used_in_training,
+                "total_cases": int(total_cases),
+                "validated_cases": int(validated_cases),
+                "pending_cases": int(pending_cases),
+                "anonymized_cases": int(anonymized_cases),
+                "used_in_training": int(used_in_training),
                 "average_quality_score": round(avg_quality, 2),
-                "collection_rate": round((validated_cases / total_cases * 100) if total_cases > 0 else 0, 2)
+                "collection_rate": collection_rate
             }
             
         except Exception as e:
             logger.error(f"Error getting collection statistics: {e}")
-            return {}
+            return {
+                "total_cases": 0,
+                "validated_cases": 0,
+                "pending_cases": 0,
+                "anonymized_cases": 0,
+                "used_in_training": 0,
+                "average_quality_score": 0.0,
+                "collection_rate": 0.0
+            }
     
     # ========================================
     # HELPER METHODS

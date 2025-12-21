@@ -8,5 +8,14 @@ This package contains services for the self-learning engine:
 - Auto-deployment system
 """
 
+from .data_collector import DataCollector
+from .training_scheduler import TrainingScheduler
+from .model_performance_manager import ModelPerformanceManager
+
 __version__ = "1.0.0"
-__all__ = ["DataCollector", "AutoTrainer", "ABTester", "ModelDeployer"]
+__all__ = [
+    "DataCollector",
+    "TrainingScheduler",
+    "ModelPerformanceManager"
+]
+

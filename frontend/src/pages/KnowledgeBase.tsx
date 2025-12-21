@@ -1,5 +1,5 @@
 //
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 import {
   Box,
   Paper,
@@ -28,7 +28,7 @@ import {
   ImageListItem,
   ImageListItemBar,
   IconButton,
-} from '@mui/material'
+} from "@mui/material";
 import {
   CloudUpload as UploadIcon,
   Search as SearchIcon,
@@ -41,128 +41,174 @@ import {
   Warning as WarningIcon,
   AutoAwesome as SmartIcon,
   Public as GlobalIcon,
-} from '@mui/icons-material'
-import apiClient from '../services/apiClient'
-import { ImageViewer } from '../components/ImageViewer'
+} from "@mui/icons-material";
+import apiClient from "../services/apiClient";
+import { ImageViewer } from "../components/ImageViewer";
 
 interface SearchResult {
-  content?: string
-  chunk_text?: string
-  text?: string
+  content?: string;
+  chunk_text?: string;
+  text?: string;
   metadata?: {
-    source?: string
-    filename?: string
-    page?: number
-    page_number?: number
-    section?: string
-    category?: string
-    year?: number
-  }
+    source?: string;
+    filename?: string;
+    page?: number;
+    page_number?: number;
+    section?: string;
+    category?: string;
+    year?: number;
+  };
   citation?: {
-    document_id?: string
-    filename?: string
-    page?: number
-    chunk_index?: number
-    section?: string
-    category?: string
-    year?: number
-  }
-  source?: string
-  filename?: string
-  page?: number
-  page_number?: number
-  relevance?: number
-  score?: number
-  similarity_score?: number
+    document_id?: string;
+    filename?: string;
+    page?: number;
+    chunk_index?: number;
+    section?: string;
+    category?: string;
+    year?: number;
+  };
+  source?: string;
+  filename?: string;
+  page?: number;
+  page_number?: number;
+  relevance?: number;
+  score?: number;
+  similarity_score?: number;
 }
 
 interface ImageResult {
-  path: string
-  caption?: string
-  description?: string
-  page?: number
-  hash?: string
+  path: string;
+  caption?: string;
+  description?: string;
+  page?: number;
+  hash?: string;
 }
 
 interface VerificationResult {
-  verified: boolean
-  confidence: string
-  concerns: string[]
-  pubmed_searches: string[]
+  verified: boolean;
+  confidence: string;
+  concerns: string[];
+  pubmed_searches: string[];
 }
 
 interface KnowledgeStats {
-  status: string
-  total_documents: number
-  total_chunks: number
-  categories_count?: number
-  categories?: string[]
-  search_mode: string
-  pdf_sources: Array<{name: string, size_mb: number, status: string}>
-  knowledge_level: string
+  status: string;
+  total_documents: number;
+  total_chunks: number;
+  categories_count?: number;
+  categories?: string[];
+  search_mode: string;
+  pdf_sources: Array<{ name: string; size_mb: number; status: string }>;
+  knowledge_level: string;
   processing_queue?: {
-    queued: number
-    processing: number
-    completed: number
-    total: number
-    status_url: string
-  }
-  uploaded_files?: number
-  total_upload_size_mb?: number
-  medical_books_dir?: string
-  medical_books_count?: number
+    queued: number;
+    processing: number;
+    completed: number;
+    total: number;
+    status_url: string;
+  };
+  uploaded_files?: number;
+  total_upload_size_mb?: number;
+  medical_books_dir?: string;
+  medical_books_count?: number;
 }
 
 export default function KnowledgeBase() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searching, setSearching] = useState(false)
-  const [results, setResults] = useState<SearchResult[]>([])
-  const [synthesizedAnswer, setSynthesizedAnswer] = useState<string | null>(null)
-  const [imageResults, setImageResults] = useState<ImageResult[]>([])
-  const [verification, setVerification] = useState<VerificationResult | null>(null)
-  const [knowledgeStats, setKnowledgeStats] = useState<KnowledgeStats | null>(null)
-  const [statsLoading, setStatsLoading] = useState(true)
-  const [searchMode, setSearchMode] = useState<'local' | 'hybrid' | 'openai'>('hybrid')
-  const [alpha, setAlpha] = useState<number>(0.6)
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [sectionFilter, setSectionFilter] = useState('')
-  const [minYear, setMinYear] = useState('')
-  const [allowOutdated, setAllowOutdated] = useState(true)
-  const [includeImages, setIncludeImages] = useState(false)
-  const [verifyOnline, setVerifyOnline] = useState(false)
-  const [viewerOpen, setViewerOpen] = useState(false)
-  const [viewerImageIndex, setViewerImageIndex] = useState(0)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [allResults, setAllResults] = useState<SearchResult[]>([]);
+  const [displayedResults, setDisplayedResults] = useState(5);
+  const [synthesizedAnswer, setSynthesizedAnswer] = useState<string | null>(
+    null
+  );
+  const [imageResults, setImageResults] = useState<ImageResult[]>([]);
+  const [verification, setVerification] = useState<VerificationResult | null>(
+    null
+  );
+  const [knowledgeStats, setKnowledgeStats] = useState<KnowledgeStats | null>(
+    null
+  );
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [searchMode, setSearchMode] = useState<"local" | "hybrid" | "openai">(
+    "hybrid"
+  );
+  const [alpha, setAlpha] = useState<number>(0.6);
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [minYear, setMinYear] = useState("");
+  const [allowOutdated, setAllowOutdated] = useState(true);
+  const [includeImages, setIncludeImages] = useState(false);
+  const [verifyOnline, setVerifyOnline] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerImageIndex, setViewerImageIndex] = useState(0);
+
+  // Feature B & D: Online search and search history
+  const [searchingOnline, setSearchingOnline] = useState(false);
+  const [onlineResults, setOnlineResults] = useState<any[]>([]);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Feature E: Category browsing
+  const [browsing, setBrowsing] = useState(false);
+  const [selectedBrowseCategory, setSelectedBrowseCategory] = useState("");
 
   // Fetch knowledge base statistics on mount
   useEffect(() => {
     const fetchKnowledgeStats = async () => {
       try {
-        const response = await apiClient.get('/api/medical/knowledge/statistics')
-        setKnowledgeStats(response.data)
+        const response = await apiClient.get(
+          "/api/medical/knowledge/statistics"
+        );
+        setKnowledgeStats(response.data);
       } catch (error) {
-        console.error('Failed to fetch knowledge stats:', error)
+        console.error("Failed to fetch knowledge stats:", error);
       } finally {
-        setStatsLoading(false)
+        setStatsLoading(false);
       }
-    }
-    fetchKnowledgeStats()
-    
+    };
+    fetchKnowledgeStats();
+
     // Refresh stats every 5 seconds if there's a processing queue
     const interval = setInterval(() => {
-      fetchKnowledgeStats()
-    }, 5000)
-    
-    return () => clearInterval(interval)
-  }, []) // Load stats on mount and set up polling
+      fetchKnowledgeStats();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []); // Load stats on mount and set up polling
+
+  // Load search history from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("kb_search_history");
+    if (saved) {
+      try {
+        setSearchHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load search history:", e);
+      }
+    }
+  }, []);
+
+  // Save search to history
+  const saveToHistory = (query: string) => {
+    const newHistory = [
+      query,
+      ...searchHistory.filter((q) => q !== query),
+    ].slice(0, 10);
+    setSearchHistory(newHistory);
+    localStorage.setItem("kb_search_history", JSON.stringify(newHistory));
+  };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return
+    if (!searchQuery.trim()) return;
 
-    setSearching(true)
+    setSearching(true);
+    saveToHistory(searchQuery); // Feature D: Save to history
+
     try {
-      const response = await apiClient.post('/api/medical/knowledge/search', {
+      const response = await apiClient.post("/api/medical/knowledge/search", {
         query: searchQuery,
-        top_k: 8,
+        top_k: 20, // Request more results for pagination
         min_score: 0,
         search_mode: searchMode,
         alpha,
@@ -174,23 +220,79 @@ export default function KnowledgeBase() {
           allow_outdated: allowOutdated,
         },
         synthesize_answer: true,
-      })
+      });
 
-      setResults(response.data.results || [])
-      setSynthesizedAnswer(response.data.answer || null)
-      setImageResults([])
-      setVerification(null)
+      setAllResults(response.data.results || []);
+      setResults((response.data.results || []).slice(0, 5)); // Feature C: Show first 5
+      setDisplayedResults(5);
+      setSynthesizedAnswer(response.data.answer || null);
+      setImageResults([]);
+      setVerification(null);
+      setOnlineResults([]); // Clear online results
     } catch (error) {
-      console.error('Search failed:', error)
+      console.error("Search failed:", error);
     } finally {
-      setSearching(false)
+      setSearching(false);
     }
-  }
+  };
+
+  // Feature B: Online PubMed search
+  const handleOnlineSearch = async () => {
+    if (!searchQuery.trim()) return;
+
+    setSearchingOnline(true);
+    try {
+      const response = await apiClient.get(
+        "/api/medical/knowledge/online/search-pubmed",
+        {
+          params: {
+            query: searchQuery,
+            max_results: 10,
+          },
+        }
+      );
+      setOnlineResults(response.data.papers || []);
+    } catch (error) {
+      console.error("Online search failed:", error);
+    } finally {
+      setSearchingOnline(false);
+    }
+  };
+
+  // Feature C: Load more results
+  const handleLoadMore = () => {
+    const newDisplayed = Math.min(displayedResults + 5, allResults.length);
+    setResults(allResults.slice(0, newDisplayed));
+    setDisplayedResults(newDisplayed);
+  };
+
+  // Feature E: Browse by category
+  const handleBrowseCategory = async (category: string) => {
+    setBrowsing(true);
+    setSelectedBrowseCategory(category);
+    try {
+      const response = await apiClient.post("/api/medical/knowledge/search", {
+        query: "", // Empty query to get all from category
+        top_k: 50,
+        min_score: 0,
+        filters: {
+          category: category,
+        },
+      });
+      setAllResults(response.data.results || []);
+      setResults((response.data.results || []).slice(0, 5));
+      setDisplayedResults(5);
+    } catch (error) {
+      console.error("Browse failed:", error);
+    } finally {
+      setBrowsing(false);
+    }
+  };
 
   const openImageViewer = (index: number) => {
-    setViewerImageIndex(index)
-    setViewerOpen(true)
-  }
+    setViewerImageIndex(index);
+    setViewerOpen(true);
+  };
 
   return (
     <Box>
@@ -245,62 +347,65 @@ export default function KnowledgeBase() {
                   <Typography variant="h6">Knowledge Level</Typography>
                 </Box>
                 <Typography variant="h3" color="secondary.main">
-                  {(knowledgeStats.knowledge_level || 'UNKNOWN').toUpperCase()}
+                  {(knowledgeStats.knowledge_level || "UNKNOWN").toUpperCase()}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Mode: {knowledgeStats.search_mode || 'N/A'}
+                  Mode: {knowledgeStats.search_mode || "N/A"}
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
-          
+
           {/* Processing Queue Status */}
-          {knowledgeStats.processing_queue && knowledgeStats.processing_queue.total > 0 && (
-            <Grid item xs={12} md={6}>
-              <Card elevation={2} sx={{ backgroundColor: '#f5f5f5' }}>
-                <CardContent>
-                  <Box display="flex" alignItems="center" gap={1} mb={2}>
-                    <StorageIcon color="warning" />
-                    <Typography variant="h6">Processing Queue</Typography>
-                  </Box>
-                  <Box display="flex" gap={2} mb={2}>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Queued
-                      </Typography>
-                      <Typography variant="h5" color="info.main">
-                        {knowledgeStats.processing_queue.queued}
-                      </Typography>
+          {knowledgeStats.processing_queue &&
+            knowledgeStats.processing_queue.total > 0 && (
+              <Grid item xs={12} md={6}>
+                <Card elevation={2} sx={{ backgroundColor: "#f5f5f5" }}>
+                  <CardContent>
+                    <Box display="flex" alignItems="center" gap={1} mb={2}>
+                      <StorageIcon color="warning" />
+                      <Typography variant="h6">Processing Queue</Typography>
                     </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Processing
-                      </Typography>
-                      <Typography variant="h5" color="warning.main">
-                        {knowledgeStats.processing_queue.processing}
-                      </Typography>
+                    <Box display="flex" gap={2} mb={2}>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Queued
+                        </Typography>
+                        <Typography variant="h5" color="info.main">
+                          {knowledgeStats.processing_queue.queued}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Processing
+                        </Typography>
+                        <Typography variant="h5" color="warning.main">
+                          {knowledgeStats.processing_queue.processing}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Completed
+                        </Typography>
+                        <Typography variant="h5" color="success.main">
+                          {knowledgeStats.processing_queue.completed}
+                        </Typography>
+                      </Box>
                     </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Completed
-                      </Typography>
-                      <Typography variant="h5" color="success.main">
-                        {knowledgeStats.processing_queue.completed}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Documents are being indexed in background. <strong>Search is immediately available</strong> with growing accuracy as processing completes.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
+                    <Typography variant="caption" color="text.secondary">
+                      Documents are being indexed in background.{" "}
+                      <strong>Search is immediately available</strong> with
+                      growing accuracy as processing completes.
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
 
           {/* Upload Location */}
           {knowledgeStats.uploaded_files !== undefined && (
             <Grid item xs={12} md={6}>
-              <Card elevation={2} sx={{ backgroundColor: '#fafafa' }}>
+              <Card elevation={2} sx={{ backgroundColor: "#fafafa" }}>
                 <CardContent>
                   <Box display="flex" alignItems="center" gap={1} mb={2}>
                     <UploadIcon color="primary" />
@@ -308,16 +413,33 @@ export default function KnowledgeBase() {
                   </Box>
                   <Box mb={1}>
                     <Typography variant="body2">
-                      <strong>Count:</strong> {knowledgeStats.uploaded_files || 0} files
+                      <strong>Count:</strong>{" "}
+                      {knowledgeStats.uploaded_files || 0} files
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Size:</strong> {knowledgeStats.total_upload_size_mb?.toFixed(2) || '0'} MB
+                      <strong>Size:</strong>{" "}
+                      {knowledgeStats.total_upload_size_mb?.toFixed(2) || "0"}{" "}
+                      MB
                     </Typography>
                   </Box>
                   {knowledgeStats.medical_books_dir && (
-                    <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 1 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      component="div"
+                      sx={{ mt: 1 }}
+                    >
                       {/* eslint-disable-next-line */}
-                      Location: <code style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{knowledgeStats.medical_books_dir}</code>
+                      Location:{" "}
+                      <code
+                        style={{
+                          fontSize: "0.75rem",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-all",
+                        }}
+                      >
+                        {knowledgeStats.medical_books_dir}
+                      </code>
                     </Typography>
                   )}
                 </CardContent>
@@ -328,25 +450,29 @@ export default function KnowledgeBase() {
       )}
 
       {/* Indexed Sources */}
-      {knowledgeStats && knowledgeStats.pdf_sources && knowledgeStats.pdf_sources.length > 0 && (
-        <Alert severity="info" sx={{ mb: 3 }} icon={<DocIcon />}>
-          <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-            Indexed Medical Sources ({knowledgeStats.pdf_sources.length})
-          </Typography>
-          <Box display="flex" gap={1} flexWrap="wrap" mt={1}>
-            {knowledgeStats.pdf_sources.map((source, idx) => (
-              <Chip
-                key={idx}
-                label={`${source.name.substring(0, 35)}${source.name.length > 35 ? '...' : ''} (${source.size_mb}MB)`}
-                size="small"
-                color={source.status === 'indexed' ? 'success' : 'default'}
-                variant="outlined"
-                icon={<DocIcon />}
-              />
-            ))}
-          </Box>
-        </Alert>
-      )}
+      {knowledgeStats &&
+        knowledgeStats.pdf_sources &&
+        knowledgeStats.pdf_sources.length > 0 && (
+          <Alert severity="info" sx={{ mb: 3 }} icon={<DocIcon />}>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Indexed Medical Sources ({knowledgeStats.pdf_sources.length})
+            </Typography>
+            <Box display="flex" gap={1} flexWrap="wrap" mt={1}>
+              {knowledgeStats.pdf_sources.map((source, idx) => (
+                <Chip
+                  key={idx}
+                  label={`${source.name.substring(0, 35)}${
+                    source.name.length > 35 ? "..." : ""
+                  } (${source.size_mb}MB)`}
+                  size="small"
+                  color={source.status === "indexed" ? "success" : "default"}
+                  variant="outlined"
+                  icon={<DocIcon />}
+                />
+              ))}
+            </Box>
+          </Alert>
+        )}
 
       {/* Online Status Indicator */}
       <Alert severity="success" icon={<GlobalIcon />} sx={{ mb: 3 }}>
@@ -354,14 +480,16 @@ export default function KnowledgeBase() {
           Online Knowledge Base Active
         </Typography>
         <Typography variant="body2">
-          Connected to global medical sources (PubMed, CDC, WHO) for real-time verification.
+          Connected to global medical sources (PubMed, CDC, WHO) for real-time
+          verification.
         </Typography>
       </Alert>
 
       {/* Upload section removed - Use dedicated "Upload PDFs" page from menu */}
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          [TIP] To upload medical PDFs, use the <strong>"Upload PDFs"</strong> menu option for batch uploads with progress tracking.
+          [TIP] To upload medical PDFs, use the <strong>"Upload PDFs"</strong>{" "}
+          menu option for batch uploads with progress tracking.
         </Typography>
       </Alert>
 
@@ -369,13 +497,53 @@ export default function KnowledgeBase() {
         <Typography variant="h6" gutterBottom>
           Search Knowledge Base
         </Typography>
+
+        {/* Feature D: Search History */}
+        {searchHistory.length > 0 && (
+          <Box mb={2}>
+            <Button
+              size="small"
+              onClick={() => setShowHistory(!showHistory)}
+              sx={{ mb: 1 }}
+            >
+              {showHistory ? "Hide" : "Show"} Recent Searches (
+              {searchHistory.length})
+            </Button>
+            {showHistory && (
+              <Box display="flex" gap={1} flexWrap="wrap">
+                {searchHistory.map((query, idx) => (
+                  <Chip
+                    key={idx}
+                    label={query}
+                    size="small"
+                    onClick={() => {
+                      setSearchQuery(query);
+                      handleSearch();
+                    }}
+                    onDelete={() => {
+                      const newHistory = searchHistory.filter(
+                        (_, i) => i !== idx
+                      );
+                      setSearchHistory(newHistory);
+                      localStorage.setItem(
+                        "kb_search_history",
+                        JSON.stringify(newHistory)
+                      );
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+        )}
+
         <Box display="flex" gap={2} mb={2}>
           <TextField
             fullWidth
             placeholder="Search for medical information..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            onKeyPress={(e) => e.key === "Enter" && handleSearch()}
           />
           <Button
             variant="contained"
@@ -385,7 +553,58 @@ export default function KnowledgeBase() {
           >
             Search
           </Button>
+
+          {/* Feature B: Online PubMed Search */}
+          <Button
+            variant="outlined"
+            startIcon={<GlobalIcon />}
+            onClick={handleOnlineSearch}
+            disabled={searchingOnline || !searchQuery.trim()}
+            color="secondary"
+          >
+            PubMed
+          </Button>
         </Box>
+
+        {/* Feature E: Browse by Category */}
+        {knowledgeStats &&
+          knowledgeStats.categories &&
+          knowledgeStats.categories.length > 0 && (
+            <Box mb={2}>
+              <Typography variant="subtitle2" gutterBottom>
+                Browse by Category:
+              </Typography>
+              <Box display="flex" gap={1} flexWrap="wrap">
+                {knowledgeStats.categories.map((cat) => (
+                  <Chip
+                    key={cat}
+                    label={cat}
+                    onClick={() => handleBrowseCategory(cat)}
+                    color={
+                      selectedBrowseCategory === cat ? "primary" : "default"
+                    }
+                    variant={
+                      selectedBrowseCategory === cat ? "filled" : "outlined"
+                    }
+                    size="small"
+                  />
+                ))}
+                {selectedBrowseCategory && (
+                  <Chip
+                    label="Clear Filter"
+                    onClick={() => {
+                      setSelectedBrowseCategory("");
+                      setResults([]);
+                      setAllResults([]);
+                    }}
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                  />
+                )}
+              </Box>
+            </Box>
+          )}
 
         <Stack spacing={2} mb={3}>
           <Box display="flex" gap={2} flexWrap="wrap">
@@ -395,7 +614,9 @@ export default function KnowledgeBase() {
                 labelId="search-mode"
                 value={searchMode}
                 label="Search mode"
-                onChange={(e) => setSearchMode(e.target.value as 'local' | 'hybrid' | 'openai')}
+                onChange={(e) =>
+                  setSearchMode(e.target.value as "local" | "hybrid" | "openai")
+                }
               >
                 <MenuItem value="hybrid">Hybrid (dense + BM25)</MenuItem>
                 <MenuItem value="local">Local only</MenuItem>
@@ -454,65 +675,94 @@ export default function KnowledgeBase() {
 
         {/* Verification Status */}
         {verification && (
-          <Alert 
-            severity={verification.verified ? 'success' : 'warning'}
+          <Alert
+            severity={verification.verified ? "success" : "warning"}
             icon={verification.verified ? <VerifiedIcon /> : <WarningIcon />}
             sx={{ mb: 2 }}
           >
             <Typography variant="subtitle2" fontWeight={600}>
-              {verification.verified ? 'Content Verified' : 'Verification Concerns'}
+              {verification.verified
+                ? "Content Verified"
+                : "Verification Concerns"}
             </Typography>
             <Typography variant="body2">
               Confidence: {verification.confidence}
             </Typography>
             {verification.concerns && verification.concerns.length > 0 && (
               <Box mt={1}>
-                <Typography variant="caption" fontWeight={600}>Concerns:</Typography>
-                <Box component="ul" sx={{ margin: '4px 0', paddingLeft: '20px' }}>
+                <Typography variant="caption" fontWeight={600}>
+                  Concerns:
+                </Typography>
+                <Box
+                  component="ul"
+                  sx={{ margin: "4px 0", paddingLeft: "20px" }}
+                >
                   {verification.concerns.map((concern, idx) => (
-                    <Box component="li" key={idx}><Typography variant="caption">{concern}</Typography></Box>
+                    <Box component="li" key={idx}>
+                      <Typography variant="caption">{concern}</Typography>
+                    </Box>
                   ))}
                 </Box>
               </Box>
             )}
-            {verification.pubmed_searches && verification.pubmed_searches.length > 0 && (
-              <Box mt={1}>
-                <Typography variant="caption" fontWeight={600}>Suggested PubMed searches:</Typography>
-                <Box display="flex" gap={1} flexWrap="wrap" mt={0.5}>
-                  {verification.pubmed_searches.map((search, idx) => (
-                    <Chip
-                      key={idx}
-                      label={search}
-                      size="small"
-                      onClick={() => window.open(`https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(search)}`, '_blank')}
-                      clickable
-                    />
-                  ))}
+            {verification.pubmed_searches &&
+              verification.pubmed_searches.length > 0 && (
+                <Box mt={1}>
+                  <Typography variant="caption" fontWeight={600}>
+                    Suggested PubMed searches:
+                  </Typography>
+                  <Box display="flex" gap={1} flexWrap="wrap" mt={0.5}>
+                    {verification.pubmed_searches.map((search, idx) => (
+                      <Chip
+                        key={idx}
+                        label={search}
+                        size="small"
+                        onClick={() =>
+                          window.open(
+                            `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(
+                              search
+                            )}`,
+                            "_blank"
+                          )
+                        }
+                        clickable
+                      />
+                    ))}
+                  </Box>
                 </Box>
-              </Box>
-            )}
+              )}
           </Alert>
         )}
 
         {/* Image Results */}
         {imageResults.length > 0 && (
           <Box mb={3}>
-            <Typography variant="h6" gutterBottom display="flex" alignItems="center" gap={1}>
+            <Typography
+              variant="h6"
+              gutterBottom
+              display="flex"
+              alignItems="center"
+              gap={1}
+            >
               <ImageIcon /> Images ({imageResults.length})
             </Typography>
             <ImageList cols={3} gap={8}>
               {imageResults.map((img, idx) => (
-                <ImageListItem key={idx} onClick={() => openImageViewer(idx)} sx={{ cursor: 'pointer' }}>
+                <ImageListItem
+                  key={idx}
+                  onClick={() => openImageViewer(idx)}
+                  sx={{ cursor: "pointer" }}
+                >
                   <Box
                     component="img"
                     src={img.path}
                     alt={img.caption || `Image ${idx + 1}`}
                     loading="lazy"
-                    sx={{ height: '200px', objectFit: 'cover' }}
+                    sx={{ height: "200px", objectFit: "cover" }}
                   />
                   <ImageListItemBar
                     title={img.caption || `Image ${idx + 1}`}
-                    subtitle={img.page ? `Page ${img.page}` : ''}
+                    subtitle={img.page ? `Page ${img.page}` : ""}
                   />
                 </ImageListItem>
               ))}
@@ -520,47 +770,52 @@ export default function KnowledgeBase() {
           </Box>
         )}
 
-
-
         {/* Synthesized Answer */}
         {synthesizedAnswer && (
-          <Paper 
-            elevation={2} 
-            sx={{ 
-              p: 3, 
-              mb: 3, 
-              bgcolor: 'primary.50',
-              border: '1px solid',
-              borderColor: 'primary.100'
+          <Paper
+            elevation={2}
+            sx={{
+              p: 3,
+              mb: 3,
+              bgcolor: "primary.50",
+              border: "1px solid",
+              borderColor: "primary.100",
             }}
           >
-            <Typography variant="h6" gutterBottom color="primary.main" display="flex" alignItems="center" gap={1}>
+            <Typography
+              variant="h6"
+              gutterBottom
+              color="primary.main"
+              display="flex"
+              alignItems="center"
+              gap={1}
+            >
               <SmartIcon /> AI Consolidated Answer
             </Typography>
-            <Typography 
-              variant="body1" 
-              component="div" 
-              sx={{ whiteSpace: 'pre-wrap' }}
+            <Typography
+              variant="body1"
+              component="div"
+              sx={{ whiteSpace: "pre-wrap" }}
             >
               {synthesizedAnswer.split(/(\[\d+\])/g).map((part, i) => {
                 if (/^\[\d+\]$/.test(part)) {
                   return (
-                    <Chip 
-                      key={i} 
-                      label={part} 
-                      size="small" 
-                      color="primary" 
-                      sx={{ 
-                        mx: 0.5, 
-                        height: 20, 
-                        fontSize: '0.75rem', 
-                        cursor: 'pointer',
-                        fontWeight: 'bold'
-                      }} 
+                    <Chip
+                      key={i}
+                      label={part}
+                      size="small"
+                      color="primary"
+                      sx={{
+                        mx: 0.5,
+                        height: 20,
+                        fontSize: "0.75rem",
+                        cursor: "pointer",
+                        fontWeight: "bold",
+                      }}
                     />
-                  )
+                  );
                 }
-                return part
+                return part;
               })}
             </Typography>
           </Paper>
@@ -576,21 +831,41 @@ export default function KnowledgeBase() {
                 // Handle different response formats
                 const metadata = result.metadata || {};
                 const citation = (result as any).citation || {};
-                const source = (result.source || metadata?.source || result.filename || metadata?.filename || 'Unknown Source') as string;
-                const page = citation.page || result.page_number || result.page || metadata?.page || metadata?.page_number;
-                const relevance = (result.score || result.similarity_score || result.relevance || 0) as number;
-                const text = (result.chunk_text || result.content || result.text || '') as string;
+                const source = (result.source ||
+                  metadata?.source ||
+                  result.filename ||
+                  metadata?.filename ||
+                  "Unknown Source") as string;
+                const page =
+                  citation.page ||
+                  result.page_number ||
+                  result.page ||
+                  metadata?.page ||
+                  metadata?.page_number;
+                const relevance = (result.score ||
+                  result.similarity_score ||
+                  result.relevance ||
+                  0) as number;
+                const text = (result.chunk_text ||
+                  result.content ||
+                  result.text ||
+                  "") as string;
                 const section = citation.section || metadata.section;
                 const category = citation.category || metadata.category;
                 const year = citation.year || metadata.year;
-                
+
                 return (
                   <Box key={index}>
                     <ListItem alignItems="flex-start">
-                      <DocIcon sx={{ mr: 2, mt: 1, color: 'primary.main' }} />
+                      <DocIcon sx={{ mr: 2, mt: 1, color: "primary.main" }} />
                       <ListItemText
                         primary={
-                          <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                          <Box
+                            display="flex"
+                            alignItems="center"
+                            gap={1}
+                            flexWrap="wrap"
+                          >
                             <Typography variant="subtitle2">
                               {source}
                             </Typography>
@@ -598,24 +873,42 @@ export default function KnowledgeBase() {
                               <Chip label={`Page ${page}`} size="small" />
                             )}
                             {section && (
-                              <Chip label={`Section: ${section}`} size="small" variant="outlined" />
+                              <Chip
+                                label={`Section: ${section}`}
+                                size="small"
+                                variant="outlined"
+                              />
                             )}
                             {category && (
-                              <Chip label={`Category: ${category}`} size="small" variant="outlined" />
+                              <Chip
+                                label={`Category: ${category}`}
+                                size="small"
+                                variant="outlined"
+                              />
                             )}
                             {year && (
-                              <Chip label={`Year: ${year}`} size="small" variant="outlined" />
+                              <Chip
+                                label={`Year: ${year}`}
+                                size="small"
+                                variant="outlined"
+                              />
                             )}
                             <Chip
-                              label={`${Math.round((relevance || 0) * 100)}% relevant`}
+                              label={`${Math.round(
+                                (relevance || 0) * 100
+                              )}% relevant`}
                               size="small"
                               color="primary"
                             />
                           </Box>
                         }
                         secondary={
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            {text || 'No preview available'}
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mt: 1 }}
+                          >
+                            {text || "No preview available"}
                           </Typography>
                         }
                       />
@@ -625,13 +918,135 @@ export default function KnowledgeBase() {
                 );
               })}
             </List>
+
+            {/* Feature C: Load More Pagination */}
+            {displayedResults < allResults.length && (
+              <Box display="flex" justifyContent="center" mt={3}>
+                <Button
+                  variant="outlined"
+                  onClick={handleLoadMore}
+                  startIcon={<SearchIcon />}
+                >
+                  Load More Results ({displayedResults} of {allResults.length}{" "}
+                  displayed)
+                </Button>
+              </Box>
+            )}
           </Box>
         )}
 
-        {!searching && results.length === 0 && searchQuery && (
-          <Alert severity="info">
-            No results found for "{searchQuery}"
-          </Alert>
+        {!searching &&
+          results.length === 0 &&
+          searchQuery &&
+          !onlineResults.length && (
+            <Alert severity="info">No results found for "{searchQuery}"</Alert>
+          )}
+
+        {/* Feature B: Online PubMed Results */}
+        {onlineResults.length > 0 && (
+          <Box mt={4}>
+            <Typography
+              variant="h6"
+              gutterBottom
+              color="secondary"
+              display="flex"
+              alignItems="center"
+              gap={1}
+            >
+              <GlobalIcon /> PubMed Results ({onlineResults.length})
+            </Typography>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              These results are from PubMed online database and represent the
+              latest medical research.
+            </Alert>
+            <List>
+              {onlineResults.map((paper, idx) => (
+                <Box key={idx}>
+                  <ListItem alignItems="flex-start">
+                    <ScienceIcon
+                      sx={{ mr: 2, mt: 1, color: "secondary.main" }}
+                    />
+                    <ListItemText
+                      primary={
+                        <Box>
+                          <Typography
+                            variant="subtitle2"
+                            component="a"
+                            href={
+                              paper.url ||
+                              `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`
+                            }
+                            target="_blank"
+                            sx={{
+                              textDecoration: "none",
+                              color: "primary.main",
+                              "&:hover": { textDecoration: "underline" },
+                            }}
+                          >
+                            {paper.title || "Untitled"}
+                          </Typography>
+                          <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
+                            {paper.pmid && (
+                              <Chip
+                                label={`PMID: ${paper.pmid}`}
+                                size="small"
+                                variant="outlined"
+                              />
+                            )}
+                            {paper.journal && (
+                              <Chip
+                                label={paper.journal}
+                                size="small"
+                                variant="outlined"
+                              />
+                            )}
+                            {paper.year && (
+                              <Chip
+                                label={`Year: ${paper.year}`}
+                                size="small"
+                              />
+                            )}
+                          </Box>
+                        </Box>
+                      }
+                      secondary={
+                        <Box mt={1}>
+                          {paper.authors && (
+                            <Typography
+                              variant="caption"
+                              display="block"
+                              color="text.secondary"
+                            >
+                              <strong>Authors:</strong> {paper.authors}
+                            </Typography>
+                          )}
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mt: 0.5 }}
+                          >
+                            {paper.abstract ||
+                              paper.summary ||
+                              "No abstract available"}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                  {idx < onlineResults.length - 1 && <Divider />}
+                </Box>
+              ))}
+            </List>
+          </Box>
+        )}
+
+        {searchingOnline && (
+          <Box mt={2}>
+            <LinearProgress />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+              Searching PubMed database...
+            </Typography>
+          </Box>
         )}
       </Paper>
 
@@ -644,5 +1059,5 @@ export default function KnowledgeBase() {
         />
       )}
     </Box>
-  )
+  );
 }

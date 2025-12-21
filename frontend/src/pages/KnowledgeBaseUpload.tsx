@@ -19,6 +19,8 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
+  CircularProgress,
+  MenuItem,
 } from "@mui/material";
 import { keyframes } from "@mui/system";
 import {
@@ -82,6 +84,20 @@ const KnowledgeBaseUpload: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [useFullContent, setUseFullContent] = useState(true);
   const [chunkSize, setChunkSize] = useState(1000);
+  const [selectedCategory, setSelectedCategory] = useState("medical_textbook");
+
+  // Available document categories
+  const categories = [
+    { value: "medical_textbook", label: "📚 Medical Textbook" },
+    { value: "clinical_guidelines", label: "📋 Clinical Guidelines" },
+    { value: "research_paper", label: "🔬 Research Paper" },
+    { value: "treatment_protocol", label: "💊 Treatment Protocol" },
+    { value: "diagnostic_manual", label: "🔍 Diagnostic Manual" },
+    { value: "pharmacology", label: "💉 Pharmacology" },
+    { value: "anatomy_physiology", label: "🫀 Anatomy & Physiology" },
+    { value: "case_study", label: "📝 Case Study" },
+    { value: "other", label: "📄 Other" },
+  ];
   const [uploadResults, setUploadResults] = useState<any>(null);
   const [statistics, setStatistics] = useState<any>(null);
   const [statisticsLoading, setStatisticsLoading] = useState(true);
@@ -228,6 +244,7 @@ const KnowledgeBaseUpload: React.FC = () => {
         });
         formData.append("use_full_content", String(useFullContent));
         formData.append("chunk_size", String(chunkSize));
+        formData.append("category", selectedCategory); // Send selected category
 
         // Update status for standard files
         setFiles((prev) =>
@@ -521,6 +538,22 @@ const KnowledgeBaseUpload: React.FC = () => {
           Upload Settings
         </Typography>
         <Stack spacing={2}>
+          <TextField
+            select
+            label="Document Category"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            disabled={uploading}
+            helperText="Select the type of medical document you're uploading"
+            sx={{ maxWidth: 400 }}
+          >
+            {categories.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
+
           <FormControlLabel
             control={
               <Switch
@@ -572,7 +605,12 @@ const KnowledgeBaseUpload: React.FC = () => {
           },
         }}
       >
-        <input {...getInputProps()} />
+        <input
+          {...getInputProps()}
+          id="knowledge-base-file-upload"
+          name="knowledge-base-file-upload"
+          aria-label="Upload knowledge base files"
+        />
         <Box sx={{ textAlign: "center" }}>
           <UploadIcon sx={{ fontSize: 64, color: "primary.main", mb: 2 }} />
           <Typography variant="h6" gutterBottom>

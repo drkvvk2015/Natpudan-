@@ -2,7 +2,7 @@
 # Executes background tasks scheduled by APScheduler
 
 $BackendDir = Join-Path (Get-Location) "backend"
-$VenvPath = Join-Path $BackendDir "venv"
+$VenvPath = Join-Path $BackendDir ".venv"
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "   Celery Worker Startup" -ForegroundColor Cyan

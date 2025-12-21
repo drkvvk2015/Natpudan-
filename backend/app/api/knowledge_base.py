@@ -126,6 +126,7 @@ async def upload_pdfs(
     files: List[UploadFile] = File(...),
     use_full_content: bool = False,  # Default to chunking for semantic search
     chunk_size: int = 1000,
+    category: str = "medical_textbook",  # Default category
     extract_images: bool = True,  # Extract and index images
     ocr_enabled: bool = True,  # Enable OCR for scanned PDFs
     current_user: User = Depends(require_kb_management_role),
@@ -138,6 +139,7 @@ async def upload_pdfs(
     - **files**: List of PDF files (up to 200MB each, 1GB total)
     - **use_full_content**: If False (default), intelligent chunking; if True, full PDF as single document
     - **chunk_size**: Size of text chunks when use_full_content=False
+    - **category**: Document category (medical_textbook, clinical_guidelines, research_paper, etc.)
     - **extract_images**: Extract and save images with metadata (default: True)
     - **ocr_enabled**: Enable OCR for scanned/image-based PDFs (default: True)
     """
@@ -322,7 +324,9 @@ async def upload_pdfs(
                     chunk_count=1,
                     is_indexed=True,
                     indexed_at=datetime.now(),
-                    uploaded_by_id=current_user.id
+                    uploaded_by_id=current_user.id,
+                    category=category,  # Use parameter
+                    source=file.filename
                 )
                 db.add(db_doc)
                 db.commit()
@@ -377,7 +381,9 @@ async def upload_pdfs(
                     chunk_count=len(chunks),
                     is_indexed=True,
                     indexed_at=datetime.now(),
-                    uploaded_by_id=current_user.id
+                    uploaded_by_id=current_user.id,
+                    category=category,  # Use parameter
+                    source=file.filename
                 )
                 db.add(db_doc)
                 db.commit()
@@ -1437,7 +1443,9 @@ async def upload_large_pdf(
                             file_size=int(file_path.stat().st_size),
                             extension=file_ext,
                             is_indexed=True,
-                            uploaded_by_id=current_user.id
+                            uploaded_by_id=current_user.id,
+                            category="medical_textbook",  # Set default category
+                            source=file.filename
                         )
                          final_db.add(new_doc)
                     

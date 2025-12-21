@@ -26,6 +26,8 @@ from ..database.models import (
     User
 )
 from ..services.phase_7_services.data_collector import DataCollector
+from ..services.phase_7_services.training_scheduler import TrainingScheduler
+from ..services.phase_7_services.model_performance_manager import ModelPerformanceManager
 
 # No /api prefix here - it's already in main.py's api_router
 router = APIRouter(prefix="/phase-7", tags=["Phase 7 - Self-Learning"])
@@ -146,8 +148,27 @@ async def get_collection_statistics(db: Session = Depends(get_db)):
     """
     try:
         collector = DataCollector(db)
-        stats = collector.get_collection_statistics()
-        return stats
+        stats = collector.get_collection_statistics() or {}
+        # Ensure all expected keys exist with safe defaults to satisfy response_model
+        defaults = {
+            "total_cases": 0,
+            "validated_cases": 0,
+            "pending_cases": 0,
+            "anonymized_cases": 0,
+            "used_in_training": 0,
+            "average_quality_score": 0.0,
+            "collection_rate": 0.0,
+        }
+        merged = {**defaults, **stats}
+        # Cast to correct types
+        merged["average_quality_score"] = float(merged.get("average_quality_score", 0.0) or 0.0)
+        merged["collection_rate"] = float(merged.get("collection_rate", 0.0) or 0.0)
+        merged["total_cases"] = int(merged.get("total_cases", 0) or 0)
+        merged["validated_cases"] = int(merged.get("validated_cases", 0) or 0)
+        merged["pending_cases"] = int(merged.get("pending_cases", 0) or 0)
+        merged["anonymized_cases"] = int(merged.get("anonymized_cases", 0) or 0)
+        merged["used_in_training"] = int(merged.get("used_in_training", 0) or 0)
+        return merged
     except Exception as e:
         logger.error(f"Error getting collection statistics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -315,6 +336,135 @@ async def validate_case(
 # TRAINING JOB ENDPOINTS (FOUNDATION)
 # ========================================
 
+@router.post("/training/jobs")
+async def create_training_job(
+    model_type: str = Query("diagnosis", description="Model type to train"),
+    model_version: Optional[str] = Query(None, description="Model version"),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new training job
+    
+    Body parameters:
+        - model_type: Type of model (diagnosis, medsam, llm)
+        - model_version: Optional version identifier
+    """
+    try:
+        scheduler = TrainingScheduler(db)
+        
+        # Generate version if not provided
+        if not model_version:
+            timestamp = datetime.utcnow().strftime("%Y%m%d%H%M")
+            model_version = f"v{timestamp}"
+        
+        # Create job
+        job = scheduler.create_training_job(
+            model_type=ModelType[model_type.upper()],
+            model_version=model_version
+        )
+        
+        return {
+            "status": "success",
+            "job_id": job.job_id,
+            "model_type": job.model_type,
+            "model_version": job.model_version,
+            "dataset_size": job.dataset_size,
+            "message": f"Training job created and queued"
+        }
+    except Exception as e:
+        logger.error(f"Error creating training job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/training/jobs/{job_id}/start")
+async def start_training_job(job_id: str, db: Session = Depends(get_db)):
+    """Start a queued training job"""
+    try:
+        scheduler = TrainingScheduler(db)
+        job = scheduler.start_job(job_id)
+        
+        return {
+            "status": "success",
+            "job_id": job.job_id,
+            "current_status": job.status,
+            "start_time": job.start_time,
+            "message": "Training job started"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error starting job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/training/jobs/{job_id}/cancel")
+async def cancel_training_job(job_id: str, db: Session = Depends(get_db)):
+    """Cancel a training job"""
+    try:
+        scheduler = TrainingScheduler(db)
+        job = scheduler.cancel_job(job_id)
+        
+        return {
+            "status": "success",
+            "job_id": job.job_id,
+            "message": "Training job cancelled"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error cancelling job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/training/jobs/{job_id}/progress")
+async def update_job_progress(
+    job_id: str,
+    progress: int = Query(..., ge=0, le=100),
+    message: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Update training job progress"""
+    try:
+        scheduler = TrainingScheduler(db)
+        job = scheduler.update_progress(job_id, progress, message)
+        
+        return {
+            "status": "success",
+            "job_id": job.job_id,
+            "progress_percentage": job.progress_percentage
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/training/jobs/{job_id}/complete")
+async def complete_training_job(
+    job_id: str,
+    accuracy: Optional[int] = Query(None, ge=0, le=100),
+    db: Session = Depends(get_db)
+):
+    """Mark training job as completed"""
+    try:
+        scheduler = TrainingScheduler(db)
+        job = scheduler.complete_job(job_id, final_accuracy=accuracy)
+        
+        return {
+            "status": "success",
+            "job_id": job.job_id,
+            "final_accuracy": job.final_accuracy,
+            "duration_seconds": (job.end_time - job.start_time).total_seconds() if job.start_time and job.end_time else None,
+            "message": "Training job completed successfully"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error completing job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/training/jobs", response_model=List[TrainingJobResponse])
 async def list_training_jobs(
     status: Optional[str] = Query(None, description="Filter by job status"),
@@ -365,6 +515,193 @@ async def get_training_job(job_id: str, db: Session = Depends(get_db)):
 # ========================================
 # MODEL PERFORMANCE ENDPOINTS
 # ========================================
+
+@router.post("/models/performance")
+async def record_model_performance(
+    model_version: str = Query(..., description="Model version"),
+    model_type: str = Query("diagnosis", description="Model type"),
+    accuracy: Optional[int] = Query(None, ge=0, le=100),
+    precision: Optional[int] = Query(None, ge=0, le=100),
+    recall: Optional[int] = Query(None, ge=0, le=100),
+    f1_score: Optional[int] = Query(None, ge=0, le=100),
+    db: Session = Depends(get_db)
+):
+    """
+    Record model performance metrics
+    
+    Query parameters:
+        - model_version: Version identifier
+        - model_type: Type of model
+        - accuracy, precision, recall, f1_score: Performance metrics (0-100)
+    """
+    try:
+        manager = ModelPerformanceManager(db)
+        
+        performance = manager.record_performance(
+            model_version=model_version,
+            model_type=ModelType[model_type.upper()],
+            accuracy=accuracy,
+            precision=precision,
+            recall=recall,
+            f1_score=f1_score
+        )
+        
+        return {
+            "status": "success",
+            "model_version": performance.model_version,
+            "model_type": performance.model_type,
+            "message": "Performance metrics recorded"
+        }
+    except Exception as e:
+        logger.error(f"Error recording performance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/models/{model_version}/activate")
+async def activate_model_version(
+    model_version: str,
+    model_type: str = Query("diagnosis", description="Model type"),
+    db: Session = Depends(get_db)
+):
+    """Activate a model version for production use"""
+    try:
+        manager = ModelPerformanceManager(db)
+        
+        performance = manager.activate_model(
+            model_version=model_version,
+            model_type=ModelType[model_type.upper()],
+            deactivate_others=True
+        )
+        
+        return {
+            "status": "success",
+            "model_version": performance.model_version,
+            "model_type": performance.model_type,
+            "deployed_at": performance.deployed_at,
+            "message": f"Model {model_version} activated"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error activating model: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/models/{model_version}/deactivate")
+async def deactivate_model_version(
+    model_version: str,
+    model_type: str = Query("diagnosis", description="Model type"),
+    db: Session = Depends(get_db)
+):
+    """Deactivate a model version"""
+    try:
+        manager = ModelPerformanceManager(db)
+        
+        performance = manager.deactivate_model(
+            model_version=model_version,
+            model_type=ModelType[model_type.upper()]
+        )
+        
+        return {
+            "status": "success",
+            "model_version": performance.model_version,
+            "deactivated_at": performance.deactivated_at,
+            "message": f"Model {model_version} deactivated"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deactivating model: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/models/compare")
+async def compare_model_versions(
+    version_a: str = Query(..., description="First model version"),
+    version_b: str = Query(..., description="Second model version"),
+    model_type: str = Query("diagnosis", description="Model type"),
+    db: Session = Depends(get_db)
+):
+    """Compare performance of two model versions"""
+    try:
+        manager = ModelPerformanceManager(db)
+        
+        comparison = manager.compare_models(
+            model_version_a=version_a,
+            model_version_b=version_b,
+            model_type=ModelType[model_type.upper()]
+        )
+        
+        return comparison
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error comparing models: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/models/ab-test")
+async def setup_ab_test(
+    version_a: str = Query(..., description="First model version"),
+    version_b: str = Query(..., description="Second model version"),
+    model_type: str = Query("diagnosis", description="Model type"),
+    traffic_split: float = Query(0.5, ge=0.0, le=1.0, description="Traffic % to model A"),
+    db: Session = Depends(get_db)
+):
+    """Setup A/B test between two model versions"""
+    try:
+        manager = ModelPerformanceManager(db)
+        
+        ab_config = manager.setup_ab_test(
+            model_version_a=version_a,
+            model_version_b=version_b,
+            model_type=ModelType[model_type.upper()],
+            traffic_split=traffic_split
+        )
+        
+        return ab_config
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error setting up A/B test: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/models/history")
+async def get_model_history(
+    model_type: str = Query("diagnosis", description="Model type"),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    """Get performance history for a model type"""
+    try:
+        manager = ModelPerformanceManager(db)
+        
+        history = manager.get_model_history(
+            model_type=ModelType[model_type.upper()],
+            limit=limit
+        )
+        
+        return {
+            "model_type": model_type,
+            "history": [
+                {
+                    "model_version": perf.model_version,
+                    "accuracy": perf.accuracy,
+                    "precision": perf.precision,
+                    "recall": perf.recall,
+                    "f1_score": perf.f1_score,
+                    "is_active": perf.is_active,
+                    "created_at": perf.created_at,
+                    "deployed_at": perf.deployed_at
+                }
+                for perf in history
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error getting model history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/models/performance", response_model=List[ModelPerformanceResponse])
 async def list_model_performance(

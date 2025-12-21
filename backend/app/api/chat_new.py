@@ -142,16 +142,16 @@ async def send_message(
             if kb is None:
                 logger.info("Knowledge base not available, skipping search")
             else:
-                # Search for MORE results to provide comprehensive information
-                search_results = kb.search(request.message, top_k=10)  # Increased to 10 for detailed context
+                # Search for FEWER results to improve response time (was 10, now 5)
+                search_results = kb.search(request.message, top_k=5)  # Reduced from 10 to 5 for faster response
             
                 if search_results:
-                    knowledge_context = "\n\n[BOOKS] **Medical Knowledge Base - Detailed References:**\n\n"
+                    knowledge_context = "\n\n[BOOKS] **Medical Knowledge Base - References:**\n\n"
                     
                     for i, result in enumerate(search_results, 1):
-                        # Get FULL text (up to 2000 chars for detailed context)
-                        text_content = result['text'][:2000]
-                        if len(result['text']) > 2000:
+                        # Get reasonable text length (reduced from 2000 to 1000 for faster processing)
+                        text_content = result['text'][:1000]
+                        if len(result['text']) > 1000:
                             text_content += "... [truncated]"
                         
                         source_name = result.get('source', 'Medical Database')

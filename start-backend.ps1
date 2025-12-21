@@ -2,7 +2,7 @@
 # Runs with automatic venv activation
 
 $BackendDir = Join-Path (Get-Location) "backend"
-$VenvPath = Join-Path $BackendDir "venv"
+$VenvPath = Join-Path $BackendDir ".venv"
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "   FastAPI Backend Startup" -ForegroundColor Cyan

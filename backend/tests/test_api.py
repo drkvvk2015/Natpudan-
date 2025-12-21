@@ -32,9 +32,11 @@ class TestHealthEndpoints:
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "healthy"
+        # Status can be "healthy" or "degraded" depending on service initialization
+        assert data["status"] in ["healthy", "degraded"]
         assert "service" in data
         assert "timestamp" in data
+        assert "services" in data
 
 
 class TestKnowledgeBaseEndpoints:

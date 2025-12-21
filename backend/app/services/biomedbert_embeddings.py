@@ -38,7 +38,7 @@ class BiomedBERTEmbeddings:
     
     def __init__(
         self,
-        model_name: str = "allenai/scibert",
+        model_name: str = "pritamdeka/S-PubMedBert-MS-MARCO",
         device: str = "cpu",
         batch_size: int = 32,
         cache_embeddings: bool = True
@@ -47,10 +47,10 @@ class BiomedBERTEmbeddings:
         Initialize BiomedBERT embeddings.
         
         Args:
-            model_name: Hugging Face model identifier
-                - "allenai/scibert" - SciBERT (768-dim)
-                - "microsoft/BiomedBERT" - BiomedBERT (768-dim)
-                - "microsoft/PubMedBERT" - PubMedBERT (768-dim)
+            model_name: Hugging Face model identifier (public models)
+                - "pritamdeka/S-PubMedBert-MS-MARCO" - PubMedBERT fine-tuned (768-dim, default)
+                - "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext" - PubMedBERT (768-dim)
+                - "dmis-lab/biobert-v1.1" - BioBERT (768-dim)
             device: "cpu" or "cuda" for GPU acceleration
             batch_size: Batch size for embedding computation
             cache_embeddings: Whether to cache computed embeddings
@@ -217,7 +217,7 @@ _biomedbert_instance: Optional[BiomedBERTEmbeddings] = None
 
 
 def get_biomedbert_embeddings(
-    model_name: str = "allenai/scibert",
+    model_name: str = "pritamdeka/S-PubMedBert-MS-MARCO",
     device: str = "cpu"
 ) -> BiomedBERTEmbeddings:
     """
