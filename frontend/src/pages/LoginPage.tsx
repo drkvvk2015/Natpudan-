@@ -1,15 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
-import { login as apiLogin } from '../services/api';
-import { TextField, Button, Container, Typography, Box, Divider, Alert, Chip, Stack } from '@mui/material';
-import { checkBackendHealth } from '../services/apiClient';
-import { Google as GoogleIcon, GitHub as GitHubIcon, Microsoft as MicrosoftIcon } from '@mui/icons-material';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate, Link } from "react-router-dom";
+import { login as apiLogin } from "../services/api";
+import {
+  TextField,
+  Button,
+  Container,
+  Typography,
+  Box,
+  Divider,
+  Alert,
+  Chip,
+  Stack,
+} from "@mui/material";
+import { checkBackendHealth } from "../services/apiClient";
+import {
+  Google as GoogleIcon,
+  GitHub as GitHubIcon,
+  Microsoft as MicrosoftIcon,
+} from "@mui/icons-material";
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const { login, isAuthenticated } = useAuth();
@@ -19,8 +33,8 @@ const LoginPage: React.FC = () => {
   // Navigate to dashboard after successful login (once auth state updates)
   useEffect(() => {
     if (loginSuccess && isAuthenticated) {
-      console.log('LoginPage: Auth state confirmed, navigating to dashboard');
-      navigate('/dashboard');
+      console.log("LoginPage: Auth state confirmed, navigating to dashboard");
+      navigate("/dashboard");
     }
   }, [loginSuccess, isAuthenticated, navigate]);
 
@@ -32,29 +46,47 @@ const LoginPage: React.FC = () => {
     })();
   }, []);
 
+  // If backend was offline at first check, keep polling until it comes online
+  useEffect(() => {
+    if (backendOk === false) {
+      const id = setInterval(async () => {
+        const res = await checkBackendHealth();
+        if (res.ok) {
+          setBackendOk(true);
+          clearInterval(id);
+        }
+      }, 5000);
+      return () => clearInterval(id);
+    }
+  }, [backendOk]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
     try {
-      console.log('LoginPage: Submitting login...');
+      console.log("LoginPage: Submitting login...");
       const { access_token, user } = await apiLogin({ email, password });
-      console.log('LoginPage: API login successful, calling context login()');
+      console.log("LoginPage: API login successful, calling context login()");
       login(access_token, user);
       setLoginSuccess(true); // This will trigger navigation via useEffect
-      console.log('LoginPage: Login context updated, waiting for auth state...');
+      console.log(
+        "LoginPage: Login context updated, waiting for auth state..."
+      );
     } catch (err: any) {
-      console.error('Login error:', err);
-      let errorMsg = 'Failed to login. Please check your credentials.';
-      
+      console.error("Login error:", err);
+      let errorMsg = "Failed to login. Please check your credentials.";
+
       if (err?.response?.data?.detail) {
         const detail = err.response.data.detail;
         // Handle validation errors array
         if (Array.isArray(detail)) {
-          errorMsg = detail.map((e: any) => e.msg || e.message || String(e)).join(', ');
-        } else if (typeof detail === 'string') {
+          errorMsg = detail
+            .map((e: any) => e.msg || e.message || String(e))
+            .join(", ");
+        } else if (typeof detail === "string") {
           errorMsg = detail;
-        } else if (typeof detail === 'object') {
+        } else if (typeof detail === "object") {
           errorMsg = detail.msg || detail.message || JSON.stringify(detail);
         }
       } else if (err?.message) {
@@ -62,65 +94,88 @@ const LoginPage: React.FC = () => {
       }
       // Automatic correction hints
       const hints: string[] = [];
-      if (!backendOk) hints.push('Backend server appears down. Please start backend on 127.0.0.1:8000.');
-      if (!email.includes('@')) hints.push('Email looks invalid (missing @).');
-      if (password.length < 6) hints.push('Password seems too short.');
-      if (errorMsg.toLowerCase().includes('incorrect')) hints.push('Incorrect email or password. Check Caps Lock.');
+      if (!backendOk)
+        hints.push(
+          "Backend server appears down. Please start backend on 127.0.0.1:8000."
+        );
+      if (!email.includes("@")) hints.push("Email looks invalid (missing @).");
+      if (password.length < 6) hints.push("Password seems too short.");
+      if (errorMsg.toLowerCase().includes("incorrect"))
+        hints.push("Incorrect email or password. Check Caps Lock.");
       if (hints.length) {
-        errorMsg = `${errorMsg}\n• ${hints.join('\n• ')}`;
+        errorMsg = `${errorMsg}\n• ${hints.join("\n• ")}`;
       }
-      
+
       setError(errorMsg);
       setLoading(false);
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'github' | 'microsoft') => {
+  const handleSocialLogin = async (
+    provider: "google" | "github" | "microsoft"
+  ) => {
     try {
-      setError(''); // Clear previous errors
+      setError(""); // Clear previous errors
       setLoading(true);
-      
+
       // Use current origin to ensure redirect URI matches across all ports
       const frontendURL = window.location.origin;
       const redirectUri = `${frontendURL}/auth/callback`;
-      const baseURL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      
+      const baseURL =
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_API_BASE_URL ||
+        "http://127.0.0.1:8000";
+
       console.log(`Initiating ${provider} OAuth flow...`);
       console.log(`Using API Base URL: ${baseURL}`);
       console.log(`OAuth redirect URI: ${redirectUri}`);
-      
-      const response = await fetch(`${baseURL}/api/auth/oauth/${provider}/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
-      
+
+      const response = await fetch(
+        `${baseURL}/api/auth/oauth/${provider}/url?redirect_uri=${encodeURIComponent(
+          redirectUri
+        )}`
+      );
+
       // Check if response is ok
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        const errorMsg = errorData.detail || errorData.error || `${provider} login is not available`;
+        const errorData = await response
+          .json()
+          .catch(() => ({ detail: "Unknown error" }));
+        const errorMsg =
+          errorData.detail ||
+          errorData.error ||
+          `${provider} login is not available`;
         setError(errorMsg);
         console.error(`OAuth error for ${provider}:`, errorData);
         setLoading(false);
         return;
       }
-      
+
       const data = await response.json();
-      
+
       if (data.auth_url) {
         // Store provider and state for callback verification
-        localStorage.setItem('oauth_provider', provider);
+        localStorage.setItem("oauth_provider", provider);
         if (data.state) {
-          localStorage.setItem('oauth_state', data.state);
+          localStorage.setItem("oauth_state", data.state);
         }
-        
+
         console.log(`Redirecting to ${provider} OAuth authorization page...`);
         // Redirect to OAuth provider
         window.location.href = data.auth_url;
       } else {
-        const errorMsg = data.detail || data.error || `Failed to initiate ${provider} login. No auth URL returned.`;
+        const errorMsg =
+          data.detail ||
+          data.error ||
+          `Failed to initiate ${provider} login. No auth URL returned.`;
         setError(errorMsg);
         setLoading(false);
       }
     } catch (err: any) {
       console.error(`Social login error for ${provider}:`, err);
-      const errorMsg = err?.message || `Failed to connect to ${provider}. Please check your internet connection and try again.`;
+      const errorMsg =
+        err?.message ||
+        `Failed to connect to ${provider}. Please check your internet connection and try again.`;
       setError(errorMsg);
       setLoading(false);
     }
@@ -128,13 +183,30 @@ const LoginPage: React.FC = () => {
 
   return (
     <Container maxWidth="xs">
-      <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <Box
+        sx={{
+          mt: 8,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
         <Typography component="h1" variant="h5">
           Login
         </Typography>
         {/* Server status indicators */}
         <Stack direction="row" spacing={1} sx={{ mt: 1, mb: 1 }}>
-          <Chip label={`Backend: ${backendOk === null ? 'Checking…' : backendOk ? 'Online' : 'Offline'}`} color={backendOk ? 'success' : 'default'} variant={backendOk ? 'filled' : 'outlined'} />
+          <Chip
+            label={`Backend: ${
+              backendOk === null
+                ? "Checking…"
+                : backendOk
+                ? "Online"
+                : "Offline"
+            }`}
+            color={backendOk ? "success" : "default"}
+            variant={backendOk ? "filled" : "outlined"}
+          />
         </Stack>
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
           <TextField
@@ -161,7 +233,13 @@ const LoginPage: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {error && <Alert severity="error" sx={{ mt: 2 }}>{typeof error === 'string' ? error : JSON.stringify(error, null, 2)}</Alert>}
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {typeof error === "string"
+                ? error
+                : JSON.stringify(error, null, 2)}
+            </Alert>
+          )}
           <Button
             type="submit"
             fullWidth
@@ -170,39 +248,44 @@ const LoginPage: React.FC = () => {
           >
             Sign In
           </Button>
-          
-          <Box sx={{ textAlign: 'center', mb: 2 }}>
+
+          <Box sx={{ textAlign: "center", mb: 2 }}>
             <Typography
               component={Link}
               to="/forgot-password"
               variant="body2"
               sx={{
-                color: 'primary.main',
-                textDecoration: 'none',
-                '&:hover': {
-                  textDecoration: 'underline',
+                color: "primary.main",
+                textDecoration: "none",
+                "&:hover": {
+                  textDecoration: "underline",
                 },
               }}
             >
               Forgot password?
             </Typography>
           </Box>
-          
+
           <Divider sx={{ my: 2 }}>
-            <Typography variant="body2" color="text.secondary">OR</Typography>
+            <Typography variant="body2" color="text.secondary">
+              OR
+            </Typography>
           </Divider>
-          
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
             <Button
               fullWidth
               variant="outlined"
               startIcon={<GoogleIcon />}
-              onClick={() => handleSocialLogin('google')}
-              sx={{ 
-                textTransform: 'none',
-                borderColor: '#4285F4',
-                color: '#4285F4',
-                '&:hover': { borderColor: '#357ae8', backgroundColor: '#4285F410' }
+              onClick={() => handleSocialLogin("google")}
+              sx={{
+                textTransform: "none",
+                borderColor: "#4285F4",
+                color: "#4285F4",
+                "&:hover": {
+                  borderColor: "#357ae8",
+                  backgroundColor: "#4285F410",
+                },
               }}
             >
               Continue with Google
@@ -211,12 +294,15 @@ const LoginPage: React.FC = () => {
               fullWidth
               variant="outlined"
               startIcon={<GitHubIcon />}
-              onClick={() => handleSocialLogin('github')}
-              sx={{ 
-                textTransform: 'none',
-                borderColor: '#333',
-                color: '#333',
-                '&:hover': { borderColor: '#000', backgroundColor: '#33333310' }
+              onClick={() => handleSocialLogin("github")}
+              sx={{
+                textTransform: "none",
+                borderColor: "#333",
+                color: "#333",
+                "&:hover": {
+                  borderColor: "#000",
+                  backgroundColor: "#33333310",
+                },
               }}
             >
               Continue with GitHub
@@ -225,18 +311,21 @@ const LoginPage: React.FC = () => {
               fullWidth
               variant="outlined"
               startIcon={<MicrosoftIcon />}
-              onClick={() => handleSocialLogin('microsoft')}
-              sx={{ 
-                textTransform: 'none',
-                borderColor: '#00A4EF',
-                color: '#00A4EF',
-                '&:hover': { borderColor: '#0078D4', backgroundColor: '#00A4EF10' }
+              onClick={() => handleSocialLogin("microsoft")}
+              sx={{
+                textTransform: "none",
+                borderColor: "#00A4EF",
+                color: "#00A4EF",
+                "&:hover": {
+                  borderColor: "#0078D4",
+                  backgroundColor: "#00A4EF10",
+                },
               }}
             >
               Continue with Microsoft
             </Button>
           </Box>
-          
+
           <Typography variant="body2" align="center" sx={{ mt: 1 }}>
             New here? <a href="/register">Create an account</a>
           </Typography>

@@ -1,7 +1,7 @@
 //
-import { useState } from 'react'
-import { useAuth } from '../context/AuthContext'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box,
   Drawer,
@@ -17,7 +17,7 @@ import {
   ListItemText,
   Avatar,
   useTheme,
-} from '@mui/material'
+} from "@mui/material";
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -33,108 +33,134 @@ import {
   Api as ApiIcon,
   Logout as LogoutIcon,
   CloudUpload,
-} from '@mui/icons-material'
+} from "@mui/icons-material";
 
-const DRAWER_WIDTH = 260
+const DRAWER_WIDTH = 260;
 
 interface LayoutProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 interface MenuItem {
-  text: string
-  icon: React.ReactNode
-  path: string
+  text: string;
+  icon: React.ReactNode;
+  path: string;
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const navigate = useNavigate()
-  const location = useLocation()
-  const theme = useTheme()
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const theme = useTheme();
 
   const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen)
-  }
+    setMobileOpen(!mobileOpen);
+  };
 
   const { user, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   // Define role visibility matrix
   const baseItems: MenuItem[] = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+    { text: "Dashboard", icon: <DashboardIcon />, path: "/" },
   ];
   const staffExtra: MenuItem[] = [
-    { text: 'Patient Intake', icon: <PersonAdd />, path: '/patient-intake' },
+    { text: "Patient Intake", icon: <PersonAdd />, path: "/patient-intake" },
   ];
   const doctorItems: MenuItem[] = [
-    { text: 'Patient List', icon: <PersonAdd />, path: '/patients' },
-    { text: 'Discharge Summary', icon: <AssessmentIcon />, path: '/discharge-summary' },
-    { text: 'Clinical Case Sheet', icon: <DiagnosisIcon />, path: '/diagnosis' },
-    { text: 'Analytics', icon: <AssessmentIcon />, path: '/analytics' },
-    { text: 'FHIR API', icon: <ApiIcon />, path: '/fhir' },
-    { text: 'Drug Checker', icon: <DrugIcon />, path: '/drugs' },
-    { text: 'Knowledge Base', icon: <KnowledgeIcon />, path: '/knowledge' },
-    { text: 'Upload PDFs', icon: <CloudUpload />, path: '/knowledge-upload' },
-    { text: 'Report Parser', icon: <LocalHospital />, path: '/report-parser' },
+    { text: "Patient List", icon: <PersonAdd />, path: "/patients" },
+    {
+      text: "Discharge Summary",
+      icon: <AssessmentIcon />,
+      path: "/discharge-summary",
+    },
+    {
+      text: "Clinical Case Sheet",
+      icon: <DiagnosisIcon />,
+      path: "/diagnosis",
+    },
+    { text: "Analytics", icon: <AssessmentIcon />, path: "/analytics" },
+    { text: "FHIR API", icon: <ApiIcon />, path: "/fhir" },
+    { text: "Drug Checker", icon: <DrugIcon />, path: "/drugs" },
+    { text: "Knowledge Base", icon: <KnowledgeIcon />, path: "/knowledge" },
+    { text: "Upload PDFs", icon: <CloudUpload />, path: "/knowledge-upload" },
+    { text: "Report Parser", icon: <LocalHospital />, path: "/report-parser" },
   ];
 
   let menuItems: MenuItem[] = baseItems;
-  if (user?.role === 'staff') {
+  if (user?.role === "staff") {
     menuItems = [...menuItems, ...staffExtra];
-  } else if (user?.role === 'doctor') {
+  } else if (user?.role === "doctor") {
     menuItems = [...menuItems, ...staffExtra, ...doctorItems];
-  } else if (user?.role === 'admin') {
+  } else if (user?.role === "admin") {
     // Admin has everything
-    menuItems = [...menuItems, ...staffExtra, ...doctorItems];
+    menuItems = [
+      ...menuItems,
+      ...staffExtra,
+      ...doctorItems,
+      { text: "User Management", icon: <PersonIcon />, path: "/admin/users" },
+    ];
   }
 
   const drawer = (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      background: 'linear-gradient(to bottom, #fafafa 0%, #ffffff 100%)',
-    }}>
+    <Box
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: "linear-gradient(to bottom, #fafafa 0%, #ffffff 100%)",
+      }}
+    >
       <Toolbar
         sx={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
+          background:
+            "linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)",
           minHeight: 80,
-          position: 'relative',
-          overflow: 'hidden',
-          '&::before': {
+          position: "relative",
+          overflow: "hidden",
+          "&::before": {
             content: '""',
-            position: 'absolute',
+            position: "absolute",
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)',
-            animation: 'pulse 4s ease-in-out infinite',
+            background:
+              "radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)",
+            animation: "pulse 4s ease-in-out infinite",
           },
-          '@keyframes pulse': {
-            '0%, 100%': { opacity: 0.6 },
-            '50%': { opacity: 1 },
+          "@keyframes pulse": {
+            "0%, 100%": { opacity: 0.6 },
+            "50%": { opacity: 1 },
           },
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%', position: 'relative', zIndex: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            width: "100%",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
           <Box
             sx={{
               width: 48,
               height: 48,
-              borderRadius: '12px',
-              background: 'rgba(255,255,255,0.25)',
-              backdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '28px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              borderRadius: "12px",
+              background: "rgba(255,255,255,0.25)",
+              backdropFilter: "blur(10px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "28px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
             }}
           >
             [AI]
@@ -144,10 +170,10 @@ export default function Layout({ children }: LayoutProps) {
               variant="h5"
               component="div"
               sx={{
-                color: 'white',
+                color: "white",
                 fontWeight: 800,
-                letterSpacing: '-0.03em',
-                textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                letterSpacing: "-0.03em",
+                textShadow: "0 2px 8px rgba(0,0,0,0.3)",
                 lineHeight: 1.2,
               }}
             >
@@ -156,11 +182,11 @@ export default function Layout({ children }: LayoutProps) {
             <Typography
               variant="caption"
               sx={{
-                color: 'rgba(255,255,255,0.9)',
+                color: "rgba(255,255,255,0.9)",
                 fontWeight: 500,
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                fontSize: '0.65rem',
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+                fontSize: "0.65rem",
               }}
             >
               Intelligent Healthcare
@@ -177,51 +203,56 @@ export default function Layout({ children }: LayoutProps) {
             <ListItemButton
               selected={location.pathname === item.path}
               onClick={() => {
-                navigate(item.path)
-                setMobileOpen(false)
+                navigate(item.path);
+                setMobileOpen(false);
               }}
               sx={{
                 borderRadius: 3,
                 px: 2,
                 py: 1.5,
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                position: 'relative',
-                overflow: 'hidden',
-                '&.Mui-selected': {
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
-                  transform: 'translateX(4px) scale(1.02)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                position: "relative",
+                overflow: "hidden",
+                "&.Mui-selected": {
+                  background:
+                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  color: "white",
+                  boxShadow: "0 4px 12px rgba(102, 126, 234, 0.4)",
+                  transform: "translateX(4px) scale(1.02)",
+                  "&:hover": {
+                    background:
+                      "linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)",
                   },
-                  '& .MuiListItemIcon-root': {
-                    color: 'white',
-                    transform: 'scale(1.1)',
+                  "& .MuiListItemIcon-root": {
+                    color: "white",
+                    transform: "scale(1.1)",
                   },
-                  '&::before': {
+                  "&::before": {
                     content: '""',
-                    position: 'absolute',
+                    position: "absolute",
                     left: 0,
                     top: 0,
                     bottom: 0,
-                    width: '4px',
-                    background: 'white',
-                    borderRadius: '0 4px 4px 0',
+                    width: "4px",
+                    background: "white",
+                    borderRadius: "0 4px 4px 0",
                   },
                 },
-                '&:hover': {
-                  backgroundColor: 'rgba(102, 126, 234, 0.08)',
-                  transform: 'translateX(6px)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                "&:hover": {
+                  backgroundColor: "rgba(102, 126, 234, 0.08)",
+                  transform: "translateX(6px)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
                 },
               }}
             >
               <ListItemIcon
                 sx={{
-                  color: location.pathname === item.path ? 'white' : theme.palette.primary.main,
+                  color:
+                    location.pathname === item.path
+                      ? "white"
+                      : theme.palette.primary.main,
                   minWidth: 40,
-                  transition: 'color 0.2s',
+                  transition: "color 0.2s",
                 }}
               >
                 {item.icon}
@@ -230,7 +261,7 @@ export default function Layout({ children }: LayoutProps) {
                 primary={item.text}
                 primaryTypographyProps={{
                   fontWeight: location.pathname === item.path ? 600 : 500,
-                  fontSize: '0.95rem',
+                  fontSize: "0.95rem",
                 }}
               />
             </ListItemButton>
@@ -245,10 +276,10 @@ export default function Layout({ children }: LayoutProps) {
           <ListItemButton
             sx={{
               borderRadius: 2,
-              transition: 'all 0.2s',
-              '&:hover': {
-                backgroundColor: 'rgba(99, 102, 241, 0.08)',
-                transform: 'translateX(4px)',
+              transition: "all 0.2s",
+              "&:hover": {
+                backgroundColor: "rgba(99, 102, 241, 0.08)",
+                transform: "translateX(4px)",
               },
             }}
           >
@@ -259,27 +290,28 @@ export default function Layout({ children }: LayoutProps) {
               primary="Settings"
               primaryTypographyProps={{
                 fontWeight: 500,
-                fontSize: '0.95rem',
+                fontSize: "0.95rem",
               }}
             />
           </ListItemButton>
         </ListItem>
       </List>
     </Box>
-  )
+  );
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       <AppBar
         position="fixed"
         elevation={0}
         sx={{
           width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
           ml: { sm: `${DRAWER_WIDTH}px` },
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
-          backdropFilter: 'blur(20px)',
-          borderBottom: 'none',
-          boxShadow: '0 4px 20px rgba(102, 126, 234, 0.25)',
+          background:
+            "linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)",
+          backdropFilter: "blur(20px)",
+          borderBottom: "none",
+          boxShadow: "0 4px 20px rgba(102, 126, 234, 0.25)",
         }}
       >
         <Toolbar>
@@ -289,15 +321,15 @@ export default function Layout({ children }: LayoutProps) {
             onClick={handleDrawerToggle}
             sx={{
               mr: 2,
-              display: { sm: 'none' },
-              '&:hover': {
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              display: { sm: "none" },
+              "&:hover": {
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
               },
             }}
           >
             <MenuIcon />
           </IconButton>
-          
+
           <Typography
             variant="h6"
             noWrap
@@ -305,60 +337,60 @@ export default function Layout({ children }: LayoutProps) {
             sx={{
               flexGrow: 1,
               fontWeight: 600,
-              letterSpacing: '-0.01em',
-              color: 'white',
-              textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              letterSpacing: "-0.01em",
+              color: "white",
+              textShadow: "0 2px 4px rgba(0,0,0,0.2)",
             }}
           >
             Physician AI Assistant
           </Typography>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Avatar
               sx={{
-                bgcolor: 'rgba(255, 255, 255, 0.25)',
+                bgcolor: "rgba(255, 255, 255, 0.25)",
                 width: 40,
                 height: 40,
-                backdropFilter: 'blur(10px)',
-                border: '2px solid rgba(255,255,255,0.3)',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                transition: 'all 0.3s',
-                '&:hover': {
-                  transform: 'scale(1.1)',
-                  boxShadow: '0 6px 16px rgba(0,0,0,0.2)',
+                backdropFilter: "blur(10px)",
+                border: "2px solid rgba(255,255,255,0.3)",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                transition: "all 0.3s",
+                "&:hover": {
+                  transform: "scale(1.1)",
+                  boxShadow: "0 6px 16px rgba(0,0,0,0.2)",
                 },
               }}
             >
               <PersonIcon sx={{ fontSize: 22 }} />
             </Avatar>
-            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+            <Box sx={{ display: { xs: "none", sm: "block" } }}>
               <Typography
                 variant="body2"
                 sx={{
-                  color: 'white',
+                  color: "white",
                   fontWeight: 600,
                   lineHeight: 1.2,
                 }}
               >
-                {user?.full_name || 'User'}
+                {user?.full_name || "User"}
               </Typography>
               <Typography
                 variant="caption"
                 sx={{
-                  color: 'rgba(255,255,255,0.8)',
-                  fontSize: '0.7rem',
+                  color: "rgba(255,255,255,0.8)",
+                  fontSize: "0.7rem",
                 }}
               >
-                {(user?.role || 'user').toUpperCase()}
+                {(user?.role || "user").toUpperCase()}
               </Typography>
             </Box>
             <IconButton
               onClick={handleLogout}
               sx={{
-                color: 'white',
+                color: "white",
                 ml: 1,
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
                 },
               }}
               title="Logout"
@@ -379,11 +411,11 @@ export default function Layout({ children }: LayoutProps) {
           onClose={handleDrawerToggle}
           ModalProps={{ keepMounted: true }}
           sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
+            display: { xs: "block", sm: "none" },
+            "& .MuiDrawer-paper": {
+              boxSizing: "border-box",
               width: DRAWER_WIDTH,
-              borderRight: 'none',
+              borderRight: "none",
               boxShadow: 3,
             },
           }}
@@ -393,11 +425,11 @@ export default function Layout({ children }: LayoutProps) {
         <Drawer
           variant="permanent"
           sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
+            display: { xs: "none", sm: "block" },
+            "& .MuiDrawer-paper": {
+              boxSizing: "border-box",
               width: DRAWER_WIDTH,
-              borderRight: '1px solid rgba(0, 0, 0, 0.08)',
+              borderRight: "1px solid rgba(0, 0, 0, 0.08)",
             },
           }}
           open
@@ -413,20 +445,20 @@ export default function Layout({ children }: LayoutProps) {
           p: 3,
           width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
           mt: 8,
-          height: 'calc(100vh - 64px)',
-          overflow: 'auto',
-          background: 'linear-gradient(to bottom, #f8f9ff 0%, #ffffff 100%)',
-          '&::-webkit-scrollbar': {
-            width: '8px',
+          height: "calc(100vh - 64px)",
+          overflow: "auto",
+          background: "linear-gradient(to bottom, #f8f9ff 0%, #ffffff 100%)",
+          "&::-webkit-scrollbar": {
+            width: "8px",
           },
-          '&::-webkit-scrollbar-track': {
-            backgroundColor: 'transparent',
+          "&::-webkit-scrollbar-track": {
+            backgroundColor: "transparent",
           },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-            borderRadius: '4px',
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: "rgba(0, 0, 0, 0.2)",
+            borderRadius: "4px",
+            "&:hover": {
+              backgroundColor: "rgba(0, 0, 0, 0.3)",
             },
           },
         }}
@@ -434,5 +466,5 @@ export default function Layout({ children }: LayoutProps) {
         {children}
       </Box>
     </Box>
-  )
+  );
 }

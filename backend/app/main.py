@@ -52,6 +52,7 @@ from app.api.treatment import router as treatment_router
 from app.api.timeline import router as timeline_router
 from app.api.analytics import router as analytics_router
 from app.api.fhir import router as fhir_router
+from app.api.admin_users import router as admin_users_router
 from app.api.health import router as health_router
 # Re-enable knowledge base router now that we are on Python 3.12
 from app.api.knowledge_base import router as knowledge_router
@@ -1013,6 +1014,7 @@ api_router.include_router(fhir_router, prefix="/fhir", tags=["fhir"])
 api_router.include_router(health_router, tags=["health"])
 api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
 api_router.include_router(patient_intake_router, prefix="/medical", tags=["patient-intake"])
+api_router.include_router(admin_users_router)
 
 # KB Automation routes (scheduled syncing, feedback, integrity checks)
 from app.api.kb_automation import router as kb_automation_router
@@ -1041,6 +1043,10 @@ api_router.include_router(phase_7_router)
 # Self-Healing System API
 from app.api.self_healing_api import router as self_healing_router
 api_router.include_router(self_healing_router)
+
+# Error Correction API
+from app.api.error_correction_api import router as error_correction_router
+api_router.include_router(error_correction_router)
 
 # Background task for processing upload queue
 _last_queue_process = 0

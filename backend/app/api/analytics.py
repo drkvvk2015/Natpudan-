@@ -112,19 +112,19 @@ async def get_analytics_dashboard(db: Session = Depends(get_db)):
         
         # Gender distribution
         gender_dist = db.query(
-            PatientIntake.sex,
+            PatientIntake.gender,
             func.count(PatientIntake.id).label('count')
-        ).group_by(PatientIntake.sex).all()
+        ).group_by(PatientIntake.gender).all()
         
-        gender_distribution = {g.sex: g.count for g in gender_dist if g.sex}
+        gender_distribution = {g.gender: g.count for g in gender_dist if g.gender}
         
         # Blood type distribution
         blood_type_dist = db.query(
-            PatientIntake.blood_group,
+            PatientIntake.blood_type,
             func.count(PatientIntake.id).label('count')
-        ).group_by(PatientIntake.blood_group).all()
+        ).group_by(PatientIntake.blood_type).all()
         
-        blood_type_distribution = {bt.blood_group: bt.count for bt in blood_type_dist if bt.blood_group}
+        blood_type_distribution = {bt.blood_type: bt.count for bt in blood_type_dist if bt.blood_type}
         
         demographics = DemographicsData(
             total_patients=total_patients,

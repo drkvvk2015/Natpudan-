@@ -11,10 +11,13 @@ if ($Help) {
     exit 0
 }
 
-$RootDir = "D:\Users\CNSHO\Documents\GitHub\Natpudan-"
+$RootDir = Split-Path -Parent $PSScriptRoot
+if (-not (Test-Path (Join-Path $RootDir "backend"))) {
+    $RootDir = $PSScriptRoot
+}
 $BackendDir = Join-Path $RootDir "backend"
 $FrontendDir = Join-Path $RootDir "frontend"
-$VenvPath = Join-Path $BackendDir "venv"
+$VenvPath = Join-Path $BackendDir ".venv"
 $DbPath = Join-Path $BackendDir "natpudan.db"
 
 Write-Host "`n=== NATPUDAN AI - FULL STACK STARTUP (SQLite) ===" -ForegroundColor Cyan
@@ -31,19 +34,19 @@ Write-Host "  SQLite database path: $DbPath" -ForegroundColor Gray
 # 1. Backend
 Write-Host "[1/5] Starting FastAPI Backend..." -ForegroundColor Green
 $backendCmd = @'
-cd "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend"
-& "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend\venv\Scripts\Activate.ps1"
+cd "' + $BackendDir + '"
+& "' + $VenvPath + '\Scripts\Activate.ps1"
 $env:DATABASE_URL = 'sqlite:///./natpudan.db'
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --timeout-keep-alive 120
 '@
 Start-Process powershell -ArgumentList @('-NoExit', '-Command', $backendCmd)
-Start-Sleep -Seconds 5
+Start-Sleep -Seconds 8
 
 # 2. Celery Worker
 Write-Host "[2/5] Starting Celery Worker..." -ForegroundColor Green
 $celeryCmd = @'
-cd "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend"
-& "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend\venv\Scripts\Activate.ps1"
+cd "' + $BackendDir + '"
+& "' + $VenvPath + '\Scripts\Activate.ps1"
 $useRedis = $env:REDIS_URL -and $env:REDIS_URL.Trim() -ne ''
 if (-not $useRedis) {
     # Fallback to SQLite transport for local dev if Redis is not configured
@@ -53,15 +56,15 @@ if (-not $useRedis) {
 python -m celery -A app.celery_config worker --loglevel=info --pool=solo --max-tasks-per-child=1000 -E
 '@
 Start-Process powershell -ArgumentList @('-NoExit', '-Command', $celeryCmd)
-Start-Sleep -Seconds 3
+Start-Sleep -Seconds 4
 
 # 3. Flower Dashboard (only if using Redis/RabbitMQ broker)
 $useRedis = $env:REDIS_URL -and $env:REDIS_URL.Trim() -ne ''
 if ($useRedis) {
     Write-Host "[3/5] Starting Flower Dashboard..." -ForegroundColor Green
     $flowerCmd = @'
-cd "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend"
-& "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend\venv\Scripts\Activate.ps1"
+cd "' + $BackendDir + '"
+& "' + $VenvPath + '\Scripts\Activate.ps1"
 python -m celery -A app.celery_config flower --port=5555 --basic_auth=admin:admin
 '@
     Start-Process powershell -ArgumentList @('-NoExit', '-Command', $flowerCmd)
@@ -74,11 +77,11 @@ python -m celery -A app.celery_config flower --port=5555 --basic_auth=admin:admi
 # 4. Frontend
 Write-Host "[4/5] Starting React Frontend..." -ForegroundColor Green
 $frontendCmd = @'
-cd "D:\Users\CNSHO\Documents\GitHub\Natpudan-\frontend"
+cd "' + $FrontendDir + '"
 npm run dev
 '@
 Start-Process powershell -ArgumentList @('-NoExit', '-Command', $frontendCmd)
-Start-Sleep -Seconds 3
+Start-Sleep -Seconds 4
 
 Write-Host "`n=== ALL SERVICES STARTED ===" -ForegroundColor Cyan
 Write-Host "`nSERVICE ENDPOINTS:" -ForegroundColor Yellow

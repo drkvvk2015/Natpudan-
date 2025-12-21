@@ -40,6 +40,9 @@ class ErrorCorrector:
         
         # Attempt automatic correction
         self.attempt_correction(error, context)
+        
+        # Analyze code-level issues
+        self._analyze_code_issues(error, context)
     
     def attempt_correction(self, error: Exception, context: Dict[str, Any]):
         """Attempt to automatically correct the error"""
@@ -202,6 +205,49 @@ class ErrorCorrector:
             error_type = error["error_type"]
             error_types[error_type] = error_types.get(error_type, 0) + 1
         return error_types
+    
+    def record_error(self, error_type: str, error_message: str, stack_trace: str = "", metadata: Dict[str, Any] = None):
+        """Record an error for pattern analysis"""
+        error_record = {
+            "timestamp": datetime.now().isoformat(),
+            "error_type": error_type,
+            "error_message": error_message,
+            "stack_trace": stack_trace,
+            "metadata": metadata or {},
+            "id": len(self.error_history) + 1
+        }
+        self.error_history.append(error_record)
+        logger.info(f"Error recorded: {error_type} - {error_message}")
+    
+    def get_last_error_id(self) -> int:
+        """Get the ID of the last recorded error"""
+        return len(self.error_history)
+    
+    def get_recent_errors(self, limit: int = 10) -> list:
+        """Get recent error records"""
+        return self.error_history[-limit:] if self.error_history else []
+    
+    def _analyze_code_issues(self, error: Exception, context: Dict[str, Any]):
+        """Analyze code-level issues and log suggestions."""
+        try:
+            from app.services.code_analyzer import get_code_analyzer
+            analyzer = get_code_analyzer()
+            
+            # Check for AttributeError (missing field/method)
+            if isinstance(error, AttributeError):
+                issue = analyzer.analyze_attribute_error(error, context)
+                if issue:
+                    logger.warning(f"[CODE ISSUE] {issue['message']}")
+                    logger.warning(f"[SUGGESTION] Try using: {issue['suggestions']}")
+            
+            # Check for other code-level issues
+            error_msg = str(error).lower()
+            if 'has no attribute' in error_msg:
+                logger.warning(f"[CODE ISSUE] Field/method access error detected")
+                logger.warning(f"[ACTION] Check field names in database model definitions")
+        
+        except Exception as e:
+            logger.error(f"Failed to analyze code issues: {e}")
 
 
 # Global error corrector instance
