@@ -1,0 +1,51 @@
+{
+  "cached_at": "2025-12-22T14:01:08.421906",
+  "content": [
+    {
+      "title": "Aerobic Exercise Alters Brain Function and Structure in Parkinson's Disease: A Randomized Controlled Trial.",
+      "abstract": "Randomized clinical trials have shown that aerobic exercise attenuates motor symptom progression in Parkinson's disease, but the underlying neural mechanisms are unclear. Here, we investigated how aerobic exercise influences disease-related functional and structural changes in the corticostriatal sensorimotor network, which is involved in the emergence of motor deficits in Parkinson's disease. Additionally, we explored effects of aerobic exercise on tissue integrity of the substantia nigra, and ...",
+      "year": "2022",
+      "pmid": "34951063",
+      "authors": "Martin E Johansson, Ian G M Cameron, Nicolien M Van der Kolk",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/34951063/"
+    },
+    {
+      "title": "Tenecteplase for Stroke at 4.5 to 24 Hours with Perfusion-Imaging Selection.",
+      "abstract": "Thrombolytic agents, including tenecteplase, are generally used within 4.5 hours after the onset of stroke symptoms. Information on whether tenecteplase confers benefit beyond 4.5 hours is limited. We conducted a multicenter, double-blind, randomized, placebo-controlled trial involving patients with ischemic stroke to compare tenecteplase (0.25 mg per kilogram of body weight, up to 25 mg) with placebo administered 4.5 to 24 hours after the time that the patient was last known to be well. Patient...",
+      "year": "2024",
+      "pmid": "38329148",
+      "authors": "Gregory W Albers, Mouhammad Jumaa, Barbara Purdon",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/38329148/"
+    },
+    {
+      "title": "Tirzepatide Reduces LV Mass and Paracardiac Adipose Tissue in Obesity-Related Heart\u00a0Failure: SUMMIT CMR Substudy.",
+      "abstract": "Obesity is a known risk factor for heart failure with preserved ejection fraction (HFpEF) and is considered a distinct phenotype with more concentric remodeling. Epicardial adipose tissue (EAT) is also increased in obesity-related HFpEF and is associated with adverse events. The cardiac magnetic resonance (CMR) substudy of the SUMMIT trial aimed to examine the effects of tirzepatide on cardiac structure and function with the underlying hypothesis that it would reduce left ventricular (LV) mass a...",
+      "year": "2025",
+      "pmid": "39566869",
+      "authors": "Christopher M Kramer, Barry A Borlaug, Michael R Zile",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39566869/"
+    },
+    {
+      "title": "AI-based selection of individuals for supplemental MRI in population-based breast cancer screening: the randomized ScreenTrustMRI trial.",
+      "abstract": "Screening mammography reduces breast cancer mortality, but studies analyzing interval cancers diagnosed after negative screens have shown that many cancers are missed. Supplemental screening using magnetic resonance imaging (MRI) can reduce the number of missed cancers. However, as qualified MRI staff are lacking, the equipment is expensive to purchase and cost-effectiveness for screening may not be convincing, the utilization of MRI is currently limited. An effective method for triaging individ...",
+      "year": "2024",
+      "pmid": "38977914",
+      "authors": "Mattie Salim, Yue Liu, Moein Sorkhei",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/38977914/"
+    },
+    {
+      "title": "Randomized Trial of Interleukin-6 Receptor Inhibition in Patients With\u00a0Acute ST-Segment Elevation Myocardial Infarction.",
+      "abstract": "Prompt myocardial revascularization with percutaneous coronary intervention (PCI) reduces infarct size and improves outcomes in patients with ST-segment elevation myocardial infarction (STEMI). However, as much as 50% of the loss of viable myocardium may be attributed to the reperfusion injury and the associated inflammatory response. This study sought to evaluate the effect of the interleukin-6 receptor inhibitor tocilizumab on myocardial salvage in acute STEMI. The ASSAIL-MI trial was a random...",
+      "year": "2021",
+      "pmid": "33858620",
+      "authors": "Kaspar Broch, Anne Kristine Anstensrud, Sindre Woxholt",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/33858620/"
+    }
+  ],
+  "ttl_hours": 24
+}

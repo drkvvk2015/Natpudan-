@@ -399,6 +399,28 @@ class MonitoringRecord(Base):
     treatment_plan = relationship("TreatmentPlan", back_populates="monitoring_records")
 
 
+# ==================== Audit Logs ====================
+
+class AuditLog(Base):
+    """Audit trail for admin/compliance: who did what and when."""
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(100), nullable=False)  # e.g., 'login', 'create_user', 'delete_document'
+    resource = Column(String(200), nullable=True)  # e.g., 'user:123', 'document:abc.pdf'
+    details = Column(Text, nullable=True)  # JSON/text payload with extra context
+    ip_address = Column(String(100), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    # Relationships
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"<AuditLog(id={self.id}, action={self.action}, resource={self.resource})>"
+
+
 # ==================== Knowledge Base Models ====================
 
 class KnowledgeDocument(Base):

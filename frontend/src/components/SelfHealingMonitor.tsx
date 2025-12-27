@@ -194,13 +194,13 @@ const SelfHealingMonitor: React.FC = () => {
             <Typography variant="body2" fontWeight="bold">
               System Warnings:
             </Typography>
-            <ul style={{ margin: "4px 0", paddingLeft: 20 }}>
+            <Box component="ul" sx={{ margin: "4px 0", paddingLeft: "20px" }}>
               {status.system_health.warnings.map((warning, idx) => (
                 <li key={idx}>
                   <Typography variant="caption">{warning}</Typography>
                 </li>
               ))}
-            </ul>
+            </Box>
           </Alert>
         )}
 
@@ -210,7 +210,7 @@ const SelfHealingMonitor: React.FC = () => {
             <Typography variant="body2" fontWeight="bold">
               Predicted Issues:
             </Typography>
-            <ul style={{ margin: "4px 0", paddingLeft: 20 }}>
+            <Box component="ul" sx={{ margin: "4px 0", paddingLeft: "20px" }}>
               {status.system_health.predicted_errors
                 .slice(0, 3)
                 .map((pred, idx) => (
@@ -221,7 +221,7 @@ const SelfHealingMonitor: React.FC = () => {
                     </Typography>
                   </li>
                 ))}
-            </ul>
+            </Box>
           </Alert>
         )}
 

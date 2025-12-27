@@ -246,10 +246,11 @@ export default function MedicalImageUpload() {
               {/* Image Preview */}
               {preview && (
                 <Box sx={{ mb: 2 }}>
-                  <img
+                  <Box
+                    component="img"
                     src={preview}
                     alt="Preview"
-                    style={{
+                    sx={{
                       width: "100%",
                       maxHeight: "300px",
                       objectFit: "contain",

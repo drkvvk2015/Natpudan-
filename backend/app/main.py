@@ -23,11 +23,12 @@ import logging.handlers
 import traceback
 import asyncio
 import sys
+import os
 
 # Configure logging with UTF-8 encoding for Windows compatibility
 logging.basicConfig(
     level=logging.INFO,
-    format='[%(levelname)s] %(message)s',
+    format='[%(asctime)s] [%(levelname)s] %(name)s: %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout)
     ]
@@ -40,6 +41,40 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 logger = logging.getLogger(__name__)
 
+# Add rotating file handler for structured audit-friendly logs
+try:
+    logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    file_handler = logging.handlers.TimedRotatingFileHandler(
+        filename=os.path.join(logs_dir, "app.log"),
+        when="midnight",
+        backupCount=14,
+        encoding="utf-8"
+    )
+    file_handler.setFormatter(logging.Formatter('[%(asctime)s] [%(levelname)s] %(name)s: %(message)s'))
+    logging.getLogger().addHandler(file_handler)
+except Exception as e:
+    logger.warning(f"[LOGGING] Failed to initialize file handler: {e}")
+
+# Sentry error monitoring (optional)
+try:
+    from sentry_sdk import init as sentry_init
+    from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+    SENTRY_DSN = os.getenv("SENTRY_DSN")
+    if SENTRY_DSN:
+        sentry_init(
+            dsn=SENTRY_DSN,
+            traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
+            profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.0")),
+            environment=os.getenv("ENVIRONMENT", "development"),
+            release=os.getenv("APP_RELEASE", "1.0.0")
+        )
+        logger.info("[OK] Sentry initialized")
+    else:
+        logger.info("[INFO] Sentry DSN not set - error telemetry disabled")
+except Exception as e:
+    logger.warning(f"[SENTRY] Initialization skipped: {e}")
+
 # Import error correction system
 from app.services.error_corrector import get_error_corrector
 
@@ -47,12 +82,14 @@ error_corrector = get_error_corrector()
 
 from app.api.auth_new import router as auth_router
 from app.api.chat_new import router as chat_router
+from app.api.chat_streaming import router as chat_streaming_router
 from app.api.discharge import router as discharge_router
 from app.api.treatment import router as treatment_router
 from app.api.timeline import router as timeline_router
 from app.api.analytics import router as analytics_router
 from app.api.fhir import router as fhir_router
 from app.api.admin_users import router as admin_users_router
+from app.api.admin_audit import router as admin_audit_router
 from app.api.health import router as health_router
 # Re-enable knowledge base router now that we are on Python 3.12
 from app.api.knowledge_base import router as knowledge_router
@@ -272,6 +309,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Attach Sentry middleware if initialized
+try:
+    from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+    app.add_middleware(SentryAsgiMiddleware)
+except Exception:
+    pass
+
 # Add global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -338,6 +382,51 @@ app.add_middleware(
 # Global error handler middleware
 from app.middleware.error_handler import ErrorHandlerMiddleware
 app.add_middleware(ErrorHandlerMiddleware)
+
+# Request logging middleware for audit-friendly logs
+@app.middleware("http")
+async def request_logger(request: Request, call_next):
+    start = time.time()
+    client_ip = request.client.host if request.client else "unknown"
+    path = request.url.path
+    method = request.method
+    try:
+        response = await call_next(request)
+        duration_ms = int((time.time() - start) * 1000)
+        logging.getLogger("request").info(
+            f"{client_ip} {method} {path} -> {response.status_code} in {duration_ms}ms"
+        )
+        return response
+    except Exception as e:
+        duration_ms = int((time.time() - start) * 1000)
+        logging.getLogger("request").error(
+            f"{client_ip} {method} {path} -> 500 in {duration_ms}ms error={e}"
+        )
+        raise
+
+# Lightweight IP-based rate limiting for login endpoint
+_rate_limit_store = {}
+_RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_LOGIN_WINDOW_SECONDS", "60"))
+_RATE_LIMIT_MAX_ATTEMPTS = int(os.getenv("RATE_LIMIT_LOGIN_MAX_ATTEMPTS", "5"))
+
+@app.middleware("http")
+async def login_rate_limiter(request: Request, call_next):
+    try:
+        if request.url.path.endswith("/api/auth/login") and request.method.upper() == "POST":
+            now = time.time()
+            ip = request.client.host if request.client else "unknown"
+            bucket = _rate_limit_store.setdefault(ip, [])
+            # purge old entries
+            _rate_limit_store[ip] = [t for t in bucket if now - t <= _RATE_LIMIT_WINDOW]
+            if len(_rate_limit_store[ip]) >= _RATE_LIMIT_MAX_ATTEMPTS:
+                return JSONResponse(status_code=429, content={
+                    "error": "Too many login attempts. Please wait and try again.",
+                    "retry_after_seconds": _RATE_LIMIT_WINDOW
+                })
+            _rate_limit_store[ip].append(now)
+    except Exception as e:
+        logger.warning(f"[RATE_LIMIT] Error applying limiter: {e}")
+    return await call_next(request)
 
 @app.get("/")
 def root() -> Dict[str, Any]:
@@ -1006,6 +1095,7 @@ def dosing(payload: Dict[str, Any]) -> Dict[str, Any]:
 api_router.include_router(prescription_router)
 api_router.include_router(auth_router)
 api_router.include_router(chat_router)
+api_router.include_router(chat_streaming_router)
 api_router.include_router(discharge_router)
 api_router.include_router(treatment_router, prefix="/treatment", tags=["treatment"])
 api_router.include_router(timeline_router, prefix="/timeline", tags=["timeline"])
@@ -1015,6 +1105,7 @@ api_router.include_router(health_router, tags=["health"])
 api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
 api_router.include_router(patient_intake_router, prefix="/medical", tags=["patient-intake"])
 api_router.include_router(admin_users_router)
+api_router.include_router(admin_audit_router, prefix="/admin", tags=["admin-audit"])
 
 # KB Automation routes (scheduled syncing, feedback, integrity checks)
 from app.api.kb_automation import router as kb_automation_router

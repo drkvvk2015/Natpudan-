@@ -6,6 +6,7 @@ import {
   deleteUser,
   setPassword,
   type UserOut,
+  type UpdateUserPayload,
 } from "../../services/adminUsers";
 import {
   Box,
@@ -169,7 +170,21 @@ const UserManagement: React.FC = () => {
     if (!editingUser) return;
     setLoading(true);
     try {
-      await updateUser(editingUser.id, editForm);
+      // Filter out null values and only send defined fields to match UpdateUserPayload type
+      const payload: UpdateUserPayload = {};
+      if (editForm.full_name !== undefined)
+        payload.full_name = editForm.full_name;
+      if (editForm.role !== undefined) payload.role = editForm.role;
+      if (
+        editForm.license_number !== undefined &&
+        editForm.license_number !== null
+      ) {
+        payload.license_number = editForm.license_number;
+      }
+      if (editForm.is_active !== undefined)
+        payload.is_active = editForm.is_active;
+
+      await updateUser(editingUser.id, payload);
       setEditOpen(false);
       await load();
     } catch (err) {
@@ -545,13 +560,13 @@ const UserManagement: React.FC = () => {
               onChange={(e) =>
                 setEditForm({
                   ...editForm,
-                  is_active: e.target.value as boolean,
+                  is_active: e.target.value === "true",
                 })
               }
               disabled={loading}
             >
-              <MenuItem value={true}>Active</MenuItem>
-              <MenuItem value={false}>Inactive</MenuItem>
+              <MenuItem value="true">Active</MenuItem>
+              <MenuItem value="false">Inactive</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>

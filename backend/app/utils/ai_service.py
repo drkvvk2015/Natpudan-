@@ -2,7 +2,7 @@
 
 import os
 import logging
-from typing import List, Dict
+from typing import List, Dict, AsyncGenerator
 from openai import OpenAI, APITimeoutError, RateLimitError, APIError
 from dotenv import load_dotenv
 
@@ -197,3 +197,68 @@ Please provide:
         max_tokens=2000,
         temperature=0.6,
     )
+
+
+async def generate_ai_response_stream(
+    messages: List[Dict[str, str]],
+    system_prompt: str = "You are a helpful medical AI assistant. Provide accurate, professional medical information.",
+    max_tokens: int = 2000,
+    temperature: float = 0.7,
+) -> AsyncGenerator[str, None]:
+    """
+    Stream AI response from OpenAI API in real-time.
+    
+    Args:
+        messages: List of conversation messages with role and content
+        system_prompt: System prompt to set AI behavior
+        max_tokens: Maximum tokens in response
+        temperature: Response randomness (0-2)
+        
+    Yields:
+        Text chunks from the AI response
+    """
+    # Check if client is available
+    if not client:
+        logger.error("OpenAI client not initialized")
+        raise Exception("OpenAI API not configured. Please set OPENAI_API_KEY in backend/.env file.")
+    
+    try:
+        # Prepare messages with system prompt
+        formatted_messages = [{"role": "system", "content": system_prompt}]
+        formatted_messages.extend(messages)
+        
+        # Call OpenAI API with streaming
+        logger.debug(f"Streaming OpenAI {MODEL} with {len(messages)} messages")
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=formatted_messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stream=True,
+        )
+        
+        # Stream response chunks
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+        
+        logger.debug("OpenAI stream completed")
+    
+    except APITimeoutError as e:
+        logger.error(f"OpenAI API timeout: {e}")
+        raise Exception("OpenAI timeout. Please try again.")
+    
+    except RateLimitError as e:
+        logger.error(f"OpenAI rate limit: {e}")
+        raise Exception("OpenAI rate limit. Please wait and try again.")
+    
+    except APIError as api_error:
+        error_msg = str(api_error)
+        logger.error(f"OpenAI API Error: {error_msg}")
+        raise Exception(f"OpenAI error: {error_msg[:150]}")
+    
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Streaming error: {error_msg}", exc_info=True)
+        raise Exception(f"Streaming error: {error_msg[:100]}")
+

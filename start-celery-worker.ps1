@@ -26,24 +26,28 @@ if (-not $venvActive) {
     Write-Host "[INFO] Virtual environment already active" -ForegroundColor Green
 }
 
-# Change to backend directory
+# Change to backend directory and set PYTHONPATH
 Push-Location $BackendDir
+
+# Ensure the backend directory is in PYTHONPATH for worker subprocesses
+$env:PYTHONPATH = $BackendDir
 
 try {
     Write-Host "[INFO] Starting Celery worker..." -ForegroundColor Yellow
     Write-Host "      App: app.celery_config" -ForegroundColor Cyan
-    Write-Host "      Concurrency: 4 workers (Windows uses solo pool)" -ForegroundColor Cyan
+    Write-Host "      Concurrency: 1 worker (Windows compatibility)" -ForegroundColor Cyan
+    Write-Host "      Pool: solo (Windows requirement)" -ForegroundColor Cyan
     Write-Host "      Log level: info" -ForegroundColor Cyan
     Write-Host "      Task events: ENABLED (-E)" -ForegroundColor Cyan
     Write-Host "`n[INFO] Worker ready and waiting for tasks...`n" -ForegroundColor Green
     Write-Host "Logs will appear below:" -ForegroundColor Gray
     Write-Host "----------------------------------------`n" -ForegroundColor Gray
     
-    # Start the worker
+    # Start the worker with solo pool for Windows compatibility
+    # Solo pool runs tasks in the main process, avoiding subprocess import issues
     celery -A app.celery_config worker `
+        --pool=solo `
         --loglevel=info `
-        --concurrency=4 `
-        --max-tasks-per-child=1000 `
         -E
     
 } catch {

@@ -1,0 +1,51 @@
+{
+  "cached_at": "2025-12-22T14:00:57.314233",
+  "content": [
+    {
+      "title": "Multiple myeloma: 2024 update on diagnosis, risk-stratification, and management.",
+      "abstract": "Multiple myeloma accounts for approximately 10% of hematologic malignancies. The diagnosis requires \u226510% clonal bone marrow plasma cells or a biopsy proven plasmacytoma plus evidence of one or more multiple myeloma defining events (MDE): CRAB (hypercalcemia, renal failure, anemia, or lytic bone lesions) attributable to the plasma cell disorder, bone marrow clonal plasmacytosis \u226560%, serum involved/uninvolved free light chain (FLC) ratio \u2265100 (provided involved FLC is \u2265100\u2009mg/L and urine monoclon...",
+      "year": "2024",
+      "pmid": "38943315",
+      "authors": "S Vincent Rajkumar",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/38943315/"
+    },
+    {
+      "title": "Hodgkin lymphoma: 2025 update on diagnosis, risk-stratification, and management.",
+      "abstract": "Hodgkin lymphoma (HL) is an uncommon B-cell lymphoid malignancy affecting 8570 new patients annually and representing ~10% of all lymphomas in the United States. HL is composed of two distinct disease entities: classical HL and nodular lymphocyte predominant HL (also called nodular lymphocyte predominant B-cell lymphoma). Nodular sclerosis, mixed cellularity, lymphocyte depletion, and lymphocyte-rich HL are subgroups of classical HL. An accurate assessment of the stage of disease in patients wit...",
+      "year": "2024",
+      "pmid": "39239794",
+      "authors": "Stephen M Ansell",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39239794/"
+    },
+    {
+      "title": "Diagnosis and management of status epilepticus: improving the status quo.",
+      "abstract": "Status epilepticus is a common neurological emergency that is characterised by prolonged or recurrent seizures without recovery between episodes and associated with substantial morbidity and mortality. Prompt recognition and targeted therapy can reduce the risk of complications and death associated with status epilepticus, thereby improving outcomes. The most recent International League Against Epilepsy definition considers two important timepoints in status epilepticus: first, when the seizure ...",
+      "year": "2025",
+      "pmid": "39637874",
+      "authors": "Jennifer V Gettings, Fatemeh Mohammad Alizadeh Chafjiri, Archana A Patel",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39637874/"
+    },
+    {
+      "title": "Management of diabetes and hyperglycaemia in the hospital.",
+      "abstract": "Hyperglycaemia in people with and without diabetes admitted to the hospital is associated with a substantial increase in morbidity, mortality, and health-care costs. Professional societies have recommended insulin therapy as the cornerstone of inpatient pharmacological management. Intravenous insulin therapy is the treatment of choice in the critical care setting. In non-intensive care settings, several insulin protocols have been proposed to manage patients with hyperglycaemia; however, meta-an...",
+      "year": "2021",
+      "pmid": "33515493",
+      "authors": "Francisco J Pasquel, M Cecilia Lansang, Ketan Dhatariya",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/33515493/"
+    },
+    {
+      "title": "Thyroid nodules: diagnosis and management.",
+      "abstract": "Thyroid nodules, with a prevalence of almost 25% in the general population, are a common occurrence. Their prevalence varies considerably depending on demographics such as age and sex as well as the presence of risk factors. This article provides a comprehensive overview of the prevalence, risk stratification and current management strategies for thyroid nodules, with a particular focus on changes in diagnostic and therapeutic protocols that have occurred over the past 10 years. Several sonograp...",
+      "year": "2024",
+      "pmid": "39152228",
+      "authors": "Giorgio Grani, Marialuisa Sponziello, Sebastiano Filetti",
+      "source": "PubMed",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39152228/"
+    }
+  ],
+  "ttl_hours": 24
+}

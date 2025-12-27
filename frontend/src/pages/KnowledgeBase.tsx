@@ -431,15 +431,16 @@ export default function KnowledgeBase() {
                     >
                       {/* eslint-disable-next-line */}
                       Location:{" "}
-                      <code
-                        style={{
+                      <Box
+                        component="code"
+                        sx={{
                           fontSize: "0.75rem",
                           whiteSpace: "pre-wrap",
                           wordBreak: "break-all",
                         }}
                       >
                         {knowledgeStats.medical_books_dir}
-                      </code>
+                      </Box>
                     </Typography>
                   )}
                 </CardContent>

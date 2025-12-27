@@ -23,6 +23,19 @@ def get_medical_assistant():
     return medical_assistant
 
 
+@router.get("/health/features")
+async def health_features() -> Dict[str, Any]:
+    """
+    Unified feature readiness report: database, OpenAI, Redis/Celery, and knowledge base.
+    """
+    try:
+        from app.services.feature_status import get_feature_status
+        return get_feature_status()
+    except Exception as e:
+        logger.error(f"Feature health error: {e}", exc_info=True)
+        return {"overall_status": "error", "error": str(e)}
+
+
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
     """

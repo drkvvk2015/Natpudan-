@@ -1,0 +1,103 @@
+# Quick Start Card - Podman Setup for Natpudan AI
+
+## ⚡ 3-Step Quick Start
+
+### Step 1: Install Podman (5-10 minutes)
+```powershell
+# Run as Administrator
+.\install-podman.ps1
+```
+
+### Step 2: Start Application
+```powershell
+.\start-podman-compose.ps1
+```
+
+### Step 3: Open in Browser
+```
+http://127.0.0.1:3000
+```
+
+---
+
+## 📋 Status Checklist
+
+- [x] PowerShell scripts fixed (no encoding errors)
+- [x] Installation script created (handles everything)
+- [x] Getting started guide written (step-by-step)
+- [x] Troubleshooting guide included (solutions for common issues)
+- [x] Command reference provided (PODMAN_QUICK_REFERENCE.md)
+- [x] Documentation complete (10+ files)
+
+---
+
+## 📖 Documentation Quick Links
+
+| Need | File |
+|------|------|
+| How to start | **PODMAN_GETTING_STARTED.md** |
+| Install help | PODMAN_WINDOWS_INSTALLATION.md |
+| Commands | PODMAN_QUICK_REFERENCE.md |
+| Troubleshooting | PODMAN_TROUBLESHOOTING.md |
+| Full guide | PODMAN_SETUP.md |
+
+---
+
+## 🛠️ Scripts Available
+
+| Script | Purpose | Use When |
+|--------|---------|----------|
+| install-podman.ps1 | Install Podman | First time setup |
+| start-podman-compose.ps1 | Start all services | Development |
+| deploy-podman-production.ps1 | Production deploy | Going live |
+| podman-utils.psm1 | Helper functions | Advanced users |
+
+---
+
+## ✅ Verification Commands
+
+```powershell
+# After running install-podman.ps1, verify:
+podman --version
+podman-compose --version
+podman machine list
+```
+
+All should work without errors.
+
+---
+
+## 🚀 After Installation
+
+```powershell
+# Services will be at:
+Frontend:  http://127.0.0.1:3000
+Backend:   http://127.0.0.1:8000
+Database:  127.0.0.1:5432
+Redis:     127.0.0.1:6379
+```
+
+---
+
+## 🆘 Quick Help
+
+**Podman not found after install?**
+- Open a NEW PowerShell window
+- PATH needs to refresh
+
+**Services won't start?**
+- Check: `podman machine list` (should show "running")
+- View logs: `podman-compose logs`
+
+**More issues?**
+- See: PODMAN_TROUBLESHOOTING.md
+
+---
+
+## 🎯 Next Action
+
+**👉 Read**: PODMAN_GETTING_STARTED.md  
+**👉 Run**: .\install-podman.ps1  
+**👉 Start**: .\start-podman-compose.ps1  
+
+That's all you need! 🎉

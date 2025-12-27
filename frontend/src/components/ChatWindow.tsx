@@ -7,9 +7,28 @@ import {
   Paper,
   CircularProgress,
   Alert,
+  Chip,
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField as DialogTextField,
+  List,
+  ListItem,
+  ListItemText,
 } from "@mui/material";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import SendIcon from "@mui/icons-material/Send";
-import { sendChatMessage, getConversationMessages } from "../services/api";
+import MedicationIcon from "@mui/icons-material/Medication";
+import SearchIcon from "@mui/icons-material/Search";
+import {
+  sendChatMessage,
+  getConversationMessages,
+  checkDrugInteractions,
+  searchDrug,
+} from "../services/api";
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -26,6 +45,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
+  const [showDrugInteractionDialog, setShowDrugInteractionDialog] =
+    useState(false);
+  const [showICDDialog, setShowICDDialog] = useState(false);
+  const [drugList, setDrugList] = useState<string[]>(["", ""]);
+  const [icdQuery, setIcdQuery] = useState("");
+  const [drugCheckResults, setDrugCheckResults] = useState<any>(null);
+  const [icdResults, setIcdResults] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -140,6 +167,88 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     }
   };
 
+  const handleCheckDrugInteraction = async () => {
+    const validDrugs = drugList.filter((d) => d.trim());
+    if (validDrugs.length < 2) {
+      setError("Please enter at least 2 drugs to check interactions");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await checkDrugInteractions({ drugs: validDrugs });
+      setDrugCheckResults(response);
+
+      // Format and add to chat
+      const interactionSummary =
+        response.interactions?.length > 0
+          ? `Found ${
+              response.interactions.length
+            } interaction(s):\n${response.interactions
+              .map(
+                (i: any) => `- ${i.drug1} + ${i.drug2}: ${i.severity} severity`
+              )
+              .join("\n")}`
+          : "No significant interactions found";
+
+      const systemMessage: ChatMessage = {
+        role: "system",
+        content: `💊 Drug Interaction Check:\n${interactionSummary}`,
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, systemMessage]);
+      setShowDrugInteractionDialog(false);
+      setDrugList(["", ""]);
+      setError(null);
+    } catch (err: any) {
+      setError(`Failed to check drug interactions: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchICD = async () => {
+    if (!icdQuery.trim()) {
+      setError("Please enter a diagnosis or symptom");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `/api/medical/icd/search?query=${encodeURIComponent(
+          icdQuery
+        )}&max_results=5`
+      );
+      const data = await response.json();
+      setIcdResults(Array.isArray(data) ? data : []);
+
+      const icdSummary =
+        data.length > 0
+          ? data
+              .slice(0, 5)
+              .map((item: any) => `- ${item.code}: ${item.description}`)
+              .join("\n")
+          : "No ICD-10 codes found";
+
+      const systemMessage: ChatMessage = {
+        role: "system",
+        content: `📋 ICD-10 Code Search for "${icdQuery}":\n${icdSummary}`,
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, systemMessage]);
+      setShowICDDialog(false);
+      setIcdQuery("");
+      setError(null);
+    } catch (err: any) {
+      setError(`Failed to search ICD codes: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -153,8 +262,54 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       <Typography variant="h6" gutterBottom>
         {conversationId
           ? `Conversation #${conversationId}`
-          : "AI Medical Assistant"}
+          : "Medical AI Chat Assistant"}
       </Typography>
+      {!conversationId && messages.length === 0 && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: "grey.50" }}>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            This assistant provides evidence-based medical information. It can
+            synthesize content from the built-in knowledge base and cite
+            sources. It does not replace professional judgment.
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            For emergencies, call local emergency services immediately.
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
+            <Chip
+              label="Define fever"
+              onClick={() => setInputMessage("Define fever")}
+              size="small"
+            />
+            <Chip
+              label="Treatment for community-acquired pneumonia"
+              onClick={() =>
+                setInputMessage(
+                  "What is the treatment for community-acquired pneumonia in adults?"
+                )
+              }
+              size="small"
+            />
+            <Chip
+              label="Drug interaction: warfarin + amoxicillin"
+              onClick={() =>
+                setInputMessage(
+                  "Check interaction between warfarin and amoxicillin"
+                )
+              }
+              size="small"
+            />
+            <Chip
+              label="Causes of chest pain"
+              onClick={() =>
+                setInputMessage(
+                  "List common causes of chest pain and red flags"
+                )
+              }
+              size="small"
+            />
+          </Stack>
+        </Paper>
+      )}
 
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
@@ -173,7 +328,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
           gap: 2,
         }}
       >
-        {messages.length === 0 && !loading && (
+        {messages.length === 0 && !loading && conversationId && (
           <Box
             sx={{
               display: "flex",
@@ -183,7 +338,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
             }}
           >
             <Typography variant="body2" color="text.secondary">
-              Start a conversation with the AI Medical Assistant
+              Start a conversation with the Medical AI Assistant
             </Typography>
           </Box>
         )}
@@ -214,9 +369,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
                     : "text.primary",
               }}
             >
-              <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                {msg.content}
-              </Typography>
+              {msg.role === "assistant" ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {msg.content}
+                </ReactMarkdown>
+              ) : (
+                <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                  {msg.content}
+                </Typography>
+              )}
               {msg.timestamp && (
                 <Typography
                   variant="caption"
@@ -241,28 +402,132 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       </Box>
 
       {/* Input Area */}
-      <Box sx={{ display: "flex", gap: 1 }}>
-        <TextField
-          fullWidth
-          multiline
-          maxRows={4}
-          placeholder="Type your message..."
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
-          disabled={loading}
-          variant="outlined"
-        />
-        <Button
-          variant="contained"
-          endIcon={<SendIcon />}
-          onClick={handleSendMessage}
-          disabled={loading || !inputMessage.trim()}
-          sx={{ minWidth: 100 }}
-        >
-          Send
-        </Button>
+      <Box sx={{ display: "flex", gap: 1, flexDirection: "column" }}>
+        {/* Quick action buttons */}
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+          <Button
+            size="small"
+            startIcon={<MedicationIcon />}
+            variant="outlined"
+            onClick={() => setShowDrugInteractionDialog(true)}
+            disabled={loading}
+          >
+            Check Drug Interaction
+          </Button>
+          <Button
+            size="small"
+            startIcon={<SearchIcon />}
+            variant="outlined"
+            onClick={() => setShowICDDialog(true)}
+            disabled={loading}
+          >
+            Search ICD-10 Codes
+          </Button>
+        </Stack>
+
+        {/* Message input */}
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <TextField
+            fullWidth
+            multiline
+            maxRows={4}
+            placeholder="Type your medical question..."
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={loading}
+            variant="outlined"
+          />
+          <Button
+            variant="contained"
+            endIcon={<SendIcon />}
+            onClick={handleSendMessage}
+            disabled={loading || !inputMessage.trim()}
+            sx={{ minWidth: 100 }}
+          >
+            Send
+          </Button>
+        </Box>
       </Box>
+
+      {/* Drug Interaction Dialog */}
+      <Dialog
+        open={showDrugInteractionDialog}
+        onClose={() => setShowDrugInteractionDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Check Drug Interactions</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+            {drugList.map((drug, idx) => (
+              <TextField
+                key={idx}
+                label={`Drug ${idx + 1}`}
+                value={drug}
+                onChange={(e) => {
+                  const newList = [...drugList];
+                  newList[idx] = e.target.value;
+                  setDrugList(newList);
+                }}
+                placeholder="e.g., Warfarin, Amoxicillin"
+                fullWidth
+              />
+            ))}
+            <Button
+              variant="outlined"
+              onClick={() => setDrugList([...drugList, ""])}
+            >
+              Add Drug
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDrugInteractionDialog(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCheckDrugInteraction}
+            variant="contained"
+            disabled={loading}
+          >
+            Check
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ICD-10 Search Dialog */}
+      <Dialog
+        open={showICDDialog}
+        onClose={() => setShowICDDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Search ICD-10 Codes</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+            <TextField
+              label="Diagnosis or Symptom"
+              value={icdQuery}
+              onChange={(e) => setIcdQuery(e.target.value)}
+              placeholder="e.g., Diabetes, Hypertension, Fever"
+              fullWidth
+              multiline
+              maxRows={3}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowICDDialog(false)}>Cancel</Button>
+          <Button
+            onClick={handleSearchICD}
+            variant="contained"
+            disabled={loading}
+          >
+            Search
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -20,6 +20,7 @@ import TreatmentPlan from "./pages/TreatmentPlan";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import FHIRExplorer from "./pages/FHIRExplorer";
 import UserManagement from "./pages/admin/UserManagement";
+import AuditLogs from "./pages/admin/AuditLogs";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -224,6 +225,16 @@ function App() {
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <Layout>
                     <UserManagement />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/audit-logs"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <Layout>
+                    <AuditLogs />
                   </Layout>
                 </ProtectedRoute>
               }

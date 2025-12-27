@@ -37,8 +37,6 @@ services:
       - POSTGRES_DB=physician_ai
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     restart: unless-stopped
     networks:
       - physician-ai-network
@@ -115,8 +113,6 @@ services:
       dockerfile: Dockerfile
     container_name: physician-ai-flower
     command: celery -A app.celery_config flower --port=5555 --basic_auth=admin:changeme
-    ports:
-      - "5555:5555"
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0

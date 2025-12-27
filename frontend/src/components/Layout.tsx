@@ -103,6 +103,11 @@ export default function Layout({ children }: LayoutProps) {
       ...staffExtra,
       ...doctorItems,
       { text: "User Management", icon: <PersonIcon />, path: "/admin/users" },
+      {
+        text: "Audit Logs",
+        icon: <AssessmentIcon />,
+        path: "/admin/audit-logs",
+      },
     ];
   }
 
