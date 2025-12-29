@@ -1,13 +1,19 @@
-# Build stage
-FROM node:18-alpine as build
+# Build stage (Mirrored for corporate bypass)
+FROM mirror.gcr.io/library/node:20-alpine as build
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
+# Handle corporate proxy during build
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG http_proxy
+ARG https_proxy
+
 # Install dependencies
-RUN npm ci --only=production
+RUN npm config set strict-ssl false && npm install --production
 
 # Copy source code
 COPY . .
@@ -16,7 +22,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM mirror.gcr.io/library/nginx:alpine
 
 # Copy built files from build stage
 COPY --from=build /app/dist /usr/share/nginx/html

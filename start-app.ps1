@@ -1,203 +1,200 @@
-# Natpudan AI Medical Assistant - Auto-Recovery Startup Script
-# This script includes automatic error detection and correction
+<#
+.SYNOPSIS
+Start Natpudan AI using Podman (Production/Containerized Mode)
+.DESCRIPTION
+This script manages the full lifecycle of the Podman-based deployment.
+It handles checking prerequisites, cleaning up errors, setting up networks,
+and starting services via Podman Compose.
+.PARAMETER Clear
+If set, cleans up all existing containers and volumes before starting (Fixes errors).
+.PARAMETER Build
+If set, rebuilds the container images.
+.EXAMPLE
+.\start-app.ps1 -Clear
+.EXAMPLE
+.\start-app.ps1 -Build
+#>
 
 param(
-    [switch]$NoAutoFix,
-    [switch]$Verbose
+    [switch]$Clear,
+    [switch]$Build,
+    [switch]$Native  # Runs locally without containers (fallback)
 )
 
-$ErrorActionPreference = "Continue"
-$rootDir = "D:\Users\CNSHO\Documents\GitHub\Natpudan-"
-$backendDir = Join-Path $rootDir "backend"
-$frontendDir = Join-Path $rootDir "frontend"
-$venvPython = Join-Path $rootDir ".venv\Scripts\python.exe"
+$ErrorActionPreference = "Stop"
+
+$global:RootDir = "D:\Users\CNSHO\Documents\GitHub\Natpudan-"
+$global:BackendDir = Join-Path $global:RootDir "backend"
+$global:FrontendDir = Join-Path $global:RootDir "frontend"
+$global:VenvPython = Join-Path $global:RootDir ".venv\Scripts\python.exe"
 
 function Write-Status {
     param([string]$Message, [string]$Type = "Info")
-    $colors = @{
-        "Success" = "Green"
-        "Error" = "Red"
-        "Warning" = "Yellow"
-        "Info" = "Cyan"
-    }
+    $colors = @{ "Success"="Green"; "Error"="Red"; "Warning"="Yellow"; "Info"="Cyan" }
     Write-Host $Message -ForegroundColor $colors[$Type]
 }
 
-function Test-Port {
-    param([int]$Port)
-    $connection = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
-    return $null -ne $connection
-}
-
-function Stop-PortProcesses {
-    param([int]$Port)
-    Write-Status "Clearing port $Port..." "Warning"
-    $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
-    foreach ($conn in $connections) {
-        try {
-            Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
-            Write-Status "  Stopped process $($conn.OwningProcess)" "Info"
-        } catch {
-            Write-Status "  Could not stop process $($conn.OwningProcess)" "Warning"
-        }
-    }
-    Start-Sleep 1
-}
-
-function Test-ServiceHealth {
-    param([string]$Url, [string]$Name)
-    try {
-        $response = Invoke-WebRequest -Uri $Url -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-        if ($response.StatusCode -eq 200) {
-            Write-Status "  $Name is healthy" "Success"
-            return $true
-        }
-    } catch {
-        Write-Status "  $Name not responding" "Warning"
-        return $false
-    }
-    return $false
-}
-
-function Repair-Environment {
-    Write-Status "`n=== Auto Error Correction ===" "Info"
-    
-    # Check and fix .env files
-    Write-Status "Checking environment configuration..." "Info"
-    
-    $frontendEnv = Join-Path $frontendDir ".env"
-    $correctEnvContent = @"
-# Backend API URL - used directly by frontend (no proxy)
-VITE_API_BASE_URL=http://127.0.0.1:8000
-VITE_WS_URL=ws://127.0.0.1:8000
-"@
-    
-    if (Test-Path $frontendEnv) {
-        $currentContent = Get-Content $frontendEnv -Raw
-        if ($currentContent -notmatch "http://127.0.0.1:8000") {
-            Write-Status "  Fixing frontend .env configuration..." "Warning"
-            Set-Content -Path $frontendEnv -Value $correctEnvContent -Force
-            Write-Status "  Frontend .env corrected" "Success"
-        } else {
-            Write-Status "  Frontend .env is correct" "Success"
-        }
-    } else {
-        Write-Status "  Creating frontend .env..." "Warning"
-        Set-Content -Path $frontendEnv -Value $correctEnvContent -Force
-        Write-Status "  Frontend .env created" "Success"
-    }
-    
-    # Check Python virtual environment
-    if (-not (Test-Path $venvPython)) {
-        Write-Status "  Python virtual environment not found!" "Error"
-        Write-Status "  Run: python -m venv .venv" "Info"
-        return $false
-    }
-    
-    # Check Node modules
-    $nodeModules = Join-Path $frontendDir "node_modules"
-    if (-not (Test-Path $nodeModules)) {
-        Write-Status "  Node modules not found. Installing..." "Warning"
-        Set-Location $frontendDir
-        npm install
-        Write-Status "  Node modules installed" "Success"
-    }
-    
-    Write-Status "Environment check complete" "Success"
-    return $true
-}
-
-# Main Script
 Clear-Host
-Write-Status "=====================================" "Info"
-Write-Status "Natpudan AI Medical Assistant" "Info"
-Write-Status "Auto-Recovery Startup" "Info"
-Write-Status "=====================================" "Info"
+Write-Status "========================================" "Info"
+Write-Status "   Natpudan AI - Podman Controller" "Info"
+Write-Status "========================================" "Info"
 
-# Step 1: Stop conflicting processes
-Write-Status "`nStep 1: Clearing ports..." "Info"
-if (Test-Port 8000) { Stop-PortProcesses 8000 }
-if (Test-Port 5173) { Stop-PortProcesses 5173 }
-Write-Status "Ports cleared" "Success"
-
-# Step 2: Auto error correction
-if (-not $NoAutoFix) {
-    if (-not (Repair-Environment)) {
-        Write-Status "`nEnvironment repair failed. Exiting..." "Error"
+# Handle Native Fallback
+if ($Native) {
+    Write-Status "Running in NATIVE mode (Local installation)..." "Warning"
+    
+    # Check Python Venv
+    if (-not (Test-Path $global:VenvPython)) {
+        Write-Status "Virtual environment not found at $($global:VenvPython). Please run .\recreate-venv-fixed.ps1" "Error"
         exit 1
     }
+
+    Write-Status "Starting Backend..." "Info"
+    $backendJob = Start-Job -ScriptBlock {
+        param($dir, $python)
+        Set-Location $dir
+        & $python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    } -ArgumentList $global:BackendDir, $global:VenvPython
+
+    Write-Status "Starting Frontend..." "Info"
+    $frontendJob = Start-Job -ScriptBlock {
+        param($dir)
+        Set-Location $dir
+        npm run dev -- --port 5173
+    } -ArgumentList $global:FrontendDir
+
+    Write-Status "Native services started (Jobs: $($backendJob.Id), $($frontendJob.Id))" "Success"
+    Write-Host "Wait for services to initialize..."
+    Start-Sleep -Seconds 10
+    Read-Host "Press Enter to stop services..."
+    Get-Job | Stop-Job
+    exit 0
 }
 
-# Step 3: Start Backend
-Write-Status "`nStep 2: Starting Backend..." "Info"
-$backendJob = Start-Job -ScriptBlock {
-    param($dir, $python)
-    Set-Location $dir
-    $env:PYTHONIOENCODING = "utf-8"
-    $env:PYTHONUTF8 = "1"
-    & $python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 2>&1
-} -ArgumentList $backendDir, $venvPython
+# 1. Check Podman
+if (-not (Get-Command podman -ErrorAction SilentlyContinue)) {
+    Write-Status "Podman not found in PATH." "Error"
+    Write-Host "Please install Podman Desktop: https://podman.io/docs/installation/windows"
+    exit 1
+}
+Write-Status "[OK] Podman detected" "Success"
 
-Write-Status "Backend starting (Job ID: $($backendJob.Id))..." "Info"
-Start-Sleep 4
+# 2. Check Podman Machine (Windows specific)
+try {
+    $machineJson = podman machine list --format=json | ConvertFrom-Json
+    $runningMachine = $machineJson | Where-Object { $_.IsRunning -eq $true }
+    if (-not $runningMachine) {
+        Write-Status "Starting Podman Machine..." "Warning"
+        podman machine start
+        Start-Sleep -Seconds 5
+    }
+    Write-Status "[OK] Podman Machine running" "Success"
+} catch {
+    Write-Status "Could not check Podman Machine (ignoring if on Linux)..." "Warning"
+}
 
-# Verify backend
-if (Test-ServiceHealth "http://127.0.0.1:8000/health" "Backend") {
-    Write-Status "Backend ready" "Success"
+# 3. Clear Errors / Cleanup (Requested by User)
+if ($Clear) {
+    Write-Status "Clearing all errors and previous sessions..." "Warning"
+    try {
+        podman-compose down 2>$null
+        podman system prune -f 2>$null
+        Write-Status "[OK] System cleaned" "Success"
+    } catch {
+        Write-Status "Cleanup minor warning: $_" "Warning"
+    }
+}
+
+# 4. Check/Create .env
+if (-not (Test-Path ".env")) {
+    Write-Status "Creating .env configuration..." "Warning"
+    $envContent = @"
+ENVIRONMENT=production
+DEBUG=False
+POSTGRES_USER=physician_user
+POSTGRES_PASSWORD=secure_password
+POSTGRES_DB=physician_ai
+# OpenAI API Key - PLEASE UPDATE
+OPENAI_API_KEY=sk-placeholder
+# Redis Configuration (Container-friendly)
+REDIS_URL=redis://redis:6379/0
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+# Ollama Configuration (Pointing to Host)
+OLLAMA_HOST=http://host.containers.internal:11434
+"@
+    Set-Content -Path ".env" -Value $envContent
+    Write-Status "[OK] .env created" "Success"
+}
+
+# 5. Start Services
+Write-Status "Starting Services (Redis, DB, Backend, Frontend)..." "Info"
+
+# Capture host proxy settings to pass to build (Filtered for garbage)
+$buildArgs = ""
+$garbage = @("", "...", "placeholder")
+if ($garbage -notcontains $env:HTTP_PROXY) { $buildArgs += " --build-arg HTTP_PROXY=$env:HTTP_PROXY" }
+if ($garbage -notcontains $env:HTTPS_PROXY) { $buildArgs += " --build-arg HTTPS_PROXY=$env:HTTPS_PROXY" }
+if ($garbage -notcontains $env:http_proxy) { $buildArgs += " --build-arg http_proxy=$env:http_proxy" }
+if ($garbage -notcontains $env:https_proxy) { $buildArgs += " --build-arg https_proxy=$env:https_proxy" }
+
+$composeArgs = "up -d"
+if ($Build) { 
+    Write-Status "Building with proxy support..." "Info"
+    $composeArgs = "build $buildArgs; podman-compose up -d"
+}
+
+try {
+    # Ensure podman-compose is available
+    if (-not (Get-Command podman-compose -ErrorAction SilentlyContinue)) {
+        throw "podman-compose not found. Run 'pip install podman-compose' or ensure it's in PATH."
+    }
+
+    if ($Build) {
+        # Run build separately to ensure args are passed
+        Invoke-Expression "podman-compose build $buildArgs"
+        podman-compose up -d
+    } else {
+        podman-compose up -d
+    }
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Status "[OK] Services started successfully" "Success"
+    } else {
+        throw "podman-compose exited with code $LASTEXITCODE"
+    }
+} catch {
+    Write-Status "Failed to start services: $_" "Error"
+    exit 1
+}
+
+# 6. Verification
+Write-Status "`nVerifying services..." "Info"
+Start-Sleep -Seconds 5
+
+# Check Backend
+$backendHealth = podman inspect -f '{{.State.Health.Status}}' physician-ai-backend 2>$null
+if ($backendHealth -eq "healthy") {
+    Write-Status "[OK] Backend is HEALTHY" "Success"
 } else {
-    Write-Status "Backend may still be starting..." "Warning"
+    Write-Status "[!] Backend status: $backendHealth" "Warning"
 }
 
-# Step 4: Start Frontend
-Write-Status "`nStep 3: Starting Frontend..." "Info"
-$frontendJob = Start-Job -ScriptBlock {
-    param($dir)
-    Set-Location $dir
-    $env:NODE_OPTIONS = '--no-warnings'
-    npx vite --host 127.0.0.1 --port 5173 2>&1
-} -ArgumentList $frontendDir
-
-Write-Status "Frontend starting (Job ID: $($frontendJob.Id))..." "Info"
-Start-Sleep 5
-
-# Verify frontend
-if (Test-ServiceHealth "http://127.0.0.1:5173" "Frontend") {
-    Write-Status "Frontend ready" "Success"
+# Check Redis
+if ((podman exec physician-ai-redis redis-cli ping) -eq "PONG") {
+    Write-Status "[OK] Redis is ONLINE and RESPONDING" "Success"
 } else {
-    Write-Status "Frontend may still be starting..." "Warning"
+    Write-Status "[!] Redis is not responding" "Error"
 }
 
-# Step 5: Final Status
-Start-Sleep 2
-Write-Status "`n=====================================" "Success"
-Write-Status "Services Started Successfully!" "Success"
-Write-Status "=====================================" "Success"
-
-Write-Host "`nBackend:  " -NoNewline -ForegroundColor White
-Write-Host "http://127.0.0.1:8000" -ForegroundColor Green
-Write-Host "Frontend: " -NoNewline -ForegroundColor White
-Write-Host "http://127.0.0.1:5173" -ForegroundColor Green
-
-Write-Status "`n[OK] No certificate warnings (using HTTP)" "Success"
-Write-Status "[OK] Auto error correction enabled" "Success"
-Write-Status "[OK] Services running in background jobs" "Success"
-
-Write-Host "`n[LIST] Open in browser: " -NoNewline
-Write-Host "http://127.0.0.1:5173" -ForegroundColor Yellow
-
-Write-Host "`n[TIP] Commands:" -ForegroundColor Cyan
-Write-Host "  Get-Job              - View running jobs"
-Write-Host "  Receive-Job -Id X    - View job output"
-Write-Host "  Stop-Job -Id X       - Stop a service"
-Write-Host "  Get-Job | Stop-Job   - Stop all services"
-
-if ($Verbose) {
-    Write-Host "`n[STATS] Service Status:" -ForegroundColor Cyan
-    Write-Host "`nBackend Job:"
-    Receive-Job -Id $backendJob.Id -Keep | Select-Object -Last 5
-    Write-Host "`nFrontend Job:"
-    Receive-Job -Id $frontendJob.Id -Keep | Select-Object -Last 5
-}
-
-Write-Status "`n[SPARKLE] Startup complete! App is ready." "Success"
-Read-Host "Press Enter to stop services and exit..."
+Write-Status "`n========================================" "Info"
+Write-Status "   Natpudan AI - Deployment Ready" "Success"
+Write-Status "========================================" "Info"
+Write-Host "Services are running at:"
+Write-Host "  - Frontend: http://localhost:3000" -ForegroundColor Cyan
+Write-Host "  - Backend API: http://localhost:8000/docs" -ForegroundColor Cyan
+Write-Host "`nTo access container shell (SSH):"
+Write-Host "  .\connect-ssh.ps1 -Container backend" -ForegroundColor Yellow
+Write-Host "  .\connect-ssh.ps1 -Container redis" -ForegroundColor Yellow
+Write-Host "  Flower:   http://localhost:5555"
+Write-Host "`nTo stop: podman-compose down" -ForegroundColor Gray

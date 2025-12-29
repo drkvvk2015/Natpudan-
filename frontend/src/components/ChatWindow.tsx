@@ -139,7 +139,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
           "Server error. Please check if the backend is running and OpenAI API key is configured.";
       } else if (err?.message?.includes("Network Error")) {
         errorMsg =
-          "Network error. Please check if the backend is running on http://localhost:8000";
+          "Network error. Please check if the backend is running on http://localhost:8001";
       } else if (err?.response?.data?.detail) {
         errorMsg = err.response.data.detail;
       }

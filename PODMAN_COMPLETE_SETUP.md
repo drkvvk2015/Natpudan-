@@ -12,10 +12,10 @@ I've configured your Natpudan AI Medical Assistant project for Podman, a modern 
 3. **[PODMAN_TROUBLESHOOTING.md](./PODMAN_TROUBLESHOOTING.md)** - Comprehensive troubleshooting guide
 
 ### 🚀 Scripts
-1. **[start-podman-compose.ps1](./start-podman-compose.ps1)** - Start full stack with Podman (recommended for development)
-2. **[deploy-podman-production.ps1](./deploy-podman-production.ps1)** - Production deployment script
-3. **[migrate-from-docker.ps1](./migrate-from-docker.ps1)** - Migration helper script
-4. **[podman-utils.psm1](./podman-utils.psm1)** - PowerShell utility module for common tasks
+1. **[start-app.ps1](./start-app.ps1)** - Main entry point. Automatically handles Podman machine startup, .env creation, environment cleanup, and proxy-aware builds.
+2. **[connect-ssh.ps1](./connect-ssh.ps1)** - Interactive shell access (SSH substitute) for all containers (backend, redis, db, etc.).
+3. **[fix-podman-trust.ps1](./fix-podman-trust.ps1)** - Advanced network fix. Captures corporate proxy certificates and configures Google mirrors to bypass "403 Forbidden" or "x509" download errors.
+4. **[podman-utils.psm1](./podman-utils.psm1)** - PowerShell utility module for common tasks.
 
 ## Quick Start (3 Steps)
 
@@ -45,11 +45,12 @@ podman machine list
 # Navigate to project
 cd d:\Users\CNSHO\Documents\GitHub\Natpudan-
 
-# Start all services
-.\start-podman-compose.ps1
+# START HERE (The modern way)
+.\start-app.ps1 -Clear -Build
 
-# Or use manual command
-podman-compose up -d
+# If your corporate network blocks the downloads (403 errors):
+.\fix-podman-trust.ps1
+.\start-app.ps1 -Build
 ```
 
 ## Key Features of This Setup

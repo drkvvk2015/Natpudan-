@@ -9,6 +9,7 @@ This advanced system learns from errors and automatically evolves correction str
 4. **Predictive Prevention**: Monitors system health to prevent errors before they occur
 5. **Auto-Optimization**: Adjusts system parameters based on historical data
 6. **Knowledge Base**: Builds a database of error solutions that grows over time
+7. **Connection Monitoring**: Auto-detects and fixes port mismatches and config issues
 
 Architecture:
 - ErrorPattern: ML model for pattern recognition
@@ -16,6 +17,7 @@ Architecture:
 - SuccessTracker: Tracks fix effectiveness
 - PreventionEngine: Proactive error prevention
 - LearningDatabase: Persistent storage of learned solutions
+- ConnectionHealthMonitor: Auto-fixes port and configuration issues
 """
 
 import logging
@@ -395,7 +397,15 @@ class SelfHealingSystem:
         self.prevention_engine = PreventionEngine(self.pattern_analyzer)
         self.metrics = self._load_metrics()
         
-        logger.info("Self-healing system initialized")
+        # Initialize connection health monitor
+        try:
+            from app.services.connection_health_monitor import get_connection_monitor
+            self.connection_monitor = get_connection_monitor()
+            logger.info("Self-healing system initialized with connection monitoring")
+        except Exception as e:
+            logger.warning(f"Connection monitor not available: {e}")
+            self.connection_monitor = None
+            logger.info("Self-healing system initialized")
     
     def _load_metrics(self) -> Dict[str, Any]:
         """Load system metrics"""
@@ -427,6 +437,30 @@ class SelfHealingSystem:
         error_type = type(error).__name__
         
         logger.info(f"Self-healing system handling {error_type}")
+        
+        # Check if this is a connection-related error
+        if self.connection_monitor:
+            conn_context = self.connection_monitor.get_error_context(error)
+            if conn_context and conn_context.get('auto_fixable'):
+                logger.info("[SELF-HEAL] Connection error detected, attempting auto-fix")
+                health_check = conn_context['health_check']
+                fix_result = self.connection_monitor.auto_fix(health_check)
+                
+                if fix_result['fixes_successful'] > 0:
+                    logger.info(f"[SELF-HEAL] Auto-fixed {fix_result['fixes_successful']} connection issues")
+                    self.metrics['successful_fixes'] += 1
+                    self._save_metrics()
+                    
+                    return {
+                        'error_type': error_type,
+                        'error_message': str(error),
+                        'solution_found': True,
+                        'solution': fix_result,
+                        'fix_applied': True,
+                        'fix_successful': True,
+                        'fix_type': 'connection_auto_fix',
+                        'timestamp': datetime.now().isoformat()
+                    }
         
         # Record error pattern
         self.pattern_analyzer.record_error(error_type, context)

@@ -1,0 +1,388 @@
+apiVersion: v1
+data:
+  app.log: |
+    [2025-12-28 10:07:16,970] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-28 10:07:19,762] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-28 10:07:20,644] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-28 10:07:21,879] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-28 10:07:46,189] [INFO] app.services.pdf_ocr_processor: [OCR] pytesseract available
+    [2025-12-28 10:07:46,202] [INFO] app.services.pdf_ocr_processor: [OCR] pdf2image available
+    [2025-12-28 10:07:46,297] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-28 10:07:46,630] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-28 10:07:47,934] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-28 10:07:47,934] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-28 10:07:48,856] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-28 10:07:48,856] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-28 10:07:48,856] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-28 10:07:48,856] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-28 10:07:48,856] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-28 10:07:48,856] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-28 10:07:48,856] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-28 10:07:48,856] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-28 10:07:49,987] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-28 10:07:49,987] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-28 10:07:49,987] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-28 10:07:49,987] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-28 10:07:49,987] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-28 10:07:49,987] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-28 10:07:49,987] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-28 10:07:49,997] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-28 10:07:49,997] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-28 10:09:19,552] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-28 10:09:22,632] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-28 10:09:23,856] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-28 10:09:25,459] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-28 10:10:33,218] [WARNING] app.services.pdf_ocr_processor: [OCR] pytesseract not installed - OCR disabled
+    [2025-12-28 10:10:33,218] [WARNING] app.services.pdf_ocr_processor: [OCR] pdf2image not installed
+    [2025-12-28 10:10:33,337] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-28 10:10:33,787] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-28 10:10:34,034] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-28 10:10:34,034] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-28 10:10:34,752] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-28 10:10:34,752] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-28 10:10:34,752] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-28 10:10:34,756] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-28 10:10:34,756] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-28 10:10:34,756] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-28 10:10:34,766] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-28 10:10:34,766] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-28 10:10:36,175] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-28 10:10:36,175] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-28 10:10:36,175] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-28 10:10:36,175] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-28 10:10:36,175] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-28 10:10:36,175] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-28 10:10:36,175] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-28 10:10:36,175] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-28 10:10:36,175] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-28 10:11:15,831] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-28 10:11:15,831] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-28 10:11:15,831] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-28 10:11:15,833] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-28 10:11:15,833] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-28 10:11:15,850] [INFO] app.main: [OK] Database connections closed
+    [2025-12-28 12:00:00,050] [INFO] apscheduler.executors.default: Running job "KB Index Integrity Check (trigger: cron[hour='12', minute='0'], next run at: 2025-12-29 12:00:00 IST)" (scheduled at 2025-12-28 12:00:00+05:30)
+    [2025-12-28 12:00:00,066] [INFO] apscheduler.executors.default: Running job "Self-Healing Preventive Maintenance (trigger: cron[hour='*/6'], next run at: 2025-12-28 18:00:00 IST)" (scheduled at 2025-12-28 12:00:00+05:30)
+    [2025-12-28 12:00:00,082] [INFO] app.main: [SCHEDULER] Running KB index integrity check...
+    [2025-12-28 12:00:00,082] [INFO] app.main: [SCHEDULER] Running preventive maintenance...
+    [2025-12-28 12:00:00,082] [INFO] app.services.self_healing_system: Running preventive maintenance...
+    [2025-12-28 12:00:00,114] [INFO] app.services.local_vector_kb: Local AI model configured: all-MiniLM-L6-v2 (lazy loading - will load on first use)
+    [2025-12-28 12:00:00,114] [INFO] app.services.hybrid_search: Hybrid search engine initialized
+    [2025-12-28 12:00:00,145] [INFO] app.services.local_vector_kb: Loaded local index with 0 chunks
+    [2025-12-28 12:00:00,145] [INFO] app.services.local_vector_kb: Local vector KB ready with 0 documents
+    [2025-12-28 12:00:00,145] [INFO] apscheduler.executors.default: Job "KB Index Integrity Check (trigger: cron[hour='12', minute='0'], next run at: 2025-12-29 12:00:00 IST)" executed successfully
+    [2025-12-28 12:00:01,090] [INFO] app.main: [SCHEDULER] ✅ Preventive maintenance completed
+    [2025-12-28 12:00:01,095] [INFO] apscheduler.executors.default: Job "Self-Healing Preventive Maintenance (trigger: cron[hour='*/6'], next run at: 2025-12-28 18:00:00 IST)" executed successfully
+  app.log.2025-12-27: |
+    [2025-12-27 10:39:15,081] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-27 10:39:19,111] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-27 10:39:20,895] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-27 10:39:22,688] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-27 10:40:16,506] [INFO] app.services.pdf_ocr_processor: [OCR] pytesseract available
+    [2025-12-27 10:40:16,537] [INFO] app.services.pdf_ocr_processor: [OCR] pdf2image available
+    [2025-12-27 10:40:16,712] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-27 10:40:17,097] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-27 10:40:19,219] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-27 10:40:19,219] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-27 10:40:20,037] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-27 10:40:20,037] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-27 10:40:20,038] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-27 10:40:20,042] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-27 10:40:20,042] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-27 10:40:20,043] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-27 10:40:20,055] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-27 10:40:20,056] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-27 10:40:21,057] [WARNING] app.main: [WARNING] System health: at_risk - 1 warnings detected
+    [2025-12-27 10:40:21,241] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 10:40:21,241] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 10:40:21,241] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 10:40:21,241] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-27 10:40:21,241] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-27 10:40:21,241] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-27 10:40:21,241] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-27 10:40:21,241] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-27 10:40:21,241] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-27 10:41:09,250] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-27 10:41:09,250] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-27 10:41:09,250] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-27 10:41:09,250] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-27 10:41:09,250] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-27 10:41:09,250] [INFO] app.main: [OK] Database connections closed
+    [2025-12-27 12:33:19,226] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-27 12:33:29,242] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-27 12:33:31,028] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-27 12:33:33,028] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-27 12:35:18,284] [WARNING] app.services.pdf_ocr_processor: [OCR] pytesseract not installed - OCR disabled
+    [2025-12-27 12:35:18,310] [WARNING] app.services.pdf_ocr_processor: [OCR] pdf2image not installed
+    [2025-12-27 12:35:18,614] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-27 12:35:19,433] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-27 12:35:19,664] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-27 12:35:19,664] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-27 12:35:21,648] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-27 12:35:21,648] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-27 12:35:21,648] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-27 12:35:21,648] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-27 12:35:21,648] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-27 12:35:21,648] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-27 12:35:21,664] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-27 12:35:21,664] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-27 12:35:22,678] [WARNING] app.main: [WARNING] System health: at_risk - 1 warnings detected
+    [2025-12-27 12:35:22,979] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 12:35:22,984] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 12:35:22,984] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 12:35:22,988] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-27 12:35:22,988] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-27 12:35:22,988] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-27 12:35:22,988] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-27 12:35:22,988] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-27 12:35:22,988] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-27 13:56:57,041] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-27 13:56:57,079] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-27 13:56:57,097] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-27 13:56:57,102] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-27 13:56:57,102] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-27 13:56:57,213] [INFO] app.main: [OK] Database connections closed
+    [2025-12-27 17:47:19,538] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-27 17:47:23,038] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-27 17:47:24,455] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-27 17:47:26,014] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-27 17:48:28,695] [INFO] app.services.pdf_ocr_processor: [OCR] pytesseract available
+    [2025-12-27 17:48:28,707] [INFO] app.services.pdf_ocr_processor: [OCR] pdf2image available
+    [2025-12-27 17:48:28,882] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-27 17:48:29,364] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-27 17:48:29,625] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-27 17:48:29,625] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-27 17:48:30,311] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-27 17:48:30,312] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-27 17:48:30,312] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-27 17:48:30,316] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-27 17:48:30,316] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-27 17:48:30,317] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-27 17:48:30,317] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-27 17:48:30,317] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-27 17:48:31,621] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 17:48:31,685] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 17:48:31,687] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 17:48:31,688] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-27 17:48:31,691] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-27 17:48:31,692] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-27 17:48:31,693] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-27 17:48:31,696] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-27 17:48:31,697] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-27 17:51:43,120] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-27 17:51:45,381] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-27 17:51:45,711] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-27 17:51:45,784] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-27 17:51:54,324] [INFO] app.services.pdf_ocr_processor: [OCR] pytesseract available
+    [2025-12-27 17:51:54,327] [INFO] app.services.pdf_ocr_processor: [OCR] pdf2image available
+    [2025-12-27 17:51:54,402] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-27 17:51:54,754] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-27 17:51:54,957] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-27 17:51:54,957] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-27 17:51:55,442] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-27 17:51:55,442] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-27 17:51:55,442] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-27 17:51:55,442] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-27 17:51:55,442] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-27 17:51:55,442] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-27 17:51:55,442] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-27 17:51:55,442] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-27 17:51:56,450] [WARNING] app.main: [WARNING] System health: at_risk - 1 warnings detected
+    [2025-12-27 17:51:56,546] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 17:51:56,547] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 17:51:56,547] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 17:51:56,548] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-27 17:51:56,548] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-27 17:51:56,549] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-27 17:51:56,549] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-27 17:51:56,551] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-27 17:51:56,551] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-27 17:52:07,215] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-27 17:52:07,215] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-27 17:52:07,216] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-27 17:52:07,216] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-27 17:52:07,216] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-27 17:52:07,221] [INFO] app.main: [OK] Database connections closed
+    [2025-12-27 17:52:14,145] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-27 17:52:14,145] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-27 17:52:14,145] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-27 17:52:14,145] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-27 17:52:14,145] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-27 17:52:14,145] [INFO] app.main: [OK] Database connections closed
+    [2025-12-27 17:55:01,664] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-27 17:55:03,725] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-27 17:55:03,998] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-27 17:55:04,024] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-27 17:55:11,797] [INFO] app.services.pdf_ocr_processor: [OCR] pytesseract available
+    [2025-12-27 17:55:11,803] [INFO] app.services.pdf_ocr_processor: [OCR] pdf2image available
+    [2025-12-27 17:55:11,881] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-27 17:55:12,384] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-27 17:55:12,450] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-27 17:55:12,455] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-27 17:55:12,922] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-27 17:55:12,923] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-27 17:55:12,923] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-27 17:55:12,925] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-27 17:55:12,925] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-27 17:55:12,925] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-27 17:55:12,926] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-27 17:55:12,926] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-27 17:55:14,007] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 17:55:14,007] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 17:55:14,007] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 17:55:14,007] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-27 17:55:14,007] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-27 17:55:14,007] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-27 17:55:14,007] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-27 17:55:14,007] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-27 17:55:14,007] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-27 18:00:00,020] [INFO] apscheduler.executors.default: Running job "Self-Healing Preventive Maintenance (trigger: cron[hour='*/6'], next run at: 2025-12-28 00:00:00 IST)" (scheduled at 2025-12-27 18:00:00+05:30)
+    [2025-12-27 18:00:00,021] [INFO] app.main: [SCHEDULER] Running preventive maintenance...
+    [2025-12-27 18:00:00,021] [INFO] app.services.self_healing_system: Running preventive maintenance...
+    [2025-12-27 18:00:01,024] [INFO] app.main: [SCHEDULER] ✅ Preventive maintenance completed
+    [2025-12-27 18:00:01,024] [INFO] apscheduler.executors.default: Job "Self-Healing Preventive Maintenance (trigger: cron[hour='*/6'], next run at: 2025-12-28 00:00:00 IST)" executed successfully
+    [2025-12-27 18:14:47,950] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-27 18:14:47,950] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-27 18:14:47,950] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-27 18:14:47,950] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-27 18:14:47,950] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-27 18:14:47,966] [INFO] app.main: [OK] Database connections closed
+    [2025-12-27 18:15:14,718] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-27 18:15:19,236] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-27 18:15:20,457] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-27 18:15:21,743] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-27 18:16:22,893] [WARNING] app.services.pdf_ocr_processor: [OCR] pytesseract not installed - OCR disabled
+    [2025-12-27 18:16:22,895] [WARNING] app.services.pdf_ocr_processor: [OCR] pdf2image not installed
+    [2025-12-27 18:16:23,132] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-27 18:16:23,703] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-27 18:16:23,783] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-27 18:16:23,783] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-27 18:16:24,405] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-27 18:16:24,405] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-27 18:16:24,405] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-27 18:16:24,405] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-27 18:16:24,405] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-27 18:16:24,405] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-27 18:16:24,418] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-27 18:16:24,421] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-27 18:16:25,593] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 18:16:25,593] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 18:16:25,593] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 18:16:25,593] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-27 18:16:25,593] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-27 18:16:25,593] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-27 18:16:25,593] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-27 18:16:25,593] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-27 18:16:25,593] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-27 18:19:56,120] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-27 18:19:56,121] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-27 18:19:56,121] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-27 18:19:56,121] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-27 18:19:56,121] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-27 18:19:56,160] [INFO] app.main: [OK] Database connections closed
+    [2025-12-27 18:20:58,481] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-27 18:21:03,472] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-27 18:21:04,616] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-27 18:21:06,234] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-27 18:22:06,026] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-27 18:22:08,424] [INFO] app.services.pdf_ocr_processor: [OCR] pytesseract available
+    [2025-12-27 18:22:08,450] [INFO] app.services.pdf_ocr_processor: [OCR] pdf2image available
+    [2025-12-27 18:22:08,651] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-27 18:22:08,811] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-27 18:22:09,360] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-27 18:22:09,438] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-27 18:22:09,513] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-27 18:22:11,419] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-27 18:22:11,419] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-27 18:22:12,274] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-27 18:22:12,275] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-27 18:22:12,275] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-27 18:22:12,275] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-27 18:22:12,275] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-27 18:22:12,275] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-27 18:22:12,275] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-27 18:22:12,275] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-27 18:22:13,281] [WARNING] app.main: [WARNING] System health: at_risk - 1 warnings detected
+    [2025-12-27 18:22:13,737] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 18:22:13,737] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 18:22:13,737] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 18:22:13,737] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-27 18:22:13,737] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-27 18:22:13,737] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-27 18:22:13,737] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-27 18:22:13,737] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-27 18:22:13,744] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-27 18:22:13,744] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-27 18:22:13,746] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-27 18:22:13,746] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-27 18:22:13,746] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-27 18:22:13,746] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-27 18:22:13,748] [INFO] app.main: [OK] Database connections closed
+    [2025-12-27 18:22:24,193] [INFO] app.services.pdf_ocr_processor: [OCR] pytesseract available
+    [2025-12-27 18:22:24,200] [INFO] app.services.pdf_ocr_processor: [OCR] pdf2image available
+    [2025-12-27 18:22:24,356] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-27 18:22:25,274] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-27 18:22:25,378] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-27 18:22:25,378] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-27 18:22:26,039] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-27 18:22:26,039] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-27 18:22:26,039] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-27 18:22:26,063] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-27 18:22:26,064] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-27 18:22:26,064] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-27 18:22:26,070] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-27 18:22:26,078] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-27 18:22:27,188] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 18:22:27,188] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 18:22:27,189] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 18:22:27,189] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-27 18:22:27,190] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-27 18:22:27,190] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-27 18:22:27,190] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-27 18:22:27,191] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-27 18:22:27,192] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-27 18:24:49,482] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-27 18:24:49,497] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-27 18:24:49,512] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-27 18:24:49,527] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-27 18:24:49,527] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-27 18:24:49,579] [INFO] app.main: [OK] Database connections closed
+    [2025-12-27 19:09:19,708] [WARNING] app.main: [SENTRY] Initialization skipped: No module named 'sentry_sdk'
+    [2025-12-27 19:09:23,167] [INFO] app.utils.ai_service: [OK] OpenAI client initialized successfully
+    [2025-12-27 19:09:24,648] [INFO] faiss.loader: Loading faiss with AVX2 support.
+    [2025-12-27 19:09:27,256] [INFO] faiss.loader: Successfully loaded faiss with AVX2 support.
+    [2025-12-27 19:10:24,496] [INFO] app.services.pdf_ocr_processor: [OCR] pytesseract available
+    [2025-12-27 19:10:24,513] [INFO] app.services.pdf_ocr_processor: [OCR] pdf2image available
+    [2025-12-27 19:10:24,767] [INFO] app.main: [DEV] CORS origins: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:3000']
+    [2025-12-27 19:10:25,426] [INFO] app.main: [STARTING] Natpudan AI Medical Assistant...
+    [2025-12-27 19:10:25,732] [INFO] app.main: [OK] Database initialized successfully
+    [2025-12-27 19:10:25,732] [INFO] app.main: [OK] OpenAI API configured and validated
+    [2025-12-27 19:10:26,493] [INFO] app.services.vector_knowledge_base: Loaded existing index with 20623 chunks
+    [2025-12-27 19:10:26,493] [INFO] app.services.vector_knowledge_base: Vector knowledge base initialized with 20623 documents
+    [2025-12-27 19:10:26,493] [INFO] app.main: [OK] Knowledge base loaded (20623 documents)
+    [2025-12-27 19:10:26,493] [INFO] app.services.upload_queue_processor: [QUEUE] Starting PDF upload queue processor
+    [2025-12-27 19:10:26,493] [INFO] app.services.upload_queue_processor: [QUEUE] Batch size: 8, Check interval: 10s
+    [2025-12-27 19:10:26,493] [INFO] app.main: [OK] PDF upload queue processor started
+    [2025-12-27 19:10:26,493] [INFO] app.services.self_healing_system: Self-healing system initialized
+    [2025-12-27 19:10:26,493] [INFO] app.main: [OK] Self-healing system initialized and learning from past errors
+    [2025-12-27 19:10:27,504] [WARNING] app.main: [WARNING] System health: at_risk - 1 warnings detected
+    [2025-12-27 19:10:27,652] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 19:10:27,652] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 19:10:27,652] [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+    [2025-12-27 19:10:27,652] [INFO] apscheduler.scheduler: Added job "Daily Knowledge Base Refresh & PubMed Sync" to job store "default"
+    [2025-12-27 19:10:27,652] [INFO] apscheduler.scheduler: Added job "KB Index Integrity Check" to job store "default"
+    [2025-12-27 19:10:27,652] [INFO] apscheduler.scheduler: Added job "Self-Healing Preventive Maintenance" to job store "default"
+    [2025-12-27 19:10:27,652] [INFO] apscheduler.scheduler: Scheduler started
+    [2025-12-27 19:10:27,652] [INFO] app.main: [OK] APScheduler started - KB automation + Self-healing jobs scheduled
+    [2025-12-27 19:10:27,652] [INFO] app.main: [STARTED] Application started - Services: DB=True, OpenAI=True, KB=True
+    [2025-12-27 20:01:37,336] [INFO] app.main: [STOPPING] Natpudan AI Medical Assistant...
+    [2025-12-27 20:01:37,336] [INFO] apscheduler.scheduler: Scheduler has been shut down
+    [2025-12-27 20:01:37,336] [INFO] app.main: [OK] APScheduler stopped
+    [2025-12-27 20:01:37,336] [INFO] app.services.upload_queue_processor: [QUEUE] Stopping PDF upload queue processor
+    [2025-12-27 20:01:37,336] [INFO] app.main: [OK] Queue processor stopped
+    [2025-12-27 20:01:37,358] [INFO] app.main: [OK] Database connections closed
+kind: ConfigMap
+metadata:
+  labels:
+    io.kompose.service: celery
+  name: celery-cm1

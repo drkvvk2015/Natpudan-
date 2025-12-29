@@ -96,7 +96,7 @@ const LoginPage: React.FC = () => {
       const hints: string[] = [];
       if (!backendOk)
         hints.push(
-          "Backend server appears down. Please start backend on 127.0.0.1:8000."
+          "Backend server appears down. Please start backend on 127.0.0.1:8001."
         );
       if (!email.includes("@")) hints.push("Email looks invalid (missing @).");
       if (password.length < 6) hints.push("Password seems too short.");
@@ -124,7 +124,7 @@ const LoginPage: React.FC = () => {
       const baseURL =
         import.meta.env.VITE_API_URL ||
         import.meta.env.VITE_API_BASE_URL ||
-        "http://127.0.0.1:8000";
+        "http://127.0.0.1:8001";
 
       console.log(`Initiating ${provider} OAuth flow...`);
       console.log(`Using API Base URL: ${baseURL}`);

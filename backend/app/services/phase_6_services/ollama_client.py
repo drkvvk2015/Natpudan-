@@ -15,7 +15,8 @@ import json
 logger = logging.getLogger(__name__)
 
 # Ollama defaults
-OLLAMA_HOST = "http://localhost:11434"
+import os
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = "llama2"  # Default, can switch to llama2-medical, etc.
 OLLAMA_TIMEOUT = 300  # 5 minutes for long responses
 

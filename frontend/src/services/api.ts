@@ -8,7 +8,7 @@ import { AxiosError, AxiosResponse } from 'axios'
 // DO NOT create a duplicate apiClient here!
 
 // API Base URL for fetch calls (not using apiClient)
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8001';
 
 // API Service Types
 export interface HealthStatus {

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Users\CNSHO\bin\kompose.exe convert -f docker-compose.yml
+    kompose.version: 1.37.0 (fb0539e64)
+  labels:
+    io.kompose.service: celery
+  name: celery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: celery
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: C:\Users\CNSHO\bin\kompose.exe convert -f docker-compose.yml
+        kompose.version: 1.37.0 (fb0539e64)
+      labels:
+        io.kompose.service: celery
+    spec:
+      containers:
+        - args:
+            - celery
+            - -A
+            - app.celery_config
+            - worker
+            - --loglevel=info
+            - --concurrency=4
+            - -E
+          env:
+            - name: CELERY_BROKER_URL
+              value: redis://redis:6379/0
+            - name: CELERY_RESULT_BACKEND
+              value: redis://redis:6379/0
+            - name: DATABASE_URL
+              value: postgresql://physician_user:secure_password@db:5432/physician_ai
+            - name: DEBUG
+              value: "False"
+            - name: ENVIRONMENT
+              value: production
+            - name: OPENAI_API_KEY
+              value: your_openai_api_key_here
+            - name: REDIS_URL
+              value: redis://redis:6379/0
+          image: celery
+          name: physician-ai-celery
+          volumeMounts:
+            - mountPath: /app/logs
+              name: celery-cm1
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            name: celery-cm1
+          name: celery-cm1

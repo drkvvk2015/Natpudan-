@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Users\CNSHO\bin\kompose.exe convert -f docker-compose.yml
+    kompose.version: 1.37.0 (fb0539e64)
+  labels:
+    io.kompose.service: backend
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: backend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: C:\Users\CNSHO\bin\kompose.exe convert -f docker-compose.yml
+        kompose.version: 1.37.0 (fb0539e64)
+      labels:
+        io.kompose.service: backend
+    spec:
+      containers:
+        - env:
+            - name: DATABASE_URL
+              value: postgresql://physician_user:secure_password@db:5432/physician_ai
+            - name: DEBUG
+              value: "False"
+            - name: ENVIRONMENT
+              value: production
+            - name: OPENAI_API_KEY
+              value: your_openai_api_key_here
+          image: backend
+          livenessProbe:
+            exec:
+              command:
+                - curl
+                - -f
+                - http://localhost:8000/health
+            failureThreshold: 3
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+          name: physician-ai-backend
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /app/logs
+              name: backend-cm1
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            name: backend-cm1
+          name: backend-cm1

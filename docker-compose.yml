@@ -1,22 +1,41 @@
+version: '3.9'
+
 services:
-  # Backend API
+  # Backend API (FastAPI)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: physician-ai-backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     environment:
-      - ENVIRONMENT=production
-      - DEBUG=False
-      - DATABASE_URL=postgresql://physician_user:secure_password@db:5432/physician_ai
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://physician_user:secure_password@db:5432/physician_ai}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      - APSCHEDULER_ENABLED=${APSCHEDULER_ENABLED:-true}
+      - KB_REFRESH_HOUR=${KB_REFRESH_HOUR:-14}
     volumes:
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
+      - ./backend/cache:/app/cache
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - physician-ai-network
@@ -26,59 +45,138 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=natpudan-backend"
 
   # PostgreSQL Database
   db:
     image: postgres:15-alpine
     container_name: physician-ai-db
     environment:
-      - POSTGRES_USER=physician_user
-      - POSTGRES_PASSWORD=secure_password
-      - POSTGRES_DB=physician_ai
+      - POSTGRES_USER=${POSTGRES_USER:-physician_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_password}
+      - POSTGRES_DB=${POSTGRES_DB:-physician_ai}
+      - POSTGRES_INITDB_ARGS=-c max_connections=200 -c shared_buffers=256MB -c effective_cache_size=1GB
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     restart: unless-stopped
     networks:
       - physician-ai-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U physician_user"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-physician_user} -d ${POSTGRES_DB:-physician_ai}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '1'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=natpudan-db"
 
-  # Frontend (if using Docker for frontend too)
+  # Frontend (React)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+        - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000}
     container_name: physician-ai-frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_API_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+      - NODE_ENV=${ENVIRONMENT:-production}
     depends_on:
       - backend
     restart: unless-stopped
     networks:
       - physician-ai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=natpudan-frontend"
 
-  # Redis (optional - for caching and session management)
+  # Redis Cache & Message Broker
   redis:
     image: redis:7-alpine
     container_name: physician-ai-redis
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
+    command: >
+      redis-server 
+      --requirepass ${REDIS_PASSWORD:-redis_password}
+      --maxmemory 512mb 
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --timeout 300
     volumes:
       - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
     restart: unless-stopped
     networks:
       - physician-ai-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=natpudan-redis"
 
   # Celery Worker (Background Tasks)
   celery:
@@ -86,44 +184,78 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: physician-ai-celery
-    command: celery -A app.celery_config worker --loglevel=info --concurrency=4 -E
+    command: celery -A app.celery_config worker --loglevel=${LOG_LEVEL:-info} --concurrency=4 -E --time-limit=3600 --soft-time-limit=3300
     environment:
-      - ENVIRONMENT=production
-      - DEBUG=False
-      - DATABASE_URL=postgresql://physician_user:secure_password@db:5432/physician_ai
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://physician_user:secure_password@db:5432/physician_ai}
+      - REDIS_URL=${REDIS_URL:-redis://:redis_password@redis:6379/0}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://:redis_password@redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://:redis_password@redis:6379/0}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
+      - ./backend/cache:/app/cache
     depends_on:
-      - db
-      - redis
-      - backend
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
     restart: unless-stopped
     networks:
       - physician-ai-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '1'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=natpudan-celery"
 
-  # Flower (Task Monitoring Dashboard)
+  # Flower (Celery Monitoring Dashboard)
   flower:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: physician-ai-flower
-    command: celery -A app.celery_config flower --port=5555 --basic_auth=admin:changeme
+    command: celery -A app.celery_config flower --port=5555 --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-changeme} --persistent=True --db=/data/flower.db
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://:redis_password@redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://:redis_password@redis:6379/0}
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./backend/data/flower:/data
     depends_on:
       - redis
       - celery
     restart: unless-stopped
     networks:
       - physician-ai-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=natpudan-flower"
 
-  # Nginx reverse proxy
+  # Nginx Reverse Proxy (SSL/TLS Termination)
   nginx:
     image: nginx:alpine
     container_name: physician-ai-nginx
@@ -133,17 +265,42 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx/logs:/var/log/nginx
     depends_on:
       - backend
       - frontend
     restart: unless-stopped
     networks:
       - physician-ai-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=natpudan-nginx"
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
 
 networks:
   physician-ai-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+

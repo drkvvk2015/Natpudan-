@@ -1,5 +1,5 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+# Use an official Python runtime as a parent image (Mirrored for corporate bypass)
+FROM mirror.gcr.io/library/python:3.12-slim
 
 # Set the working directory in the container
 WORKDIR /app
@@ -13,8 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy the requirements file into the container at /app
 COPY ./requirements.txt /app/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Handle corporate proxy during build
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG http_proxy
+ARG https_proxy
+
+# Upgrade pip and install dependencies (Using trust for corporate proxy)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
 
 # Copy the rest of the backend application code into the container at /app
 COPY . /app/

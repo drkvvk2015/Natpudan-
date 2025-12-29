@@ -1,0 +1,50 @@
+{
+  "$schema": "./ports.schema.json",
+  "description": "Centralized port configuration for Natpudan application",
+  "version": "1.0.0",
+  "services": {
+    "backend": {
+      "dev": 8001,
+      "prod": 8000,
+      "test": 8002,
+      "description": "FastAPI backend server"
+    },
+    "frontend": {
+      "dev": 5173,
+      "prod": 3000,
+      "preview": 3000,
+      "description": "Vite frontend dev server"
+    },
+    "database": {
+      "postgres": 5432,
+      "description": "PostgreSQL database"
+    },
+    "redis": {
+      "default": 6379,
+      "description": "Redis cache and Celery broker"
+    },
+    "celery": {
+      "flower": 5555,
+      "description": "Celery Flower monitoring"
+    },
+    "nginx": {
+      "http": 80,
+      "https": 443,
+      "description": "Reverse proxy"
+    }
+  },
+  "urls": {
+    "backend": {
+      "dev": "http://127.0.0.1:8001",
+      "prod": "http://127.0.0.1:8000"
+    },
+    "frontend": {
+      "dev": "http://localhost:5173",
+      "prod": "http://localhost:3000"
+    },
+    "websocket": {
+      "dev": "ws://127.0.0.1:8001",
+      "prod": "ws://127.0.0.1:8000"
+    }
+  }
+}
