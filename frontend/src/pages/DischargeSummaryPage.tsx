@@ -148,6 +148,10 @@ const DischargeSummaryPage: React.FC = () => {
   const [pastMedicalHistory, setPastMedicalHistory] = useState("");
   const [physicalExamination, setPhysicalExamination] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
+  const [icd10Codes, setIcd10Codes] = useState<string[]>([]);
+  const [icd10SearchQuery, setIcd10SearchQuery] = useState("");
+  const [icd10SearchResults, setIcd10SearchResults] = useState<any[]>([]);
+  const [isSearchingIcd10, setIsSearchingIcd10] = useState(false);
   const [hospitalCourse, setHospitalCourse] = useState("");
   const [proceduresPerformed, setProceduresPerformed] = useState("");
   const [medications, setMedications] = useState("");
@@ -162,6 +166,83 @@ const DischargeSummaryPage: React.FC = () => {
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Search ICD-10 codes
+  const searchIcd10Codes = async () => {
+    if (!icd10SearchQuery.trim()) return;
+    
+    setIsSearchingIcd10(true);
+    try {
+      const response = await fetch("/api/discharge-summary/icd10/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          query: icd10SearchQuery,
+          max_results: 10,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to search ICD-10 codes");
+      
+      const data = await response.json();
+      setIcd10SearchResults(data.results || []);
+    } catch (error) {
+      console.error("ICD-10 search error:", error);
+      setErrorMessage("Failed to search ICD-10 codes");
+    } finally {
+      setIsSearchingIcd10(false);
+    }
+  };
+
+  // Add ICD-10 code to list
+  const addIcd10Code = (code: string) => {
+    if (!icd10Codes.includes(code)) {
+      setIcd10Codes([...icd10Codes, code]);
+    }
+    setIcd10SearchQuery("");
+    setIcd10SearchResults([]);
+  };
+
+  // Remove ICD-10 code
+  const removeIcd10Code = (code: string) => {
+    setIcd10Codes(icd10Codes.filter(c => c !== code));
+  };
+
+  // Auto-suggest ICD-10 codes from diagnosis
+  const suggestIcd10FromDiagnosis = async () => {
+    if (!diagnosis.trim()) return;
+    
+    try {
+      const response = await fetch("/api/discharge-summary/icd10/suggest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(diagnosis),
+      });
+
+      if (!response.ok) throw new Error("Failed to suggest ICD-10 codes");
+      
+      const data = await response.json();
+      const suggestions = data.suggestions || [];
+      
+      // Add suggested codes that aren't already in the list
+      const newCodes = suggestions
+        .map((s: any) => s.code)
+        .filter((code: string) => !icd10Codes.includes(code))
+        .slice(0, 3); // Top 3 suggestions
+      
+      if (newCodes.length > 0) {
+        setIcd10Codes([...icd10Codes, ...newCodes]);
+      }
+    } catch (error) {
+      console.error("ICD-10 suggestion error:", error);
+    }
+  };
 
   const generateAISummary = async () => {
     setIsGenerating(true);
@@ -246,7 +327,30 @@ Format the response as a complete discharge summary.
   };
 
   const handleSave = () => {
-    // Implement save logic here
+    // TODO: Implement actual API save logic with icd10_codes
+    const summaryData = {
+      patient_name: patientName,
+      patient_age: patientAge,
+      patient_gender: patientGender,
+      mrn: mrn,
+      admission_date: admissionDate,
+      discharge_date: dischargeDate,
+      chief_complaint: chiefComplaint,
+      history_present_illness: historyOfPresentIllness,
+      past_medical_history: pastMedicalHistory,
+      physical_examination: physicalExamination,
+      diagnosis: diagnosis,
+      icd10_codes: icd10Codes,  // Include ICD-10 codes
+      hospital_course: hospitalCourse,
+      procedures_performed: proceduresPerformed,
+      medications: medications,
+      discharge_medications: dischargeMedications,
+      follow_up_instructions: followUpInstructions,
+      diet_restrictions: dietRestrictions,
+      activity_restrictions: activityRestrictions,
+    };
+    
+    console.log("Saving discharge summary with data:", summaryData);
     setSuccessMessage("Discharge summary saved successfully!");
     setTimeout(() => setSuccessMessage(""), 3000);
   };
@@ -280,6 +384,9 @@ ${physicalExamination}
 
 Diagnosis:
 ${diagnosis}
+
+ICD-10 Codes:
+${icd10Codes.length > 0 ? icd10Codes.join(", ") : "Not specified"}
 
 Hospital Course:
 ${hospitalCourse}
@@ -574,6 +681,103 @@ ${activityRestrictions}
               rows={2}
             />
           </Grid>
+          
+          {/* ICD-10 Codes Section */}
+          <Grid item xs={12}>
+            <Paper elevation={1} sx={{ p: 2, bgcolor: "grey.50" }}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                ICD-10 Codes
+              </Typography>
+              
+              {/* Selected ICD-10 Codes */}
+              {icd10Codes.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Selected Codes:
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {icd10Codes.map((code) => (
+                      <Chip
+                        key={code}
+                        label={code}
+                        onDelete={() => removeIcd10Code(code)}
+                        color="primary"
+                        size="small"
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* ICD-10 Search */}
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Search ICD-10 codes (e.g., 'diabetes', 'I10', 'pneumonia')"
+                  value={icd10SearchQuery}
+                  onChange={(e) => setIcd10SearchQuery(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      searchIcd10Codes();
+                    }
+                  }}
+                />
+                <Button
+                  variant="contained"
+                  onClick={searchIcd10Codes}
+                  disabled={isSearchingIcd10 || !icd10SearchQuery.trim()}
+                  size="small"
+                >
+                  {isSearchingIcd10 ? <CircularProgress size={20} /> : "Search"}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={suggestIcd10FromDiagnosis}
+                  disabled={!diagnosis.trim()}
+                  size="small"
+                  startIcon={<AutoAwesome />}
+                >
+                  Suggest
+                </Button>
+              </Box>
+
+              {/* Search Results */}
+              {icd10SearchResults.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Search Results:
+                  </Typography>
+                  <Box sx={{ maxHeight: 200, overflow: "auto" }}>
+                    {icd10SearchResults.map((result) => (
+                      <Card key={result.code} sx={{ mb: 1 }}>
+                        <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <Box>
+                              <Typography variant="body2" fontWeight={600}>
+                                {result.code}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {result.description}
+                              </Typography>
+                            </Box>
+                            <Button
+                              size="small"
+                              onClick={() => addIcd10Code(result.code)}
+                              disabled={icd10Codes.includes(result.code)}
+                            >
+                              {icd10Codes.includes(result.code) ? "Added" : "Add"}
+                            </Button>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+
           <Grid item xs={12}>
             <VoiceTextField
               label="Hospital Course"

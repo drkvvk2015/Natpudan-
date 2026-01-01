@@ -29,6 +29,7 @@ import {
   Medication as MedicationIcon,
   MonitorHeart as StethoscopeIcon,
   FormatListBulleted as ListIcon,
+  DragIndicator as DragIcon,
 } from '@mui/icons-material';
 import { sendChatMessage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -56,6 +57,11 @@ interface Message {
   timestamp: Date;
 }
 
+interface Position {
+  x: number;
+  y: number;
+}
+
 const FloatingChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -69,8 +75,32 @@ const FloatingChatBot: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [authState, setAuthState] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState<Position>({ x: 24, y: 24 });
+  const [dragOffset, setDragOffset] = useState<Position>({ x: 0, y: 0 });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatWindowRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated } = useAuth();
+
+  // Load saved position from localStorage
+  useEffect(() => {
+    const savedPosition = localStorage.getItem('chatbotPosition');
+    if (savedPosition) {
+      try {
+        const parsed = JSON.parse(savedPosition);
+        setPosition(parsed);
+      } catch (e) {
+        console.error('Failed to parse saved position:', e);
+      }
+    }
+  }, []);
+
+  // Save position to localStorage when it changes
+  useEffect(() => {
+    if (isOpen) {
+      localStorage.setItem('chatbotPosition', JSON.stringify(position));
+    }
+  }, [position, isOpen]);
 
   // Listen for authentication state changes
   useEffect(() => {
@@ -86,6 +116,51 @@ const FloatingChatBot: React.FC = () => {
     window.addEventListener('authStateChanged', handleAuthChange as EventListener);
     return () => window.removeEventListener('authStateChanged', handleAuthChange as EventListener);
   }, [isAuthenticated]);
+
+  // Drag functionality
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (chatWindowRef.current) {
+      const rect = chatWindowRef.current.getBoundingClientRect();
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+      setIsDragging(true);
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging && chatWindowRef.current) {
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+      const chatWidth = chatWindowRef.current.offsetWidth;
+      const chatHeight = chatWindowRef.current.offsetHeight;
+
+      let newX = windowWidth - e.clientX + dragOffset.x - chatWidth;
+      let newY = windowHeight - e.clientY + dragOffset.y - chatHeight;
+
+      // Boundary constraints
+      newX = Math.max(10, Math.min(newX, windowWidth - chatWidth - 10));
+      newY = Math.max(10, Math.min(newY, windowHeight - chatHeight - 10));
+
+      setPosition({ x: newX, y: newY });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -171,8 +246,8 @@ const FloatingChatBot: React.FC = () => {
           aria-label="chat"
           sx={{
             position: 'fixed',
-            bottom: 24,
-            right: 24,
+            bottom: position.y,
+            right: position.x,
             zIndex: 1300,
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
@@ -206,11 +281,12 @@ const FloatingChatBot: React.FC = () => {
       {/* Chat Window */}
       <Slide direction="up" in={isOpen} timeout={400}>
         <Paper
+          ref={chatWindowRef}
           elevation={24}
           sx={{
             position: 'fixed',
-            bottom: 24,
-            right: 24,
+            bottom: position.y,
+            right: position.x,
             width: 400,
             height: 600,
             zIndex: 1300,
@@ -222,10 +298,13 @@ const FloatingChatBot: React.FC = () => {
             borderColor: 'transparent',
             background: 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #667eea, #764ba2, #f093fb, #4facfe) border-box',
             boxShadow: '0 20px 60px rgba(102, 126, 234, 0.3)',
+            cursor: isDragging ? 'grabbing' : 'default',
+            userSelect: isDragging ? 'none' : 'auto',
           }}
         >
-          {/* Animated Header */}
+          {/* Animated Header with Drag Handle */}
           <Box
+            onMouseDown={handleMouseDown}
             sx={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
               backgroundSize: '200% 200%',
@@ -236,9 +315,20 @@ const FloatingChatBot: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'space-between',
               boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              cursor: isDragging ? 'grabbing' : 'grab',
+              '&:active': {
+                cursor: 'grabbing',
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <DragIcon 
+                sx={{ 
+                  opacity: 0.7, 
+                  fontSize: 20,
+                  mr: 0.5,
+                }} 
+              />
               <Avatar
                 sx={{
                   bgcolor: 'rgba(255,255,255,0.2)',
@@ -263,7 +353,7 @@ const FloatingChatBot: React.FC = () => {
                     }}
                   />
                   <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                    Online & Ready
+                    {isDragging ? 'Dragging...' : 'Online & Ready'}
                   </Typography>
                 </Box>
               </Box>

@@ -16,6 +16,7 @@ from app.crud import (
     delete_discharge_summary,
 )
 from app.utils.ai_service import generate_discharge_summary
+from app.services.icd10_service import get_icd10_service
 
 router = APIRouter(prefix="/discharge-summary", tags=["discharge-summary"])
 
@@ -32,6 +33,7 @@ class DischargeSummaryRequest(BaseModel):
     past_medical_history: Optional[str] = None
     physical_examination: Optional[str] = None
     diagnosis: Optional[str] = None
+    icd10_codes: Optional[List[str]] = None
     hospital_course: Optional[str] = None
     procedures_performed: Optional[str] = None
     medications: Optional[str] = None
@@ -54,8 +56,14 @@ class DischargeSummaryResponse(BaseModel):
 class DischargeSummaryDetail(DischargeSummaryRequest):
     id: int
     ai_summary: Optional[str]
+    icd10_codes: Optional[List[str]]
     created_at: str
     updated_at: str
+
+
+class ICD10SearchRequest(BaseModel):
+    query: str
+    max_results: Optional[int] = 10
 
 
 class AIGenerateRequest(BaseModel):
@@ -130,6 +138,15 @@ async def get_summary(
             detail="Not authorized to view this summary"
         )
     
+    # Parse ICD-10 codes from JSON string if stored
+    icd10_codes_list = None
+    if summary.icd10_codes:
+        try:
+            import json
+            icd10_codes_list = json.loads(summary.icd10_codes) if isinstance(summary.icd10_codes, str) else summary.icd10_codes
+        except:
+            icd10_codes_list = None
+    
     return DischargeSummaryDetail(
         id=summary.id,
         patient_name=summary.patient_name,
@@ -143,6 +160,7 @@ async def get_summary(
         past_medical_history=summary.past_medical_history,
         physical_examination=summary.physical_examination,
         diagnosis=summary.diagnosis,
+        icd10_codes=icd10_codes_list,
         hospital_course=summary.hospital_course,
         procedures_performed=summary.procedures_performed,
         medications=summary.medications,
@@ -220,15 +238,75 @@ async def delete_summary(
     return {"message": "Discharge summary deleted successfully"}
 
 
+@router.post("/icd10/search")
+async def search_icd10_codes(
+    request: ICD10SearchRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Search ICD-10 codes for diagnosis."""
+    try:
+        icd_service = get_icd10_service()
+        results = icd_service.search_codes(
+            query=request.query,
+            max_results=request.max_results
+        )
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to search ICD-10 codes: {str(e)}"
+        )
+
+
+@router.post("/icd10/suggest")
+async def suggest_icd10_from_diagnosis(
+    diagnosis: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Suggest ICD-10 codes based on diagnosis text."""
+    try:
+        icd_service = get_icd10_service()
+        # Extract key terms from diagnosis
+        diagnosis_terms = [term.strip() for term in diagnosis.split(',')]
+        suggestions = icd_service.suggest_codes(diagnosis_terms)
+        return {"suggestions": suggestions}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to suggest ICD-10 codes: {str(e)}"
+        )
+
+
 @router.post("/ai-generate")
 async def ai_generate(
     request: AIGenerateRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Generate AI discharge summary from patient data."""
+    """Generate AI discharge summary from patient data with ICD-10 codes."""
     try:
+        # Generate AI summary
         ai_summary = await generate_discharge_summary(request.patient_data)
-        return {"ai_summary": ai_summary}
+        
+        # Auto-suggest ICD-10 codes if diagnosis is provided
+        suggested_icd10 = []
+        if request.patient_data.get('diagnosis'):
+            try:
+                icd_service = get_icd10_service()
+                diagnosis_text = request.patient_data.get('diagnosis', '')
+                diagnosis_terms = [term.strip() for term in diagnosis_text.split(',')]
+                suggestions = icd_service.suggest_codes(diagnosis_terms)
+                suggested_icd10 = [{
+                    "code": s.get("code"),
+                    "description": s.get("description")
+                } for s in suggestions[:5]]  # Top 5 suggestions
+            except Exception as icd_error:
+                # Log but don't fail the whole request
+                print(f"ICD-10 suggestion error: {icd_error}")
+        
+        return {
+            "ai_summary": ai_summary,
+            "suggested_icd10_codes": suggested_icd10
+        }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

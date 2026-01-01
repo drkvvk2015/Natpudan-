@@ -137,6 +137,11 @@ def create_discharge_summary(
     patient_data: dict,
 ) -> DischargeSummary:
     """Create new discharge summary."""
+    import json
+    # Convert ICD-10 codes list to JSON string if present
+    if 'icd10_codes' in patient_data and isinstance(patient_data['icd10_codes'], list):
+        patient_data['icd10_codes'] = json.dumps(patient_data['icd10_codes'])
+    
     summary = DischargeSummary(
         created_by_id=created_by_id,
         **patient_data
@@ -165,8 +170,13 @@ def update_discharge_summary(
     patient_data: dict,
 ) -> Optional[DischargeSummary]:
     """Update discharge summary."""
+    import json
     summary = get_discharge_summary(db, summary_id)
     if summary:
+        # Convert ICD-10 codes list to JSON string if present
+        if 'icd10_codes' in patient_data and isinstance(patient_data['icd10_codes'], list):
+            patient_data['icd10_codes'] = json.dumps(patient_data['icd10_codes'])
+        
         for key, value in patient_data.items():
             if hasattr(summary, key):
                 setattr(summary, key, value)
