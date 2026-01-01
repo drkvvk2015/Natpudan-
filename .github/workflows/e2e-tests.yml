@@ -38,6 +38,9 @@ jobs:
       - name: Run E2E smoke test
         shell: pwsh
         env:
+          SECRET_KEY: "test-secret-key-for-ci-only-do-not-use-in-production-12345678901234567890"
+          OPENAI_API_KEY: "dummy-key-for-ci"
+          DATABASE_URL: "sqlite:///./test.db"
           SKIP_VENV_CHECK: "true"
         run: |
           cd ${{ github.workspace }}
