@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - clean-main2
     tags:
       - 'v*'
   pull_request:
