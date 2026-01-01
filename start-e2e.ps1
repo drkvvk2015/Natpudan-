@@ -33,14 +33,28 @@ function Remove-PortByNumber {
   }
 }
 
-# Resolve Python in venv
+# Resolve Python in venv or use system Python (for CI)
 $pyCandidates = @(
   (Join-Path $root '.venv\Scripts\python.exe'),
-  (Join-Path $backend 'venv\Scripts\python.exe')
+  (Join-Path $backend 'venv\Scripts\python.exe'),
+  'python'  # Fallback to system Python (for CI environments)
 )
-$python = $pyCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+$python = $null
+foreach ($candidate in $pyCandidates) {
+  if ($candidate -eq 'python') {
+    # Check if system python exists
+    if (Get-Command python -ErrorAction SilentlyContinue) {
+      $python = 'python'
+      break
+    }
+  } elseif (Test-Path $candidate) {
+    $python = $candidate
+    break
+  }
+}
+
 if (-not $python) {
-  Write-Status '[ERROR] Could not locate Python in .venv. Please create venv and install deps.' 'Error'
+  Write-Status '[ERROR] Could not locate Python. Please install Python or create venv.' 'Error'
   Write-Host 'Try:' -ForegroundColor Yellow
   Write-Host '  python -m venv .venv' -ForegroundColor Yellow
   Write-Host '  .\.venv\Scripts\Activate.ps1' -ForegroundColor Yellow
