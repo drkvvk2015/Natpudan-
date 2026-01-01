@@ -1,5 +1,5 @@
 param(
-  [int]$Port = 8001,
+  [int]$Port = 8000,
   [string]$HostAddr = "127.0.0.1"
 )
 $ErrorActionPreference = "Stop"
@@ -28,9 +28,10 @@ if (-not (Test-Path $python)) {
 
 Write-Host "Starting backend at http://${HostAddr}:${Port} (no reload)" -ForegroundColor Cyan
 Start-Process -FilePath $python -ArgumentList "-m","uvicorn","app.main:app","--host",$HostAddr,"--port",$Port -WorkingDirectory $backend
-Start-Sleep -Seconds 3
+Write-Host "Waiting for backend to initialize (12s)..." -ForegroundColor Gray
+Start-Sleep -Seconds 12
 try {
-  $h = Invoke-RestMethod -Uri "http://${HostAddr}:${Port}/health" -TimeoutSec 10
+  $h = Invoke-RestMethod -Uri "http://${HostAddr}:${Port}/health" -TimeoutSec 15
   Write-Host "Backend health: $($h.status)" -ForegroundColor Green
 } catch {
   Write-Host "Health check timed out (server may still be initializing). Backend is starting..." -ForegroundColor Yellow

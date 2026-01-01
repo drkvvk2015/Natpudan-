@@ -1,0 +1,132 @@
+version: '3.9'
+
+services:
+  # Backend API (Using existing container)
+  backend:
+    image: natpudan_backend_1:latest
+    container_name: natpudan-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://physician_user:secure_password@db:5432/physician_ai
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - APSCHEDULER_ENABLED=true
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+      - ./backend/cache:/app/cache
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    networks:
+      - natpudan-network
+
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: natpudan-db
+    environment:
+      - POSTGRES_USER=physician_user
+      - POSTGRES_PASSWORD=secure_password
+      - POSTGRES_DB=physician_ai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - natpudan-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U physician_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: natpudan-redis
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - natpudan-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Frontend (Development mode with volume mount - no build needed)
+  frontend:
+    image: node:20-slim
+    container_name: natpudan-frontend
+    working_dir: /app
+    command: sh -c "npm config set strict-ssl false && npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - natpudan-network
+
+  # Celery Worker
+  celery:
+    image: natpudan_backend_1:latest
+    container_name: natpudan-celery
+    command: celery -A app.celery_config worker --loglevel=info --concurrency=4
+    environment:
+      - DATABASE_URL=postgresql://physician_user:secure_password@db:5432/physician_ai
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+      - ./backend/cache:/app/cache
+    depends_on:
+      - db
+      - redis
+      - backend
+    restart: unless-stopped
+    networks:
+      - natpudan-network
+
+  # Flower (Celery Monitoring)
+  flower:
+    image: natpudan_backend_1:latest
+    container_name: natpudan-flower
+    command: celery -A app.celery_config flower --port=5555 --basic_auth=admin:admin123
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery
+    restart: unless-stopped
+    networks:
+      - natpudan-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  natpudan-network:
+    driver: bridge

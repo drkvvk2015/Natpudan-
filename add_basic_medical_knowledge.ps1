@@ -9,7 +9,7 @@ $BASE_URL = "http://localhost:8000"
 # Login as admin
 Write-Host "[1] Logging in as admin..." -ForegroundColor Yellow
 $loginBody = @{
-    email = "admin@example.com"
+    email = "admin@admin.com"
     password = "admin123"
 } | ConvertTo-Json
 

@@ -1,0 +1,207 @@
+version: '3.9'
+
+# Production deployment using pre-built images from GitHub Container Registry
+# Usage: docker-compose -f docker-compose.production.yml up -d
+
+services:
+  # Backend API (Using pre-built image)
+  backend:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-your-username}/natpudan-backend:${IMAGE_TAG:-latest}
+    container_name: natpudan-backend-prod
+    restart: always
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-physician_user}:${POSTGRES_PASSWORD:-secure_password}@db:5432/${POSTGRES_DB:-physician_ai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - LOG_LEVEL=INFO
+      - APSCHEDULER_ENABLED=true
+    volumes:
+      - backend-data:/app/data
+      - backend-logs:/app/logs
+      - backend-cache:/app/cache
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - natpudan-prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 512M
+
+  # Frontend (Using pre-built image)
+  frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-your-username}/natpudan-frontend:${IMAGE_TAG:-latest}
+    container_name: natpudan-frontend-prod
+    restart: always
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - natpudan-prod
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: natpudan-db-prod
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-physician_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_password}
+      - POSTGRES_DB=${POSTGRES_DB:-physician_ai}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - natpudan-prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-physician_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: natpudan-redis-prod
+    restart: always
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - natpudan-prod
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  # Celery Worker
+  celery:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-your-username}/natpudan-backend:${IMAGE_TAG:-latest}
+    container_name: natpudan-celery-prod
+    restart: always
+    command: celery -A app.celery_config worker --loglevel=info --concurrency=4
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-physician_user}:${POSTGRES_PASSWORD:-secure_password}@db:5432/${POSTGRES_DB:-physician_ai}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - backend-data:/app/data
+      - backend-logs:/app/logs
+      - backend-cache:/app/cache
+    depends_on:
+      - db
+      - redis
+      - backend
+    networks:
+      - natpudan-prod
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+
+  # Flower (Celery Monitoring)
+  flower:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-your-username}/natpudan-backend:${IMAGE_TAG:-latest}
+    container_name: natpudan-flower-prod
+    restart: always
+    command: celery -A app.celery_config flower --port=5555 --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin123}
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery
+    networks:
+      - natpudan-prod
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Nginx Reverse Proxy (Optional - for SSL/Load Balancing)
+  nginx:
+    image: nginx:alpine
+    container_name: natpudan-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - natpudan-prod
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  backend-data:
+    driver: local
+  backend-logs:
+    driver: local
+  backend-cache:
+    driver: local
+
+networks:
+  natpudan-prod:
+    driver: bridge

@@ -1,66 +1,60 @@
-# Start Redis Docker Container for Celery Broker
+# Start Redis Podman/Docker Container for Celery Broker
 # Required for APScheduler + Celery integration
 
 param(
     [int]$Port = 6379
 )
 
-$ContainerName = "redis-natpudan"
+$ContainerName = "physician-ai-redis"
+$Image = "mirror.gcr.io/library/redis:alpine"
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "   Redis Startup Script" -ForegroundColor Cyan
+Write-Host "   Redis Startup Script (Podman)" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
-# Check if Docker is installed
-try {
-    $dockerVersion = docker --version 2>$null
-    if ($dockerVersion) {
-        Write-Host "[OK] Docker installed: $dockerVersion" -ForegroundColor Green
+# Check for Podman first
+$engine = "podman"
+if (-not (Get-Command podman -ErrorAction SilentlyContinue)) {
+    $engine = "docker"
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        Write-Host "[ERROR] Neither Podman nor Docker found." -ForegroundColor Red
+        exit 1
     }
-} catch {
-    Write-Host "[ERROR] Docker not found. Please install Docker Desktop." -ForegroundColor Red
-    Write-Host "`n[INFO] Installation options:" -ForegroundColor Yellow
-    Write-Host "  1. Official: https://www.docker.com/products/docker-desktop" -ForegroundColor Cyan
-    Write-Host "  2. Chocolatey (Admin): choco install docker-desktop" -ForegroundColor Cyan
-    Write-Host "  3. Windows Package Manager (Admin): winget install Docker.DockerDesktop" -ForegroundColor Cyan
-    Write-Host "`nAfter installing, restart your terminal and try again.`n" -ForegroundColor Gray
-    exit 1
 }
 
-# Check if container already running
-$running = docker ps --filter "name=$ContainerName" --format "{{.Names}}" 2>$null
+Write-Host "[OK] Using container engine: $engine" -ForegroundColor Green
 
-if ($running -eq $ContainerName) {
+# Check if container already running
+$running = & $engine ps --filter "name=$ContainerName" --format "{{.Names}}" 2>$null
+if ($running -match $ContainerName) {
     Write-Host "[OK] Redis already running" -ForegroundColor Green
     Write-Host "     Container: $ContainerName" -ForegroundColor Yellow
     Write-Host "     Port: $Port" -ForegroundColor Yellow
-    Write-Host "     URL: redis://localhost:$Port`n" -ForegroundColor Yellow
     exit 0
 }
+
+# Remove existing stopped container
+& $engine rm -f $ContainerName 2>$null | Out-Null
 
 # Start container
 Write-Host "[INFO] Starting Redis container..." -ForegroundColor Yellow
 try {
-    docker run -d `
+    & $engine run -d `
         --name $ContainerName `
         -p ${Port}:6379 `
-        -v redis-data:/data `
-        --restart unless-stopped `
-        redis:latest 2>&1 | Out-Null
+        $Image redis-server --requirepass redis_password --maxmemory 512mb --maxmemory-policy allkeys-lru --appendonly yes | Out-Null
     
     Start-Sleep -Seconds 2
     
-    $check = docker ps --filter "name=$ContainerName" --format "{{.Names}}" 2>$null
-    
-    if ($check -eq $ContainerName) {
+    $check = & $engine ps --filter "name=$ContainerName" --format "{{.Names}}" 2>$null
+    if ($check -match $ContainerName) {
         Write-Host "[OK] Redis started successfully" -ForegroundColor Green
         Write-Host "     Container: $ContainerName" -ForegroundColor Yellow
         Write-Host "     Port: $Port" -ForegroundColor Yellow
-        Write-Host "     URL: redis://localhost:$Port" -ForegroundColor Yellow
-        Write-Host "`nTo stop: docker stop $ContainerName`n" -ForegroundColor Gray
+        Write-Host "     URL: redis://:redis_password@localhost:$Port" -ForegroundColor Yellow
     } else {
         Write-Host "[ERROR] Failed to start Redis" -ForegroundColor Red
-        docker logs $ContainerName 2>&1
+        & $engine logs $ContainerName
         exit 1
     }
 } catch {

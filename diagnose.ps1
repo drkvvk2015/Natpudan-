@@ -9,7 +9,7 @@ param(
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-$global:RootDir = "D:\Users\CNSHO\Documents\GitHub\Natpudan-"
+$global:RootDir = $PSScriptRoot
 $global:BackendDir = Join-Path $global:RootDir "backend"
 
 # Colors
@@ -36,70 +36,59 @@ function Write-Status {
 
 function Test-Port {
     param([int]$Port)
+    $tcp = New-Object System.Net.Sockets.TcpClient
     try {
-        $tcp = New-Object System.Net.Sockets.TcpClient
         $tcp.Connect("127.0.0.1", $Port)
         $tcp.Close()
         return $true
     } catch {
         return $false
+    } finally {
+        if ($tcp) { $tcp.Dispose() }
     }
 }
 
 function Test-Service {
     param([string]$Name, [int]$Port, [string]$Url)
     
-    Write-Host "`n╔════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║ $Name" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "`n[ $Name ]" -ForegroundColor Cyan
     
     # Test port
     if (Test-Port -Port $Port) {
-        Write-Status "Port $Port: OPEN" "Success" "✓"
+        Write-Status "Port ${Port}: OPEN" "Success" "OK"
         
         # Test HTTP endpoint if URL provided
         if ($Url) {
             try {
                 $response = Invoke-WebRequest -Uri $Url -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-                Write-Status "HTTP Status: $($response.StatusCode) OK" "Success" "✓"
-                
-                if ($Verbose) {
-                    Write-Status "Response Headers:" "Debug"
-                    $response.Headers.GetEnumerator() | ForEach-Object {
-                        Write-Host "  $($_.Key): $($_.Value)" -ForegroundColor Gray
-                    }
-                }
+                Write-Status "HTTP Status: $($response.StatusCode) OK" "Success" "OK"
             } catch {
-                Write-Status "HTTP Request Failed: $($_.Exception.Message)" "Error" "✗"
+                Write-Status "HTTP Request Failed: $($_.Exception.Message)" "Error" "ERR"
             }
         }
     } else {
-        Write-Status "Port $Port: CLOSED (Service not running)" "Error" "✗"
+        Write-Status "Port ${Port}: CLOSED (Service not running)" "Error" "ERR"
     }
 }
 
 function Check-Docker {
-    Write-Host "`n╔════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║ DOCKER & CONTAINERS" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "`n[ DOCKER & CONTAINERS ]" -ForegroundColor Cyan
     
     # Check Docker installation
-    try {
-        $dockerVersion = docker --version 2>$null
-        if ($dockerVersion) {
-            Write-Status "$dockerVersion" "Success" "✓"
-        }
-    } catch {
-        Write-Status "Docker not installed" "Error" "✗"
+    $dockerVersion = try { docker --version 2>$null } catch { $null }
+    if ($dockerVersion) {
+        Write-Status "$dockerVersion" "Success" "OK"
+    } else {
+        Write-Status "Docker not found or not in PATH" "Error" "ERR"
         return $false
     }
     
     # Check Docker daemon
     try {
         docker ps >$null 2>&1
-        Write-Status "Docker daemon running" "Success" "✓"
+        Write-Status "Docker daemon running" "Success" "OK"
     } catch {
-        Write-Status "Docker daemon not responding" "Error" "✗"
+        Write-Status "Docker daemon not responding" "Error" "ERR"
         return $false
     }
     
@@ -107,7 +96,7 @@ function Check-Docker {
     Write-Host "`nRunning Containers:" -ForegroundColor Yellow
     $containers = docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
     
-    if ($containers) {
+    if ($containers -and ($containers.Count -gt 1)) {
         $containers | ForEach-Object {
             if ($_ -match "physician-ai") {
                 Write-Host "  $_" -ForegroundColor Green
@@ -116,238 +105,124 @@ function Check-Docker {
             }
         }
     } else {
-        Write-Status "  No containers running" "Warning" "⚠"
+        Write-Status "  No containers running" "Warning" "WARN"
     }
     
     return $true
 }
 
 function Check-Python {
-    Write-Host "`n╔════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║ PYTHON ENVIRONMENT" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "`n[ PYTHON ENVIRONMENT ]" -ForegroundColor Cyan
     
     # Check Python
-    try {
-        $pythonVersion = python --version 2>&1
-        Write-Status "$pythonVersion" "Success" "✓"
-    } catch {
-        Write-Status "Python not found" "Error" "✗"
+    $pythonVersion = try { python --version 2>&1 } catch { $null }
+    if ($pythonVersion) {
+        Write-Status "$pythonVersion" "Success" "OK"
+    } else {
+        Write-Status "Python not found" "Error" "ERR"
         return $false
     }
     
     # Check virtual environment
-    $venvPath = Join-Path $global:BackendDir "venv"
+    $venvPath = Join-Path $global:BackendDir ".venv"
+    if (-not (Test-Path $venvPath)) {
+        $venvPath = Join-Path $global:BackendDir "venv"
+    }
+
     if (Test-Path $venvPath) {
-        Write-Status "Virtual environment exists" "Success" "✓"
+        Write-Status "Virtual environment found at $venvPath" "Success" "OK"
         
         # Check if activated
-        if (Test-Path env:VIRTUAL_ENV) {
-            Write-Status "Virtual environment is ACTIVE" "Success" "✓"
+        if ($env:VIRTUAL_ENV) {
+            Write-Status "Virtual environment is ACTIVE" "Success" "OK"
         } else {
-            Write-Status "Virtual environment not active (activate with: .\backend\venv\Scripts\Activate.ps1)" "Warning" "⚠"
+            Write-Status "Virtual environment not active" "Warning" "WARN"
         }
     } else {
-        Write-Status "Virtual environment not found" "Error" "✗"
-        if ($Fix) {
-            Write-Status "Creating virtual environment..." "Info" "⚙️"
-            python -m venv $venvPath
-        }
+        Write-Status "Virtual environment not found" "Error" "ERR"
         return $false
-    }
-    
-    # Check key packages
-    Write-Host "`nKey Packages:" -ForegroundColor Yellow
-    $packages = @("fastapi", "celery", "redis", "sqlalchemy", "psycopg2", "flower")
-    
-    foreach ($package in $packages) {
-        try {
-            python -c "import $($package.Replace('-', '_'))" 2>$null
-            Write-Status "$package" "Success" "✓"
-        } catch {
-            Write-Status "$package - NOT INSTALLED" "Error" "✗"
-        }
     }
     
     return $true
 }
 
 function Check-Database {
-    Write-Host "`n╔════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║ DATABASE" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "`n[ DATABASE ]" -ForegroundColor Cyan
     
-    # Check PostgreSQL container
-    $dbContainer = docker ps --filter "name=physician-ai-db" --format "{{.Names}}"
-    
-    if ($dbContainer) {
-        Write-Status "PostgreSQL Container: Running" "Success" "✓"
-        
-        # Test connection
-        try {
-            $result = docker exec physician-ai-db pg_isready -U physician_user 2>&1
-            if ($result -like "*accepting*") {
-                Write-Status "Database Connection: OK" "Success" "✓"
-                
-                # Get database stats
-                $stats = docker exec physician-ai-db psql -U physician_user -d physician_ai -t -c `
-                    "SELECT 'Tables: ' || count(*) FROM information_schema.tables WHERE table_schema='public'" 2>&1
-                Write-Status "$stats" "Info" "📊"
-            } else {
-                Write-Status "Database Connection: FAILED" "Error" "✗"
-            }
-        } catch {
-            Write-Status "Could not test database: $($_)" "Error" "✗"
-        }
+    if (Test-Path (Join-Path $global:BackendDir "natpudan.db")) {
+        Write-Status "SQLite Database: natpudan.db exists" "Success" "OK"
     } else {
-        Write-Status "PostgreSQL Container: Not Running" "Error" "✗"
+        Write-Status "SQLite Database: natpudan.db MISSING" "Warning" "WARN"
     }
-}
 
-function Check-Redis {
-    Write-Host "`n╔════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║ REDIS (Message Broker)" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════╝" -ForegroundColor Cyan
-    
-    # Check local Redis
-    if (Test-Port -Port 6379) {
-        Write-Status "Local Redis: RUNNING" "Success" "✓"
-        
-        # Test ping
-        try {
-            $response = docker exec physician-ai-redis redis-cli PING 2>$null
-            if ($response -eq "PONG") {
-                Write-Status "Redis Response: PONG" "Success" "✓"
-                
-                # Get stats
-                $stats = docker exec physician-ai-redis redis-cli INFO memory 2>&1 | grep "used_memory_human"
-                Write-Status "$stats" "Info" "📊"
-            }
-        } catch {
-            Write-Status "Could not ping Redis" "Error" "✗"
-        }
-    } else {
-        Write-Status "Redis: NOT RUNNING" "Error" "✗"
+    if (Test-Path (Join-Path $global:BackendDir "physician_ai.db")) {
+        Write-Status "SQLite Database: physician_ai.db exists" "Success" "OK"
     }
 }
 
 function Check-Backend {
-    Write-Host "`n╔════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║ FASTAPI BACKEND" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "`n[ FASTAPI BACKEND ]" -ForegroundColor Cyan
     
-    if (Test-Port -Port 8000) {
-        Write-Status "Backend: RUNNING" "Success" "✓"
-        
-        # Test endpoints
-        $endpoints = @{
-            "Health Check" = "http://localhost:8000/health"
-            "API Docs" = "http://localhost:8000/docs"
-            "OpenAPI Spec" = "http://localhost:8000/openapi.json"
-        }
-        
-        Write-Host "`nEndpoints:" -ForegroundColor Yellow
-        foreach ($endpoint in $endpoints.GetEnumerator()) {
-            try {
-                $response = Invoke-WebRequest -Uri $endpoint.Value -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-                Write-Status "$($endpoint.Key): $($response.StatusCode)" "Success" "✓"
-            } catch {
-                Write-Status "$($endpoint.Key): FAILED" "Error" "✗"
-            }
-        }
-    } else {
-        Write-Status "Backend: NOT RUNNING" "Error" "✗"
-    }
-}
-
-function Check-Celery {
-    Write-Host "`n╔════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║ CELERY WORKER" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════╝" -ForegroundColor Cyan
-    
-    # Check if worker is running (via Flower)
-    if (Test-Port -Port 5555) {
-        Write-Status "Flower Dashboard: RUNNING" "Success" "✓"
-        
+    # Try to get port from config
+    $BackendPort = 8000
+    $ConfigPath = Join-Path $global:RootDir "config/ports.json"
+    if (Test-Path $ConfigPath) {
         try {
-            $workers = Invoke-WebRequest -Uri "http://localhost:5555/api/workers" `
-                -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-            $workerCount = ($workers.Content | ConvertFrom-Json).PSObject.Properties.Count
-            Write-Status "Active Workers: $workerCount" "Info" "📊"
+            $cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+            if ($cfg.services.backend.dev) { $BackendPort = [int]$cfg.services.backend.dev }
+        } catch {}
+    }
+
+    if (Test-Port -Port $BackendPort) {
+        Write-Status "Backend: RUNNING on port ${BackendPort}" "Success" "OK"
+        
+        # Test health
+        try {
+            $response = Invoke-WebRequest -Uri "http://localhost:${BackendPort}/health" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+            Write-Status "Health Check: $($response.StatusCode)" "Success" "OK"
         } catch {
-            Write-Status "Could not fetch worker stats" "Error" "✗"
+            Write-Status "Health Check: FAILED" "Error" "ERR"
         }
     } else {
-        Write-Status "Celery Worker: NOT RUNNING" "Error" "✗"
-        Write-Status "Flower Dashboard: NOT RUNNING (run .\start-flower.ps1)" "Warning" "⚠"
+        Write-Status "Backend: NOT RUNNING on port ${BackendPort}" "Error" "ERR"
     }
 }
 
 function Check-Frontend {
-    Write-Host "`n╔════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║ REACT FRONTEND" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "`n[ REACT FRONTEND ]" -ForegroundColor Cyan
     
     if (Test-Port -Port 5173) {
-        Write-Status "Frontend Dev Server: RUNNING" "Success" "✓"
-        
-        try {
-            $response = Invoke-WebRequest -Uri "http://localhost:5173" `
-                -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-            Write-Status "Vite Server: OK" "Success" "✓"
-        } catch {
-            Write-Status "Frontend not responding" "Warning" "⚠"
-        }
+        Write-Status "Frontend Dev Server: RUNNING on port 5173" "Success" "OK"
     } else {
-        Write-Status "Frontend Dev Server: NOT RUNNING" "Warning" "⚠"
-        Write-Status "Run 'npm run dev' in frontend directory" "Info" "💡"
+        Write-Status "Frontend Dev Server: NOT RUNNING on port 5173" "Warning" "WARN"
     }
 }
 
 function Show-Summary {
-    Write-Host "`n╔════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║ DIAGNOSTICS SUMMARY" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "`n[ DIAGNOSTICS SUMMARY ]" -ForegroundColor Cyan
     
-    # Count running services
-    $running = 0
-    $total = 0
-    
+    # Try to get port from config
+    $BackendPort = 8000
+    $ConfigPath = Join-Path $global:RootDir "config/ports.json"
+    if (Test-Path $ConfigPath) {
+        try {
+            $cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+            if ($cfg.services.backend.dev) { $BackendPort = [int]$cfg.services.backend.dev }
+        } catch {}
+    }
+
     $services = @(
-        @{Name="Backend"; Port=8000},
+        @{Name="Backend"; Port=$BackendPort},
         @{Name="Frontend"; Port=5173},
-        @{Name="Flower"; Port=5555},
-        @{Name="Redis"; Port=6379},
-        @{Name="PostgreSQL"; Port=5432}
+        @{Name="Redis"; Port=6379}
     )
     
     foreach ($service in $services) {
         if (Test-Port -Port $service.Port) {
-            Write-Status "$($service.Name): RUNNING" "Success" "✓"
-            $running++
+            Write-Status "$($service.Name): RUNNING" "Success" "OK"
         } else {
-            Write-Status "$($service.Name): NOT RUNNING" "Warning" "✗"
+            Write-Status "$($service.Name): NOT RUNNING" "Warning" "FAIL"
         }
-        $total++
-    }
-    
-    Write-Host "`nStatus: $running/$total services running" -ForegroundColor Cyan
-    
-    if ($running -eq $total) {
-        Write-Host "`n✅ All services healthy and running!" -ForegroundColor Green
-        Write-Host @"
-
-Quick Links:
-  • Frontend:  http://localhost:5173
-  • Backend:   http://localhost:8000/docs
-  • Flower:    http://localhost:5555
-"@
-    } elseif ($running -gt 0) {
-        Write-Host "`n⚠️  Some services are missing. Run:" -ForegroundColor Yellow
-        Write-Host "  .\start-debug-full.ps1" -ForegroundColor Cyan
-    } else {
-        Write-Host "`n❌ No services running. Run:" -ForegroundColor Red
-        Write-Host "  .\start-debug-full.ps1" -ForegroundColor Cyan
     }
 }
 
@@ -355,19 +230,13 @@ Quick Links:
 # MAIN EXECUTION
 # ============================================================================
 
-Write-Host @"
-╔════════════════════════════════════════════════════════════════════════════╗
-║                NATPUDAN AI - DIAGNOSTIC REPORT                            ║
-╚════════════════════════════════════════════════════════════════════════════╝
-"@ -ForegroundColor Green
+Write-Host "`nNATPUDAN AI - DIAGNOSTIC REPORT`n" -ForegroundColor Green
 
 # Run all checks
 Check-Docker
 Check-Python
 Check-Database
-Check-Redis
 Check-Backend
-Check-Celery
 Check-Frontend
 
 # Show summary

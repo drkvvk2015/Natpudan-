@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    image: mirror.gcr.io/library/python:3.12-slim
+    working_dir: /app
+    command: >
+      bash -c "
+      apt-get update && apt-get install -y --no-install-recommends curl postgresql-client && rm -rf /var/lib/apt/lists/* &&
+      pip install --no-cache-dir -r requirements.txt &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://natpudan:natpudan123@db:5432/natpudan
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=your-secret-key-here-change-in-production
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Frontend
+  frontend:
+    image: mirror.gcr.io/library/node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+
+  # PostgreSQL Database
+  db:
+    image: mirror.gcr.io/library/postgres:16-alpine
+    environment:
+      - POSTGRES_DB=natpudan
+      - POSTGRES_USER=natpudan
+      - POSTGRES_PASSWORD=natpudan123
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U natpudan"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: mirror.gcr.io/library/redis:alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Celery Worker
+  celery:
+    image: mirror.gcr.io/library/python:3.12-slim
+    working_dir: /app
+    command: >
+      bash -c "
+      pip install --no-cache-dir -r requirements.txt &&
+      celery -A app.celery_app worker --loglevel=info
+      "
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://natpudan:natpudan123@db:5432/natpudan
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - db
+
+  # Flower (Celery monitoring)
+  flower:
+    image: mirror.gcr.io/library/python:3.12-slim
+    working_dir: /app
+    command: >
+      bash -c "
+      pip install --no-cache-dir -r requirements.txt &&
+      celery -A app.celery_app flower --port=5555
+      "
+    volumes:
+      - ./backend:/app
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+volumes:
+  postgres_data:
+  redis_data:

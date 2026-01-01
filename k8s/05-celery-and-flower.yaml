@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery
+  namespace: natpudan
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: celery
+  template:
+    metadata:
+      labels:
+        app: celery
+    spec:
+      containers:
+      - name: celery
+        image: ghcr.io/YOUR_USERNAME/natpudan-backend:latest
+        command:
+        - celery
+        - -A
+        - app.celery_config
+        - worker
+        - --loglevel=info
+        - --concurrency=4
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)"
+        - name: REDIS_URL
+          value: "redis://redis:6379/0"
+        - name: CELERY_BROKER_URL
+          value: "redis://redis:6379/0"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://redis:6379/0"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: natpudan-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: natpudan-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: natpudan-secrets
+              key: POSTGRES_DB
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: natpudan-secrets
+              key: OPENAI_API_KEY
+        envFrom:
+        - configMapRef:
+            name: natpudan-config
+        volumeMounts:
+        - name: backend-data
+          mountPath: /app/data
+        - name: backend-logs
+          mountPath: /app/logs
+        - name: backend-cache
+          mountPath: /app/cache
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "2"
+      volumes:
+      - name: backend-data
+        persistentVolumeClaim:
+          claimName: backend-data-pvc
+      - name: backend-logs
+        emptyDir: {}
+      - name: backend-cache
+        emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flower
+  namespace: natpudan
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flower
+  template:
+    metadata:
+      labels:
+        app: flower
+    spec:
+      containers:
+      - name: flower
+        image: ghcr.io/YOUR_USERNAME/natpudan-backend:latest
+        command:
+        - celery
+        - -A
+        - app.celery_config
+        - flower
+        - --port=5555
+        - --basic_auth=$(FLOWER_USER):$(FLOWER_PASSWORD)
+        ports:
+        - containerPort: 5555
+          name: http
+        env:
+        - name: CELERY_BROKER_URL
+          value: "redis://redis:6379/0"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://redis:6379/0"
+        - name: FLOWER_USER
+          valueFrom:
+            secretKeyRef:
+              name: natpudan-secrets
+              key: FLOWER_USER
+        - name: FLOWER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: natpudan-secrets
+              key: FLOWER_PASSWORD
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flower
+  namespace: natpudan
+spec:
+  selector:
+    app: flower
+  ports:
+  - port: 5555
+    targetPort: 5555
+  type: ClusterIP

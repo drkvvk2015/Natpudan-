@@ -7,8 +7,8 @@ $FrontendDir = Join-Path $RootDir "frontend"
 $VenvPath = Join-Path $BackendDir ".venv"
 
 Write-Host "`n=== NATPUDAN - BACKEND + FRONTEND ===" -ForegroundColor Cyan
-Write-Host "Starting backend on http://127.0.0.1:8000" -ForegroundColor Yellow
-Write-Host "Starting frontend on http://127.0.0.1:5173" -ForegroundColor Yellow
+Write-Status "Starting backend on http://127.0.0.1:8000" "Yellow"
+Write-Status "Starting frontend on http://127.0.0.1:5173" "Yellow"
 Write-Host ""
 
 # Backend in new window
