@@ -1,0 +1,15 @@
+  # Set permissions for the workflow. Specify 'id-token: write' to allow OIDC token generation at the workflow level.
+permissions: 
+  id-token: write
+  contents: read
+ 
+jobs: 
+  syncconfig: 
+    runs-on: ubuntu-latest 
+    steps: 
+      - name: Azure login
+        uses: Azure/login@v2.3.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.448b95c0-4c06-4b2b-ada8-6102c172dee9 }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
