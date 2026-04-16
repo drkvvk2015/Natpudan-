@@ -1,174 +1,269 @@
 # Natpudan AI Medical Assistant
 
-A production-ready FastAPI + React application for medical professionals with AI-powered features, role-based access control (RBAC), and comprehensive patient management capabilities.
+A production-ready FastAPI + React full-stack application for medical professionals with AI-powered diagnostics, role-based access control (RBAC), and comprehensive patient management capabilities.
 
-## [EMOJI] Features
+## Features
 
--  **AI Chat Assistant** - OpenAI GPT-4 integration for medical consultations
-- [EMOJI] **Discharge Summary** - AI-powered generation with voice typing support
-- [EMOJI] **Role-Based Access Control** - Staff, Doctor, and Admin roles
--  **Secure Authentication** - JWT + OAuth2 (Google, GitHub, Microsoft)
--  **Database Persistence** - SQLAlchemy with SQLite/PostgreSQL
-- [EMOJI] **Patient Management** - Intake forms, medical history, treatment plans
-- [EMOJI] **Analytics Dashboard** - Demographics, disease trends, treatment outcomes
--  **FHIR Integration** - Healthcare data interoperability
--  **Medical Timeline** - Comprehensive patient event tracking
+✅ **AI Chat Assistant** - OpenAI GPT-4 integration for medical consultations  
+✅ **AI Diagnosis** - Intelligent clinical case analysis and recommendations  
+✅ **Discharge Summary** - AI-powered generation with voice typing support  
+✅ **Role-Based Access Control** - Staff, Doctor, and Admin roles with fine-grained permissions  
+✅ **Secure Authentication** - JWT + OAuth2 (Google, GitHub, Microsoft)  
+✅ **Database Persistence** - SQLAlchemy ORM with SQLite (dev) / PostgreSQL (prod)  
+✅ **Patient Management** - Intake forms, medical history, treatment plans, follow-ups  
+✅ **Analytics Dashboard** - Demographics, disease trends, treatment outcomes  
+✅ **Knowledge Base** - Vector embeddings (FAISS) for medical literature search  
+✅ **Drug Interaction Checker** - Real-time medication interaction warnings  
+✅ **FHIR Integration** - Healthcare data interoperability standards  
+✅ **Medical Timeline** - Comprehensive patient event tracking and history  
+✅ **Multi-Platform** - Web, PWA, Android/iOS (Capacitor), Desktop (Electron)
 
-## [EMOJI] Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.10+ (tested with Python 3.14)
-- Node.js 18+
-- Git
+- **Python** 3.11+ (tested with 3.11, 3.12, 3.13)
+- **Node.js** 20+ (LTS recommended)
+- **Git**
+- **OpenAI API Key** (required for AI features) - get it at [platform.openai.com](https://platform.openai.com/api-keys)
 
-### Backend Setup (FastAPI)
+### Fastest Way to Start (Windows PowerShell)
 
 ```powershell
-# 1. Clone repository
+# Clone and navigate
 git clone https://github.com/drkvvk2015/Natpudan-.git
 cd Natpudan-
 
-# 2. Create virtual environment
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+# Run the unified startup script (handles venv, dependencies, both servers)
+.\start-app.ps1
+```
 
-# 3. Install backend dependencies
+The app will open:
+- **Backend**: http://localhost:8000
+- **Frontend**: http://localhost:5173  
+- **API Docs**: http://localhost:8000/docs
+
+### Manual Setup (All Platforms)
+
+#### Step 1: Backend Setup
+
+```powershell
+# Create virtual environment
 cd backend
+python -m venv .venv  # or: py -3.11 -m venv .venv
+
+# Activate (Windows)
+.\.venv\Scripts\Activate.ps1
+# Or Linux/Mac:
+# source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 pip install -r requirements-db.txt
 
-# 4. Create .env file (copy from .env.example if available)
-# Or create manually with required environment variables (see below)
+# Create .env from example
+Copy-Item .env.example .env
+# Edit .env to add: OPENAI_API_KEY, SECRET_KEY, DATABASE_URL
 
-# 5. Run backend server
+# Run migrations
+python -m alembic upgrade head
+
+# Start backend server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Backend Environment Self-Repair (Windows)
+#### Step 2: Frontend Setup
 
-If backend startup fails due to Python/venv mismatch (for example a broken `.venv311`), run the built-in repair script:
+```powershell
+# In a new terminal, from project root
+cd frontend
+
+# Install dependencies
+npm install
+
+# Create .env from example
+Copy-Item .env.example .env
+# Edit .env to point to backend: VITE_API_BASE_URL=http://localhost:8000
+
+# Start dev server
+npm run dev
+```
+
+#### Step 3: Access the Application
+
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **API Docs (Swagger)**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+#### Default Login (Development Only)
+
+```
+Username: admin@natpudan.local
+Password: admin123
+Role: Admin
+```
+
+### Backend Troubleshooting
+
+If backend startup fails due to Python/venv issues:
 
 ```powershell
 cd backend
 .\repair-backend-env.ps1 -Install
+# Optional: Add -RunTests for smoke tests
+./repair-backend-env.ps1 -Install -RunTests
 ```
 
-Optional: include test smoke check:
-
-```powershell
-.\repair-backend-env.ps1 -Install -RunTests
-```
-
-Test-only dependencies are tracked in `backend/requirements-test.txt`.
-
-For API integration/auth flow tests (starts local API automatically):
-
-```powershell
-.\repair-backend-env.ps1 -RunIntegrationTests
-```
-
-`backend/pytest.ini` excludes non-deterministic/manual tests (`test_openai.py`, `test_auth.py`) from default `pytest` runs.
-
-### Professional Dev Workflow
-
-- CI pipeline: `.github/workflows/ci.yml`
-- Dependency automation: `.github/dependabot.yml`
-- Backend smoke repair: `backend/repair-backend-env.ps1`
-- Database migrations: `backend/migrate.ps1`
-- Frontend typecheck focuses on platform/core files; the production build remains the full-app validation gate.
-
-Common migration commands:
+### Database Management
 
 ```powershell
 cd backend
+
+# View current migration version
+python -m alembic current
+
+# Create a new migration for schema changes
+python -m alembic revision --autogenerate -m "Add new table"
+
+# Apply migrations
+python -m alembic upgrade head
+
+# Or use the migration script:
 .\migrate.ps1 -Command current
-.\migrate.ps1 -Command revision -Message "describe schema change"
 .\migrate.ps1 -Command upgrade
 ```
 
-### Observability
-
-- Backend logs now include request correlation IDs via `X-Request-ID`
-- Optional Sentry support:
-  - Backend: `SENTRY_DSN`
-  - Frontend: `VITE_SENTRY_DSN`
-
-Backend will be available at: `http://localhost:8000`
-
-### Frontend Setup (React + Vite)
+### Testing
 
 ```powershell
-# 1. Navigate to frontend directory
-cd frontend
+cd backend
 
-# 2. Install dependencies
-npm install
+# Run all tests (excluding manual/integration tests)
+pytest
 
-# 3. Run development server
-npm run dev
+# Run specific test file
+pytest tests/test_contracts.py -v
+
+# Run with coverage
+pytest --cov=app
 ```
 
-Frontend will be available at: `http://localhost:5173`
+### Frontend Build & Deployment
 
-## RBAC
+```powershell
+cd frontend
 
-- Staff: patient data entry, chat.
-- Doctor: chat, diagnosis, knowledge base, analytics, FHIR.
-- Admin: full access.
+# Production build (optimized)
+npm run build:web
 
-##  Environment Variables
+# Preview production build locally
+npm run preview
 
-Create a `backend/.env` file with the following variables:
+# Type checking
+npm run typecheck
 
-### Required
+# Lint code
+npm run lint
+```
+
+## Role-Based Access Control (RBAC)
+
+Natpudan uses three role levels with hierarchical permissions:
+
+| Feature | Staff | Doctor | Admin |
+|---------|-------|--------|-------|
+| Patient Intake | ✅ | ✅ | ✅ |
+| Chat with AI | ✅ | ✅ | ✅ |
+| AI Diagnosis | ❌ | ✅ | ✅ |
+| Knowledge Base Search | ❌ | ✅ | ✅ |
+| Drug Interactions | ❌ | ✅ | ✅ |
+| Treatment Plans | ❌ | ✅ | ✅ |
+| Analytics Dashboard | ❌ | ✅ | ✅ |
+| FHIR Explorer | ❌ | ✅ | ✅ |
+| User Management | ❌ | ❌ | ✅ |
+| System Settings | ❌ | ❌ | ✅ |
+
+## Configuration
+
+### Backend Environment Variables
+
+Create `backend/.env` file with the following:
+
+#### Required Variables
 
 ```env
-# Database (SQLite for development)
+# Database Configuration
+# For development: SQLite (automatic)
 DATABASE_URL=sqlite:///./natpudan.db
 
+# For production: PostgreSQL
+# DATABASE_URL=postgresql://user:password@localhost:5432/natpudan_db
+
 # JWT Authentication
-SECRET_KEY=your-secret-key-change-in-production
+SECRET_KEY=generate-with:-python -c "import secrets; print(secrets.token_urlsafe(32))"
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-# OpenAI Integration (Required for AI features)
-OPENAI_API_KEY=sk-proj-your-openai-api-key-here
-OPENAI_MODEL=gpt-4-turbo-preview
+# OpenAI (Required for all AI features)
+OPENAI_API_KEY=sk-proj-your-key-here
+OPENAI_MODEL=gpt-4o
 
 # Application URLs
 FRONTEND_URL=http://localhost:5173
 BACKEND_URL=http://localhost:8000
+ENVIRONMENT=development
 ```
 
-### Optional (OAuth Providers)
+#### Optional: OAuth Providers
 
 ```env
-# Google OAuth
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
+# Google
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-secret
 
-# GitHub OAuth
-GITHUB_CLIENT_ID=your-github-client-id
-GITHUB_CLIENT_SECRET=your-github-client-secret
+# GitHub
+GITHUB_CLIENT_ID=your-client-id
+GITHUB_CLIENT_SECRET=your-secret
 
-# Microsoft OAuth
-MICROSOFT_CLIENT_ID=your-microsoft-client-id
-MICROSOFT_CLIENT_SECRET=your-microsoft-client-secret
+# Microsoft
+MICROSOFT_CLIENT_ID=your-client-id
+MICROSOFT_CLIENT_SECRET=your-secret
+```
+
+#### Optional: Monitoring
+
+```env
+# Sentry (error tracking)
+SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+SENTRY_TRACES_SAMPLE_RATE=0.1
+```
+
+### Frontend Environment Variables
+
+Create `frontend/.env` file:
+
+```env
+# Backend API location
+VITE_API_BASE_URL=http://localhost:8000
+VITE_WS_URL=ws://localhost:8000
+
+# Optional: Sentry monitoring
+VITE_SENTRY_DSN=
 ```
 
 ### Generate SECRET_KEY
 
-```powershell
+```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 ### Get OpenAI API Key
 
-1. Visit <https://platform.openai.com/api-keys>
-2. Create a new API key
-3. Add to `.env` file
-4. Monitor usage at <https://platform.openai.com/usage>
+1. Visit [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Create a new API key with appropriate permissions
+3. Add to `backend/.env` as `OPENAI_API_KEY`
+4. Monitor usage at [platform.openai.com/usage](https://platform.openai.com/usage)
 
 ##  Security Features
 
@@ -369,6 +464,113 @@ See `LICENSE` file for details.
 - FastAPI framework
 - React and Material-UI teams
 - Medical professionals for domain expertise
+
+##  Project Structure
+
+```
+Natpudan-/
+├── backend/                      # FastAPI server
+│   ├── app/
+│   │   ├── main.py              # Application entry point
+│   │   ├── models.py            # SQLAlchemy ORM models
+│   │   ├── database.py          # Database configuration
+│   │   ├── api/                 # API route handlers
+│   │   │   ├── auth_new.py      # Authentication (JWT, OAuth2)
+│   │   │   ├── chat_new.py      # Chat and AI conversations
+│   │   │   ├── discharge.py     # Discharge summary generation
+│   │   │   ├── treatment.py     # Treatment plans
+│   │   │   ├── timeline.py      # Patient timelines
+│   │   │   ├── analytics.py     # Dashboard analytics
+│   │   │   └── fhir.py          # FHIR integration
+│   │   ├── services/            # Business logic
+│   │   │   ├── vector_knowledge_base.py    # Vector embeddings (FAISS)
+│   │   │   ├── drug_interactions.py        # Medication checker
+│   │   │   ├── rag_service.py             # Retrieval-augmented generation
+│   │   │   └── icd10_service.py           # ICD-10 code mapping
+│   │   └── websocket_handlers.py # Real-time streaming
+│   ├── alembic/                 # Database migrations
+│   ├── tests/                   # Unit and integration tests
+│   ├── requirements.txt         # Python dependencies
+│   └── .env                     # Environment variables (create manually)
+│
+├── frontend/                     # React + Vite web app
+│   ├── src/
+│   │   ├── main.tsx             # React entry point
+│   │   ├── App.tsx              # Router setup
+│   │   ├── pages/               # Page components
+│   │   ├── components/          # Reusable UI components
+│   │   ├── services/            # API client and utilities
+│   │   ├── context/             # React Context (auth, etc.)
+│   │   └── styles/              # Global styles
+│   ├── vite.config.ts           # Vite build configuration
+│   ├── package.json             # NPM dependencies
+│   └── tsconfig.json            # TypeScript configuration
+│
+├── data/                        # Knowledge base and resources
+│   ├── knowledge_base/          # Medical PDFs and FAISS index
+│   └── icd_codes/               # ICD-10 code database
+│
+├── docs/                        # Documentation
+├── scripts/                     # Helper scripts
+├── docker-compose.yml           # Docker composition for production
+├── start-app.ps1               # PowerShell startup script
+├── init_db_manual.py           # Manual database initialization
+└── README.md                   # This file
+```
+
+## Repository Cleanup
+
+This repository has been cleaned to remove unnecessary build artifacts and virtual environments that bloat repository size:
+
+### Files Removed
+
+- **`frontend/release/`** - Electron packaged app binaries (dist: ~190+ MB)
+- **`.venv/`, `.venv311/`, `backend/.venv/`** - Python virtual environment caches (~500 MB total)
+
+### Why These Were Removed
+
+- **Build artifacts** are regenerated during deployment; storing them in version control wastes storage and slows down clones
+- **Virtual environments** are machine-specific and platform-dependent; they should be recreated locally using `python -m venv` and `pip install -r requirements.txt`
+
+### Keeping the Repository Clean
+
+```bash
+# Don't commit virtual environments
+echo ".venv/
+.venv311/
+backend/.venv/
+venv/"  >> .gitignore
+
+# Don't commit build outputs
+echo "frontend/release/
+frontend/dist/
+backend/dist/
+*.egg-info/
+__pycache__/
+*.pyc"  >> .gitignore
+
+# Clean up if accidentally added
+git rm -r --cached .venv/ backend/.venv/ frontend/release/ 2>/dev/null
+git commit -m "chore: remove virtual environments and build artifacts"
+```
+
+### Dependency Installation
+
+Always reproduce dependencies locally:
+
+```bash
+# Backend
+cd backend
+python -m venv .venv
+.venv/Scripts/activate  # Windows
+# source .venv/bin/activate  # Linux/Mac
+pip install -r requirements.txt
+python -m alembic upgrade head
+
+# Frontend
+cd frontend
+npm ci  # Use npm ci instead of npm install for reproducible builds
+```
 
 ##  Support
 
