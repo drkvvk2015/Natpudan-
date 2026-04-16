@@ -279,3 +279,30 @@ def _format_uptime(seconds: float) -> str:
         parts.append(f"{secs}s")
     
     return " ".join(parts)
+
+
+@router.get('/health/ai-provider')
+async def ai_provider_status() -> Dict[str, Any]:
+    '''
+    Check AI provider status and configuration
+    Returns status of OpenAI, Ollama, and embedded models
+    '''
+    try:
+        from app.utils.hybrid_ai_service import get_hybrid_ai
+        
+        service = get_hybrid_ai()
+        status = await service.get_status()
+        
+        return {
+            'status': 'healthy',
+            'ai_service': status,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+    
+    except Exception as e:
+        logger.error(f'AI provider status error: {e}', exc_info=True)
+        return {
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }

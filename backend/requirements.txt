@@ -84,3 +84,5 @@ uvicorn==0.38.0
 watchfiles==1.1.1
 websockets==15.0.1
 sentry-sdk==2.29.1
+# Embedded AI Models - Optional for TinyLLama and other GGUF models
+llama-cpp-python==0.2.94
