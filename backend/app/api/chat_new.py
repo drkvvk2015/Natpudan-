@@ -20,7 +20,7 @@ from app.crud import (
     create_message,
     get_conversation_messages,
 )
-from app.utils.ai_service import generate_ai_response
+from app.utils.hybrid_ai_service import generate_ai_response
 import os
 
 # Knowledge base is NOT loaded at import time to avoid blocking

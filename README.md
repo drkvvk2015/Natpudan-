@@ -1,611 +1,237 @@
 # Natpudan AI Medical Assistant
 
-A production-ready FastAPI + React full-stack application for medical professionals with AI-powered diagnostics, role-based access control (RBAC), and comprehensive patient management capabilities.
+A production-ready **FastAPI + React/TypeScript** full-stack medical AI application with intelligent diagnostics, role-based access control, and comprehensive patient management.
 
 ## Features
 
-✅ **AI Chat Assistant** - OpenAI GPT-4 / Local TinyLLama / Ollama integration for medical consultations  
-✅ **AI Diagnosis** - Intelligent clinical case analysis and recommendations  
-✅ **Discharge Summary** - AI-powered generation with voice typing support  
-✅ **Role-Based Access Control** - Staff, Doctor, and Admin roles with fine-grained permissions  
-✅ **Secure Authentication** - JWT + OAuth2 (Google, GitHub, Microsoft)  
-✅ **Database Persistence** - SQLAlchemy ORM with SQLite (dev) / PostgreSQL (prod)  
-✅ **Patient Management** - Intake forms, medical history, treatment plans, follow-ups  
-✅ **Analytics Dashboard** - Demographics, disease trends, treatment outcomes  
-✅ **Knowledge Base** - Vector embeddings (FAISS) for medical literature search  
-✅ **Drug Interaction Checker** - Real-time medication interaction warnings  
-✅ **FHIR Integration** - Healthcare data interoperability standards  
-✅ **Medical Timeline** - Comprehensive patient event tracking and history  
-✅ **Multi-Platform** - Web, PWA, Android/iOS (Capacitor), Desktop (Electron)
+| Category | Capability |
+|----------|-----------|
+| **AI** | GPT-4 chat, clinical diagnosis, discharge summaries, OCR medical report parsing |
+| **Knowledge Base** | Vector search (FAISS), hybrid BM25+vector, RAG queries, PubMed integration |
+| **PDF Engine** | Large PDF upload, OCR extraction (Tesseract/pdf2image), duplicate detection, background processing queue |
+| **Patient Management** | Intake forms, medical timeline, treatment plans, medication follow-ups |
+| **Reports** | OPD case sheet PDF, prescription PDF, medical history PDF generation |
+| **Analytics** | Demographics, disease trends, risk assessment, treatment outcomes |
+| **Drug Checker** | Real-time interaction warnings with severity classification |
+| **Authentication** | JWT + OAuth2 (Google, GitHub, Microsoft), multi-tab sync |
+| **FHIR** | Healthcare interoperability standard (patient resources, observations, conditions) |
+| **Multi-Platform** | Web PWA, Android/iOS (Capacitor), Windows/Linux Desktop (Electron) |
 
-## Quick Start
+## Tech Stack
 
-### Prerequisites
+- **Backend**: FastAPI, SQLAlchemy, SQLite/PostgreSQL, OpenAI API
+- **Frontend**: React 18, TypeScript, Vite 7, MUI v5, React Router v6
+- **AI/ML**: OpenAI GPT-4, FAISS vector embeddings, TinyLLama (local), Ollama (local)
+- **PDF**: PyMuPDF, Tesseract OCR, pdf2image
+- **Deploy**: Docker Compose, Capacitor (mobile), Electron (desktop)
 
-- **Python** 3.11+ (tested with 3.11, 3.12, 3.13)
-- **Node.js** 20+ (LTS recommended)
-- **Git**
-- **OpenAI API Key** (required for AI features) - get it at [platform.openai.com](https://platform.openai.com/api-keys)
+---
 
-### Fastest Way to Start (Windows PowerShell)
+## Quick Start (Windows)
 
 ```powershell
-# Clone and navigate
 git clone https://github.com/drkvvk2015/Natpudan-.git
 cd Natpudan-
-
-# Run the unified startup script (handles venv, dependencies, both servers)
 .\start-app.ps1
 ```
 
-The app will open:
-- **Backend**: http://localhost:8000
-- **Frontend**: http://localhost:5173  
-- **API Docs**: http://localhost:8000/docs
+Opens:
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **Swagger Docs**: http://localhost:8000/docs
 
-### Manual Setup (All Platforms)
+---
 
-#### Step 1: Backend Setup
+## Manual Setup
+
+### 1. Backend
 
 ```powershell
-# Create virtual environment
-cd backend
-python -m venv .venv  # or: py -3.11 -m venv .venv
-
-# Activate (Windows)
-.\.venv\Scripts\Activate.ps1
-# Or Linux/Mac:
-# source .venv/bin/activate
+# From project root — create & activate Python 3.11 venv
+python -m venv .venv311
+.\.venv311\Scripts\Activate.ps1
 
 # Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-db.txt
+pip install -r backend/requirements.txt
 
-# Create .env from example
-Copy-Item .env.example .env
-# Edit .env to add: OPENAI_API_KEY, SECRET_KEY, DATABASE_URL
+# Configure environment
+Copy-Item backend/.env.example backend/.env
+# Edit backend/.env — add OPENAI_API_KEY and SECRET_KEY
 
-# Run migrations
-python -m alembic upgrade head
-
-# Start backend server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Start backend
+cd backend
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-#### Step 2: Frontend Setup
+### 2. Frontend
 
 ```powershell
-# In a new terminal, from project root
 cd frontend
-
-# Install dependencies
 npm install
-
-# Create .env from example
-Copy-Item .env.example .env
-# Edit .env to point to backend: VITE_API_BASE_URL=http://localhost:8000
-
-# Start dev server
 npm run dev
 ```
 
-#### Step 3: Access the Application
-
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Docs (Swagger)**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-#### Default Login (Development Only)
+### Default Dev Login
 
 ```
-Username: admin@natpudan.local
+Email:    admin@natpudan.local
 Password: admin123
-Role: Admin
+Role:     Admin
 ```
 
-### Backend Troubleshooting
+---
 
-If backend startup fails due to Python/venv issues:
+## Environment Variables
 
-```powershell
-cd backend
-.\repair-backend-env.ps1 -Install
-# Optional: Add -RunTests for smoke tests
-./repair-backend-env.ps1 -Install -RunTests
-```
-
-### Database Management
-
-```powershell
-cd backend
-
-# View current migration version
-python -m alembic current
-
-# Create a new migration for schema changes
-python -m alembic revision --autogenerate -m "Add new table"
-
-# Apply migrations
-python -m alembic upgrade head
-
-# Or use the migration script:
-.\migrate.ps1 -Command current
-.\migrate.ps1 -Command upgrade
-```
-
-### Testing
-
-```powershell
-cd backend
-
-# Run all tests (excluding manual/integration tests)
-pytest
-
-# Run specific test file
-pytest tests/test_contracts.py -v
-
-# Run with coverage
-pytest --cov=app
-```
-
-### Frontend Build & Deployment
-
-```powershell
-cd frontend
-
-# Production build (optimized)
-npm run build:web
-
-# Preview production build locally
-npm run preview
-
-# Type checking
-npm run typecheck
-
-# Lint code
-npm run lint
-```
-
-## Role-Based Access Control (RBAC)
-
-Natpudan uses three role levels with hierarchical permissions:
-
-| Feature | Staff | Doctor | Admin |
-|---------|-------|--------|-------|
-| Patient Intake | ✅ | ✅ | ✅ |
-| Chat with AI | ✅ | ✅ | ✅ |
-| AI Diagnosis | ❌ | ✅ | ✅ |
-| Knowledge Base Search | ❌ | ✅ | ✅ |
-| Drug Interactions | ❌ | ✅ | ✅ |
-| Treatment Plans | ❌ | ✅ | ✅ |
-| Analytics Dashboard | ❌ | ✅ | ✅ |
-| FHIR Explorer | ❌ | ✅ | ✅ |
-| User Management | ❌ | ❌ | ✅ |
-| System Settings | ❌ | ❌ | ✅ |
-
-## Configuration
-
-### AI Provider Options
-
-The app supports multiple AI providers with automatic fallback:
-
-| Provider | Best For | Setup | Cost | Privacy |
-|----------|----------|-------|------|---------|
-| **TinyLLama** (Embedded) | Development, demos, privacy-first | ~5 min | 🆓 Free | ✅ 100% local |
-| **Ollama** (Local) | Production, better accuracy | ~15 min | 🆓 Free | ✅ 100% local |
-| **OpenAI** | Critical medical decisions, best accuracy | API key | 💰 Per-token | ⚠️ API-based |
-
-**Quick Start:** Use `AI_PROVIDER=auto` to automatically try embedded → ollama → openai
-
-**TinyLLama Setup:** See [TINYLLAMA_SETUP.md](TINYLLAMA_SETUP.md) for complete instructions
-
-### Backend Environment Variables
-
-Create `backend/.env` file with the following:
-
-#### Required Variables
+### `backend/.env`
 
 ```env
-# Database Configuration
-# For development: SQLite (automatic)
+# Database (SQLite for dev, PostgreSQL for prod)
 DATABASE_URL=sqlite:///./natpudan.db
 
-# For production: PostgreSQL
-# DATABASE_URL=postgresql://user:password@localhost:5432/natpudan_db
-
-# JWT Authentication
-SECRET_KEY=generate-with:-python -c "import secrets; print(secrets.token_urlsafe(32))"
+# JWT
+SECRET_KEY=your-secret-key   # python -c "import secrets; print(secrets.token_urlsafe(32))"
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-# OpenAI (Required for all AI features)
+# OpenAI (required for full AI features)
 OPENAI_API_KEY=sk-proj-your-key-here
 OPENAI_MODEL=gpt-4o
 
-# AI Provider Configuration (Optional - for local/embedded models)
-# Options: "auto" (embedded→ollama→openai), "embedded" (TinyLLama), "ollama", "openai"
+# AI Provider fallback chain: embedded -> ollama -> openai
 AI_PROVIDER=auto
-
-# For TinyLLama Embedded Model (lightweight, local, no API key needed)
-# Download guide: See TINYLLAMA_SETUP.md
-EMBEDDED_MODEL_PATH=models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf  # Optional
-MODEL_GPU_LAYERS=0  # 0 for CPU only, 10-33 for GPU acceleration
-
-# For Ollama Server (if running locally)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=mistral
 
-# Application URLs
+# Optional OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+
 FRONTEND_URL=http://localhost:5173
 BACKEND_URL=http://localhost:8000
 ENVIRONMENT=development
 ```
 
-#### Optional: OAuth Providers
+### `frontend/.env`
 
 ```env
-# Google
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-secret
-
-# GitHub
-GITHUB_CLIENT_ID=your-client-id
-GITHUB_CLIENT_SECRET=your-secret
-
-# Microsoft
-MICROSOFT_CLIENT_ID=your-client-id
-MICROSOFT_CLIENT_SECRET=your-secret
-```
-
-#### Optional: Monitoring
-
-```env
-# Sentry (error tracking)
-SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
-SENTRY_TRACES_SAMPLE_RATE=0.1
-```
-
-### Frontend Environment Variables
-
-Create `frontend/.env` file:
-
-```env
-# Backend API location
 VITE_API_BASE_URL=http://localhost:8000
 VITE_WS_URL=ws://localhost:8000
-
-# Optional: Sentry monitoring
-VITE_SENTRY_DSN=
 ```
-
-### Generate SECRET_KEY
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-### Get OpenAI API Key
-
-1. Visit [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-2. Create a new API key with appropriate permissions
-3. Add to `backend/.env` as `OPENAI_API_KEY`
-4. Monitor usage at [platform.openai.com/usage](https://platform.openai.com/usage)
-
-##  Security Features
-
-- **Password Security**: Bcrypt hashing for secure password storage
-- **JWT Authentication**: Secure token-based authentication
-- **OAuth2 Integration**: Social login with Google, GitHub, Microsoft
-- **Database Security**: SQL injection protection via SQLAlchemy ORM
-- **Environment Variables**: Sensitive credentials stored in `.env` (never committed)
-- **CORS Configuration**: Controlled cross-origin access
-- **Dependencies**: Regularly updated via Dependabot alerts
-
-### Security Best Practices
-
-- Never commit `.env` files to version control
-- Rotate API keys regularly
-- Use strong SECRET_KEY in production
-- Enable HTTPS in production
-- Review GitHub Security tab for vulnerabilities
-
-##  Architecture
-
-### Backend (FastAPI)
-
-- **Database**: SQLAlchemy ORM with SQLite (dev) / PostgreSQL (prod)
-- **Models**: User, Conversation, Message, DischargeSummary
-- **Authentication**: JWT + OAuth2 with bcrypt password hashing
-- **AI Integration**: OpenAI GPT-4 for medical assistance
-- **API Structure**:
-  - `/api/auth/*` - Authentication endpoints
-  - `/api/chat/*` - AI chat with conversation history
-  - `/api/discharge-summary/*` - Discharge summary CRUD + AI generation
-  - `/api/medical/*` - Medical features (diagnosis, knowledge base)
-  - `/api/treatment/*` - Treatment plan management
-  - `/api/analytics/*` - Analytics dashboard
-  - `/api/fhir/*` - FHIR integration
-
-### Frontend (React + TypeScript)
-
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite 7
-- **UI Library**: Material-UI (MUI) v5
-- **Routing**: React Router v6
-- **State Management**: React Context API
-- **API Client**: Axios
-- **Features**:
-  - Responsive design
-  - Voice typing (Web Speech API)
-  - Real-time AI chat
-  - OAuth social login
-  - Professional medical forms
-
-##  User Roles
-
-### Staff Role
-
-- Patient data entry
-- Basic chat access
-- View patient records
-
-### Doctor Role
-
-- Full chat access with AI
-- Diagnosis assistance
-- Discharge summary generation
-- Treatment plan creation
-- Knowledge base access
-- Analytics viewing
-
-### Admin Role
-
-- All doctor permissions
-- User management
-- System configuration
-- Full analytics access
-
-##  API Testing
-
-### Using curl
-
-```powershell
-# Register new user
-curl -X POST http://127.0.0.1:8001/api/auth/register `
-  -H "Content-Type: application/json" `
-  -d '{\"email\":\"doctor@test.com\",\"password\":\"SecurePass123!\",\"full_name\":\"Dr. Test\",\"role\":\"doctor\",\"license_number\":\"MD12345\"}'
-
-# Login
-curl -X POST http://127.0.0.1:8001/api/auth/login `
-  -H "Content-Type: application/json" `
-  -d '{\"email\":\"doctor@test.com\",\"password\":\"SecurePass123!\"}'
-
-# Chat (requires token)
-curl -X POST http://127.0.0.1:8001/api/chat/message `
-  -H "Content-Type: application/json" `
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" `
-  -d '{\"message\":\"What are the symptoms of pneumonia?\"}'
-```
-
-## [EMOJI] Database
-
-### SQLite (Development)
-
-Database file: `backend/natpudan.db`
-
-View with DB Browser for SQLite: <https://sqlitebrowser.org/>
-
-### PostgreSQL (Production)
-
-Update `DATABASE_URL` in `.env`:
-
-```env
-DATABASE_URL=postgresql://username:password@localhost:5432/natpudan_db
-```
-
-### Database Migrations
-
-```powershell
-cd backend
-alembic init alembic
-alembic revision --autogenerate -m "Initial schema"
-alembic upgrade head
-```
-
-##  Logo Usage
-
-Professional logo system with medical cross + AI circuit design:
-
-- **Icon**: `frontend/public/logo-icon.svg` (80x80px)
-- **Full Logo**: `frontend/public/logo-full.svg` (400x100px with text)
-- **React Component**: `frontend/src/components/NatpudanLogo.tsx`
-
-See `LOGO_USAGE.md` for detailed branding guidelines.
-
-## [EMOJI] Troubleshooting
-
-### Backend won't start
-
-```powershell
-# Check if all dependencies are installed
-cd backend
-pip install -r requirements.txt
-pip install -r requirements-db.txt
-
-# Check if .env file exists with required variables
-cat .env
-
-# Check if port 8001 is available
-netstat -an | findstr :8001
-```
-
-### Frontend won't start
-
-```powershell
-# Reinstall dependencies
-cd frontend
-Remove-Item -Recurse -Force node_modules
-npm install
-
-# Clear cache
-npm cache clean --force
-```
-
-### Database errors
-
-```powershell
-# Delete and recreate database
-cd backend
-Remove-Item natpudan.db
-# Restart backend - database will auto-initialize
-```
-
-### OpenAI API errors
-
-- Verify API key is correct in `.env`
-- Check API quota at <https://platform.openai.com/usage>
-- Ensure proper billing setup
-
-##  Documentation
-
-- API Docs: <http://127.0.0.1:8001/docs> (Swagger UI)
-- ReDoc: <http://127.0.0.1:8001/redoc>
-- Logo Guidelines: `LOGO_USAGE.md`
-
-##  Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## [EMOJI] License
-
-See `LICENSE` file for details.
-
-##  Acknowledgments
-
-- OpenAI GPT-4 for AI capabilities
-- FastAPI framework
-- React and Material-UI teams
-- Medical professionals for domain expertise
-
-##  Project Structure
-
-```
-Natpudan-/
-├── backend/                      # FastAPI server
-│   ├── app/
-│   │   ├── main.py              # Application entry point
-│   │   ├── models.py            # SQLAlchemy ORM models
-│   │   ├── database.py          # Database configuration
-│   │   ├── api/                 # API route handlers
-│   │   │   ├── auth_new.py      # Authentication (JWT, OAuth2)
-│   │   │   ├── chat_new.py      # Chat and AI conversations
-│   │   │   ├── discharge.py     # Discharge summary generation
-│   │   │   ├── treatment.py     # Treatment plans
-│   │   │   ├── timeline.py      # Patient timelines
-│   │   │   ├── analytics.py     # Dashboard analytics
-│   │   │   └── fhir.py          # FHIR integration
-│   │   ├── services/            # Business logic
-│   │   │   ├── vector_knowledge_base.py    # Vector embeddings (FAISS)
-│   │   │   ├── drug_interactions.py        # Medication checker
-│   │   │   ├── rag_service.py             # Retrieval-augmented generation
-│   │   │   └── icd10_service.py           # ICD-10 code mapping
-│   │   └── websocket_handlers.py # Real-time streaming
-│   ├── alembic/                 # Database migrations
-│   ├── tests/                   # Unit and integration tests
-│   ├── requirements.txt         # Python dependencies
-│   └── .env                     # Environment variables (create manually)
-│
-├── frontend/                     # React + Vite web app
-│   ├── src/
-│   │   ├── main.tsx             # React entry point
-│   │   ├── App.tsx              # Router setup
-│   │   ├── pages/               # Page components
-│   │   ├── components/          # Reusable UI components
-│   │   ├── services/            # API client and utilities
-│   │   ├── context/             # React Context (auth, etc.)
-│   │   └── styles/              # Global styles
-│   ├── vite.config.ts           # Vite build configuration
-│   ├── package.json             # NPM dependencies
-│   └── tsconfig.json            # TypeScript configuration
-│
-├── data/                        # Knowledge base and resources
-│   ├── knowledge_base/          # Medical PDFs and FAISS index
-│   └── icd_codes/               # ICD-10 code database
-│
-├── docs/                        # Documentation
-├── scripts/                     # Helper scripts
-├── docker-compose.yml           # Docker composition for production
-├── start-app.ps1               # PowerShell startup script
-├── init_db_manual.py           # Manual database initialization
-└── README.md                   # This file
-```
-
-## Repository Cleanup
-
-This repository has been cleaned to remove unnecessary build artifacts and virtual environments that bloat repository size:
-
-### Files Removed
-
-- **`frontend/release/`** - Electron packaged app binaries (dist: ~190+ MB)
-- **`.venv/`, `.venv311/`, `backend/.venv/`** - Python virtual environment caches (~500 MB total)
-
-### Why These Were Removed
-
-- **Build artifacts** are regenerated during deployment; storing them in version control wastes storage and slows down clones
-- **Virtual environments** are machine-specific and platform-dependent; they should be recreated locally using `python -m venv` and `pip install -r requirements.txt`
-
-### Keeping the Repository Clean
-
-```bash
-# Don't commit virtual environments
-echo ".venv/
-.venv311/
-backend/.venv/
-venv/"  >> .gitignore
-
-# Don't commit build outputs
-echo "frontend/release/
-frontend/dist/
-backend/dist/
-*.egg-info/
-__pycache__/
-*.pyc"  >> .gitignore
-
-# Clean up if accidentally added
-git rm -r --cached .venv/ backend/.venv/ frontend/release/ 2>/dev/null
-git commit -m "chore: remove virtual environments and build artifacts"
-```
-
-### Dependency Installation
-
-Always reproduce dependencies locally:
-
-```bash
-# Backend
-cd backend
-python -m venv .venv
-.venv/Scripts/activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
-pip install -r requirements.txt
-python -m alembic upgrade head
-
-# Frontend
-cd frontend
-npm ci  # Use npm ci instead of npm install for reproducible builds
-```
-
-##  Support
-
-For issues and questions:
-
-- GitHub Issues: <https://github.com/drkvvk2015/Natpudan-/issues>
-- Check existing documentation and troubleshooting guide first
 
 ---
 
-**Note**: This application is for educational and professional use. Always verify AI-generated medical information with qualified healthcare professionals.
+## Role-Based Access Control
+
+| Feature | Staff | Doctor | Admin |
+|---------|:-----:|:------:|:-----:|
+| Patient Intake | YES | YES | YES |
+| AI Chat | YES | YES | YES |
+| AI Diagnosis | - | YES | YES |
+| Knowledge Base | - | YES | YES |
+| Drug Interaction Checker | - | YES | YES |
+| Treatment Plans | - | YES | YES |
+| Report PDF Generation | - | YES | YES |
+| Analytics Dashboard | - | YES | YES |
+| FHIR Explorer | - | - | YES |
+| User Management | - | - | YES |
+
+---
+
+## API Overview
+
+| Prefix | Description |
+|--------|-------------|
+| `/api/auth` | Register, login, OAuth, password reset |
+| `/api/chat` | AI chat conversations |
+| `/api/medical/diagnosis` | AI diagnosis from symptoms |
+| `/api/medical/knowledge` | Knowledge base search, RAG, hybrid search |
+| `/api/reports` | OPD case sheet, prescription, medical history PDFs |
+| `/api/treatment` | Treatment plan management |
+| `/api/timeline` | Patient medical timeline |
+| `/api/analytics` | Dashboard analytics |
+| `/api/fhir` | FHIR resources |
+| `/health` | Health check |
+| `/health/detailed` | System metrics (CPU, memory, disk) |
+
+---
+
+## Building for Production
+
+```powershell
+# Web build
+cd frontend ; npm run build:web
+
+# Docker (full stack with PostgreSQL)
+docker-compose up --build
+
+# Android APK (requires Android Studio)
+npm run build:android
+
+# Windows Electron desktop
+npm run build:windows
+```
+
+---
+
+## Testing
+
+```powershell
+cd backend
+pytest                        # all tests
+pytest --cov=app              # with coverage
+pytest tests/test_api.py -v   # specific file
+```
+
+---
+
+## Project Structure
+
+```
+Natpudan-/
+├── backend/
+│   ├── app/
+│   │   ├── api/          # Route handlers (auth, chat, diagnosis, knowledge_base, reports...)
+│   │   ├── services/     # Business logic (OCR, vector KB, drug interactions, RAG...)
+│   │   ├── models.py     # SQLAlchemy ORM models
+│   │   ├── database.py   # DB session management + auto-migrations
+│   │   └── main.py       # FastAPI app entrypoint
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── pages/        # React page components
+│   │   ├── components/   # Shared UI components
+│   │   ├── services/     # API clients (apiClient, opdCaseSheetService...)
+│   │   └── context/      # Auth context
+│   └── vite.config.ts
+├── start-app.ps1             # One-command dev startup (Windows)
+└── docker-compose.yml        # Production deployment
+```
+
+---
+
+## Troubleshooting
+
+**Port conflict on 8000**
+Backend auto-tries 8001. Update `VITE_API_BASE_URL` in `frontend/.env` if needed.
+
+**Missing Python packages**
+```powershell
+pip install fastapi uvicorn sqlalchemy python-jose[cryptography] passlib[bcrypt] python-multipart pydantic-settings psutil openai PyMuPDF faiss-cpu Pillow pytesseract pdf2image
+```
+
+**Android build fails**
+Requires Android Studio with SDK. Set the `ANDROID_HOME` environment variable.
+
+**AI features not working**
+Set `OPENAI_API_KEY` in `backend/.env`. Use `AI_PROVIDER=auto` to fall back to local models (Ollama/TinyLLama).
+
+---
+
+## License
+
+MIT

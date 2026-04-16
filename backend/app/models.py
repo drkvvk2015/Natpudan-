@@ -1,6 +1,6 @@
 """Database models for Natpudan AI - Consolidated from app/models.py and app/database/models.py"""
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum, JSON, UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -388,6 +388,9 @@ class MonitoringRecord(Base):
 class KnowledgeDocument(Base):
     """Knowledge base document model for tracking uploaded medical documents"""
     __tablename__ = "knowledge_documents"
+    __table_args__ = (
+        UniqueConstraint("file_hash", name="uq_knowledge_documents_file_hash"),
+    )
     
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(String(36), unique=True, index=True, nullable=False)  # UUID

@@ -48,6 +48,10 @@ class PDFOCRProcessor:
         pdf_path: Path, 
         extract_images: bool = True,
         use_ocr: bool = True,
+        force_ocr: bool = False,
+        ocr_lang: str = "eng",
+        ocr_dpi: int = 300,
+        ocr_preprocess: bool = False,
         document_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -118,16 +122,27 @@ class PDFOCRProcessor:
                 'ocr_applied': False
             }
             
-            # Apply OCR if needed and available
-            if not is_text_based and use_ocr and self.ocr_enabled:
-                logger.info(f"[OCR] PDF appears to be scanned, applying OCR...")
-                ocr_result = self._apply_ocr_to_pdf(pdf_path, page_count)
+            # Apply OCR if needed (or forced) and available
+            should_apply_ocr = (force_ocr or (not is_text_based)) and use_ocr and self.ocr_enabled
+            if should_apply_ocr:
+                logger.info(
+                    f"[OCR] Applying OCR ({'forced' if force_ocr else 'auto-detected scanned PDF'})..."
+                )
+                ocr_result = self._apply_ocr_to_pdf(
+                    pdf_path,
+                    page_count,
+                    ocr_lang=ocr_lang,
+                    ocr_dpi=ocr_dpi,
+                    ocr_preprocess=ocr_preprocess
+                )
                 if ocr_result['success']:
                     result['text'] = ocr_result['text']
                     result['total_chars'] = len(ocr_result['text'])
-                    result['method'] = 'ocr'
+                    result['method'] = 'ocr_forced' if force_ocr else 'ocr'
                     result['ocr_applied'] = True
                     result['ocr_confidence'] = ocr_result.get('confidence', 0)
+                    result['ocr_lang'] = ocr_lang
+                    result['ocr_dpi'] = ocr_dpi
             
             logger.info(f"[PDF] Extracted {result['total_chars']} chars, {len(extracted_images)} images")
             return result
@@ -208,7 +223,14 @@ class PDFOCRProcessor:
         
         return images
     
-    def _apply_ocr_to_pdf(self, pdf_path: Path, page_count: int) -> Dict[str, Any]:
+    def _apply_ocr_to_pdf(
+        self,
+        pdf_path: Path,
+        page_count: int,
+        ocr_lang: str = "eng",
+        ocr_dpi: int = 300,
+        ocr_preprocess: bool = False
+    ) -> Dict[str, Any]:
         """Apply OCR to entire PDF using Tesseract"""
         if not OCR_AVAILABLE:
             return {
@@ -240,19 +262,28 @@ class PDFOCRProcessor:
             
             # Convert PDF to images
             logger.info(f"[OCR] Converting PDF to images for OCR...")
-            images = convert_from_path(str(pdf_path), dpi=300)
+            images = convert_from_path(str(pdf_path), dpi=max(150, min(600, int(ocr_dpi))))
             
             text_parts = []
             total_confidence = 0
             
             for i, image in enumerate(images):
                 logger.info(f"[OCR] Processing page {i + 1}/{len(images)}")
+
+                if ocr_preprocess:
+                    try:
+                        from PIL import ImageOps, ImageFilter
+                        image = ImageOps.grayscale(image)
+                        image = image.filter(ImageFilter.SHARPEN)
+                        image = ImageOps.autocontrast(image)
+                    except Exception as pre_err:
+                        logger.debug(f"[OCR] Preprocess skipped on page {i+1}: {pre_err}")
                 
                 # Perform OCR
                 ocr_data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
                 
                 # Extract text and confidence
-                page_text = pytesseract.image_to_string(image, lang='eng')
+                page_text = pytesseract.image_to_string(image, lang=ocr_lang or 'eng')
                 confidences = [int(conf) for conf in ocr_data['conf'] if conf != '-1']
                 page_confidence = sum(confidences) / len(confidences) if confidences else 0
                 
@@ -267,7 +298,9 @@ class PDFOCRProcessor:
                 'success': True,
                 'text': "\n".join(text_parts),
                 'confidence': avg_confidence,
-                'pages_processed': len(images)
+                'pages_processed': len(images),
+                'lang': ocr_lang,
+                'dpi': ocr_dpi
             }
             
         except Exception as e:

@@ -187,65 +187,72 @@ class UploadQueueProcessor:
             if not Path(kb_doc.file_path).exists():
                 raise FileNotFoundError(f"PDF file not found: {kb_doc.file_path}")
             
-            # Get knowledge base
+            # Load canonical text if available (faster and deterministic), fallback to extraction
+            canonical_text_path = Path("data/knowledge_base/text") / f"{doc_status.document_id}.txt"
+            if canonical_text_path.exists():
+                text_content = canonical_text_path.read_text(encoding="utf-8", errors="ignore")
+                extraction_method = "canonical_text"
+            else:
+                # Fallback extraction path
+                ocr_processor = get_pdf_ocr_processor()
+                pdf_result = ocr_processor.extract_pdf_with_images(
+                    Path(kb_doc.file_path),
+                    extract_images=True,
+                    use_ocr=True,
+                    document_id=doc_status.document_id
+                )
+                text_content = pdf_result['text']
+                extraction_method = pdf_result.get("method", "ocr_or_text")
+
+            total_chars = len(text_content or "")
+            if not text_content.strip():
+                raise ValueError("No text content available for embedding")
+
+            # Add to vector KB (real processing, not simulated)
             knowledge_base = get_knowledge_base()
-            
-            # Read file
-            with open(kb_doc.file_path, 'rb') as f:
-                file_content = f.read()
-            
-            # Extract text with OCR processor for consistency
-            ocr_processor = get_pdf_ocr_processor()
-            pdf_result = ocr_processor.extract_pdf_with_images(
-                Path(kb_doc.file_path),
-                extract_images=True,
-                use_ocr=True,
-                document_id=doc_status.document_id
+            total_chunks = max(1, kb_doc.chunk_count or 1)
+
+            # Progress: extraction/prep complete
+            doc_status.current_chunk = 0
+            doc_status.progress_percent = 10
+            doc_status.estimated_time_seconds = max(5, int(total_chunks * 0.6))
+            db.commit()
+
+            added_chunks = knowledge_base.add_document(
+                content=text_content,
+                metadata={
+                    "source": kb_doc.filename,
+                    "filename": kb_doc.filename,
+                    "document_id": doc_status.document_id,
+                    "category": kb_doc.category or "medical_pdf",
+                    "section": "body",
+                    "indexed_at": datetime.utcnow().isoformat(),
+                    "processing_type": doc_status.processing_type or "embedding",
+                    "extraction_method": extraction_method,
+                },
+                chunk_size=2000,
+                chunk_overlap=50
             )
-            
-            text_content = pdf_result['text']
-            total_chars = len(text_content)
-            total_chunks = kb_doc.chunk_count or 1
-            
-            # Simulate processing chunks
-            # In real scenario, this would call the actual embedding API
-            for i in range(1, total_chunks + 1):
-                # Update progress
-                doc_status.current_chunk = i
-                doc_status.progress_percent = int((i / total_chunks) * 100)
-                
-                # Estimate time remaining
-                if i > 1:
-                    elapsed = (datetime.utcnow() - doc_status.started_at).total_seconds()
-                    per_chunk_time = elapsed / (i - 1)
-                    remaining_chunks = total_chunks - i
-                    doc_status.estimated_time_seconds = int(per_chunk_time * remaining_chunks)
-                else:
-                    doc_status.estimated_time_seconds = total_chunks * 2  # Rough estimate
-                
-                db.commit()
-                
-                # Small delay to simulate processing
-                time.sleep(0.1)
-                
-                # Log progress every 10 chunks
-                if i % max(1, total_chunks // 10) == 0:
-                    logger.info(f"[PROCESS] {kb_doc.filename}: {doc_status.progress_percent}% ({i}/{total_chunks})")
-            
-            # Mark as completed
-            doc_status.status = 'completed'
+
+            # Progress complete
+            doc_status.current_chunk = max(1, int(added_chunks or total_chunks))
+            doc_status.total_chunks = max(1, int(added_chunks or total_chunks))
             doc_status.progress_percent = 100
-            doc_status.current_chunk = total_chunks
+            doc_status.status = 'completed'
             doc_status.completed_at = datetime.utcnow()
             doc_status.estimated_time_seconds = 0
-            
+
             # Update knowledge document
             kb_doc.is_indexed = True
             kb_doc.indexed_at = datetime.utcnow()
-            
+            if added_chunks:
+                kb_doc.chunk_count = int(added_chunks)
+
             db.commit()
-            
-            logger.info(f"[PROCESS] Completed: {kb_doc.filename} ({total_chars} chars, {total_chunks} chunks)")
+
+            logger.info(
+                f"[PROCESS] Completed: {kb_doc.filename} ({total_chars} chars, {kb_doc.chunk_count} chunks, method={extraction_method})"
+            )
             return True
             
         except Exception as e:

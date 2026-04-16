@@ -43,6 +43,7 @@ from app.api.analytics import router as analytics_router
 from app.api.fhir import router as fhir_router
 from app.api.health import router as health_router
 from app.api.knowledge_base import router as knowledge_router
+from app.api.reports import router as reports_router
 from app.database import init_db, SessionLocal
 from sqlalchemy import text
 
@@ -56,9 +57,25 @@ service_health = {
     "knowledge_base": False
 }
 
+# Dedicated async queue worker task (more reliable than request-triggered processing)
+_queue_worker_task: asyncio.Task | None = None
+
+
+async def _queue_worker_loop(interval_seconds: int = 5):
+    """Run upload queue processing in a dedicated background loop."""
+    from app.services.upload_queue_processor import process_upload_queue
+    logger.info(f"[QUEUE] Dedicated worker loop started (interval={interval_seconds}s)")
+    while True:
+        try:
+            process_upload_queue()
+        except Exception as e:
+            logger.warning(f"[QUEUE] Worker loop iteration failed: {e}")
+        await asyncio.sleep(interval_seconds)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan with graceful startup/shutdown"""
+    global _queue_worker_task
     logger.info("[STARTING] Natpudan AI Medical Assistant...")
     settings.validate()
     init_monitoring()
@@ -100,6 +117,10 @@ async def lifespan(app: FastAPI):
         processor = get_queue_processor()
         processor.start()
         logger.info("[OK] PDF upload queue processor started")
+
+        # Start dedicated background worker loop
+        _queue_worker_task = asyncio.create_task(_queue_worker_loop(interval_seconds=5))
+        logger.info("[OK] Dedicated queue worker task started")
     except Exception as e:
         logger.error(f"[ERROR] Queue processor initialization failed: {e}")
     
@@ -115,6 +136,15 @@ async def lifespan(app: FastAPI):
         processor = get_queue_processor()
         processor.stop()
         logger.info("[OK] Queue processor stopped")
+
+        # Stop dedicated worker loop
+        if _queue_worker_task and not _queue_worker_task.done():
+            _queue_worker_task.cancel()
+            try:
+                await _queue_worker_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("[OK] Dedicated queue worker task stopped")
     except Exception as e:
         logger.warning(f"Warning stopping queue processor: {e}")
     
@@ -843,6 +873,7 @@ api_router.include_router(analytics_router, prefix="/analytics", tags=["analytic
 api_router.include_router(fhir_router, prefix="/fhir", tags=["fhir"])
 api_router.include_router(health_router, tags=["health"])
 api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
+api_router.include_router(reports_router, prefix="/reports", tags=["reports"])
 # Background task for processing upload queue
 _last_queue_process = 0
 _queue_process_interval = 10  # Process queue every 10 seconds
@@ -881,10 +912,10 @@ async def background_queue_processor(request: Request, call_next):
     try:
         # Check if it's time to process (every 10 seconds)
         current_time = time.time()
-        if current_time - _last_queue_process >= _queue_process_interval:
+        if _queue_worker_task is None and current_time - _last_queue_process >= _queue_process_interval:
             _last_queue_process = current_time
             
-            # Don't block the request - fire and forget
+            # Fallback mode only (primary mode is dedicated worker task)
             from app.services.upload_queue_processor import process_upload_queue
             try:
                 process_upload_queue()

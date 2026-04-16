@@ -139,7 +139,7 @@ VITE_WS_URL=ws://127.0.0.1:8000
 
     # Validate critical backend imports and auto-install dependencies if needed
     Write-Status "  Checking backend dependencies..." "Info"
-    $importCheck = & $script:venvPython -c "import fastapi,uvicorn,sqlalchemy; print('ok')" 2>&1
+    & $script:venvPython -c "import fastapi,uvicorn,sqlalchemy; print('ok')" 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Write-Status "  Missing backend dependencies. Installing from requirements..." "Warning"
         Push-Location $backendDir

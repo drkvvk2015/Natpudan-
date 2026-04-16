@@ -12,6 +12,9 @@ import logging
 from pathlib import Path
 import shutil
 from datetime import datetime
+import re
+import unicodedata
+from collections import Counter
 
 from app.services.enhanced_knowledge_base import get_knowledge_base
 from app.services.local_vector_kb import get_local_knowledge_base
@@ -20,9 +23,11 @@ from app.api.auth_new import get_current_user
 from app.models import User, KnowledgeDocument
 from app.database import get_db
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 import hashlib
 import uuid
 from app.services.online_knowledge_service import OnlineKnowledgeService
+from app.models import DocumentProcessingStatus
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +45,86 @@ MAX_TOTAL_SIZE = 5 * 1024 * 1024 * 1024  # 5GB total
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".doc", ".docx"}
 UPLOAD_DIR = Path("data/knowledge_base/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+CANONICAL_TEXT_DIR = Path("data/knowledge_base/text")
+CANONICAL_TEXT_DIR.mkdir(parents=True, exist_ok=True)
+
+UPLOAD_METRICS: Dict[str, Any] = {
+    "total_upload_requests": 0,
+    "total_files_received": 0,
+    "total_successful": 0,
+    "total_failed": 0,
+    "total_skipped": 0,
+    "total_bytes_received": 0,
+    "avg_processing_seconds": 0.0,
+    "ocr_applied_count": 0,
+    "last_error": None,
+    "last_updated": None,
+}
+
+
+def _update_upload_metrics(**kwargs):
+    for k, v in kwargs.items():
+        if k in UPLOAD_METRICS and isinstance(UPLOAD_METRICS[k], (int, float)):
+            UPLOAD_METRICS[k] += v
+        elif k in UPLOAD_METRICS:
+            UPLOAD_METRICS[k] = v
+    UPLOAD_METRICS["last_updated"] = datetime.utcnow().isoformat()
+
+
+def _looks_like_pdf_bytes(content: bytes) -> bool:
+    return content.startswith(b"%PDF-")
+
+
+def _is_encrypted_pdf(file_path: Path) -> bool:
+    try:
+        import fitz
+        doc = fitz.open(str(file_path))
+        encrypted = bool(getattr(doc, "is_encrypted", False) or getattr(doc, "needs_pass", False))
+        doc.close()
+        return encrypted
+    except Exception:
+        return False
+
+
+def _persist_canonical_text(document_id: str, text_content: str) -> Optional[str]:
+    try:
+        out = CANONICAL_TEXT_DIR / f"{document_id}.txt"
+        out.write_text(text_content, encoding="utf-8")
+        return str(out)
+    except Exception as e:
+        logger.warning(f"Failed to persist canonical text for {document_id}: {e}")
+        return None
+
+
+def _ensure_processing_status(
+    db: Session,
+    document_id: str,
+    total_chunks: int,
+    processing_type: str = "embedding"
+):
+    status = db.query(DocumentProcessingStatus).filter(
+        DocumentProcessingStatus.document_id == document_id
+    ).first()
+    if not status:
+        status = DocumentProcessingStatus(
+            document_id=document_id,
+            status="queued",
+            progress_percent=0,
+            current_chunk=0,
+            total_chunks=max(1, int(total_chunks)),
+            processing_type=processing_type,
+            retry_count=0,
+            error_message=None,
+        )
+        db.add(status)
+    else:
+        status.status = "queued"
+        status.progress_percent = 0
+        status.current_chunk = 0
+        status.total_chunks = max(1, int(total_chunks))
+        status.processing_type = processing_type
+        status.error_message = None
+    db.commit()
 
 def infer_year_from_name(name: str) -> Optional[int]:
     import re
@@ -64,6 +149,56 @@ class PDFProcessingRequest(BaseModel):
     extract_tables: bool = False  # Set to True if you need tables (slower)
     extract_images: bool = True  # Extract images with metadata (DEFAULT: True)
     ocr_enabled: bool = True  # Enable OCR for scanned PDFs (DEFAULT: True)
+
+
+def normalize_extracted_text(text: str, remove_repeated_lines: bool = True) -> str:
+    """Normalize extracted text for better indexing quality.
+
+    - Unicode normalize (NFKC)
+    - Fix line-break hyphenation (e.g., medi-\ncal -> medical)
+    - Collapse excessive whitespace/newlines
+    - Optionally remove repeated header/footer style lines
+    """
+    if not text:
+        return ""
+
+    normalized = unicodedata.normalize("NFKC", text)
+    normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Join words split by line-break hyphenation
+    normalized = re.sub(r"(\w)-\n(\w)", r"\1\2", normalized)
+
+    if remove_repeated_lines:
+        lines = [ln.strip() for ln in normalized.split("\n")]
+        non_empty_lines = [ln for ln in lines if ln]
+
+        repeated_candidates = set()
+        if len(non_empty_lines) >= 120:
+            freq = Counter(non_empty_lines)
+            threshold = max(4, len(non_empty_lines) // 120)
+            repeated_candidates = {
+                ln for ln, cnt in freq.items()
+                if cnt >= threshold and len(ln) <= 90 and not ln.startswith("--- Page")
+            }
+
+        cleaned_lines = [
+            ln for ln in lines
+            if ln not in repeated_candidates
+        ]
+        normalized = "\n".join(cleaned_lines)
+
+    # Collapse excessive spaces/newlines
+    normalized = re.sub(r"[ \t]{2,}", " ", normalized)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+
+    return normalized.strip()
+
+
+def _normalize_filename_for_match(filename: str) -> str:
+    name = (filename or "").strip().lower()
+    # Remove timestamp prefixes like 20260416_123000_
+    name = re.sub(r"^\d{8}_\d{6}_", "", name)
+    return name
 
 
 class SearchRequest(BaseModel):
@@ -93,6 +228,12 @@ async def upload_pdfs(
     chunk_size: int = 1000,
     extract_images: bool = True,  # Extract and index images
     ocr_enabled: bool = True,  # Enable OCR for scanned PDFs
+    force_ocr: bool = False,  # Force OCR even for text PDFs
+    ocr_lang: str = "eng",  # OCR language pack(s), e.g. eng or eng+lat
+    ocr_dpi: int = 300,  # OCR render DPI
+    ocr_preprocess: bool = False,  # Preprocess page images before OCR
+    quality_mode: str = "balanced",  # fast|balanced|high
+    duplicate_mode: str = "skip",  # skip|replace|allow
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -107,6 +248,17 @@ async def upload_pdfs(
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
+
+    req_started = datetime.utcnow()
+    _update_upload_metrics(total_upload_requests=1, total_files_received=len(files))
+
+    quality_mode = (quality_mode or "balanced").lower().strip()
+    duplicate_mode = (duplicate_mode or "skip").lower().strip()
+
+    if quality_mode not in {"fast", "balanced", "high"}:
+        raise HTTPException(status_code=400, detail="Invalid quality_mode. Use: fast|balanced|high")
+    if duplicate_mode not in {"skip", "replace", "allow"}:
+        raise HTTPException(status_code=400, detail="Invalid duplicate_mode. Use: skip|replace|allow")
     
     # Validate file count
     if len(files) > 20:
@@ -126,6 +278,13 @@ async def upload_pdfs(
         # Read file to check size
         content = await file.read()
         file_size = len(content)
+
+        # Basic file signature hardening (anti-spoof)
+        if file_ext == ".pdf" and not _looks_like_pdf_bytes(content):
+            raise HTTPException(
+                status_code=400,
+                detail=f"File {file.filename} is not a valid PDF signature"
+            )
         
         if file_size > MAX_FILE_SIZE:
             raise HTTPException(
@@ -147,6 +306,7 @@ async def upload_pdfs(
     # Process files
     results = []
     knowledge_base = get_knowledge_base()
+    _update_upload_metrics(total_bytes_received=total_size)
     
     for file in files:
         try:
@@ -163,23 +323,61 @@ async def upload_pdfs(
             
             # Calculate file hash for deduplication
             file_hash = hashlib.sha256(content).hexdigest()
+
+            file_size = len(content)
             
-            # Check if document already exists
-            existing_doc = db.query(KnowledgeDocument).filter(
-                KnowledgeDocument.file_hash == file_hash
-            ).first()
+            # Duplicate handling (exact hash + near duplicate by name/size)
+            if duplicate_mode != "allow":
+                exact_duplicate = db.query(KnowledgeDocument).filter(
+                    KnowledgeDocument.file_hash == file_hash
+                ).first()
+
+                near_duplicate = None
+                if not exact_duplicate:
+                    size_tolerance = max(100 * 1024, int(file_size * 0.01))  # 100KB or 1%
+                    lower_size = max(0, file_size - size_tolerance)
+                    upper_size = file_size + size_tolerance
+                    normalized_name = _normalize_filename_for_match(file.filename)
+
+                    candidate_docs = db.query(KnowledgeDocument).filter(
+                        KnowledgeDocument.file_size >= lower_size,
+                        KnowledgeDocument.file_size <= upper_size
+                    ).all()
+                    for candidate in candidate_docs:
+                        if _normalize_filename_for_match(candidate.filename) == normalized_name:
+                            near_duplicate = candidate
+                            break
+
+                existing_doc = exact_duplicate or near_duplicate
+                duplicate_type = "exact_hash" if exact_duplicate else ("name_size_similarity" if near_duplicate else None)
+
+                if existing_doc and duplicate_mode == "skip":
+                    logger.info(f"Duplicate skipped: {file.filename} ({duplicate_type})")
+                    results.append({
+                        "filename": file.filename,
+                        "status": "skipped",
+                        "reason": f"Duplicate detected ({duplicate_type})",
+                        "existing_document_id": existing_doc.document_id,
+                        "uploaded_at": existing_doc.uploaded_at.isoformat() if existing_doc.uploaded_at else None
+                    })
+                    continue
+
+                if existing_doc and duplicate_mode == "replace":
+                    logger.info(f"Duplicate replace mode: removing old document {existing_doc.document_id} for {file.filename}")
+                    old_path = existing_doc.file_path
+                    db.delete(existing_doc)
+                    db.commit()
+                    if old_path:
+                        try:
+                            old_file = Path(old_path)
+                            if old_file.exists() and old_file.is_file():
+                                old_file.unlink()
+                        except Exception as cleanup_err:
+                            logger.warning(f"Failed to delete old duplicate file {old_path}: {cleanup_err}")
             
-            if existing_doc:
-                logger.info(f"Document {file.filename} already exists (hash: {file_hash})")
-                results.append({
-                    "filename": file.filename,
-                    "status": "skipped",
-                    "reason": "Document already uploaded",
-                    "existing_document_id": existing_doc.document_id,
-                    "uploaded_at": existing_doc.uploaded_at.isoformat()
-                })
-                continue
-            
+            # Generate unique document ID (must be before OCR call)
+            doc_uuid = str(uuid.uuid4())
+
             # Extract text based on file type
             file_ext = Path(file.filename).suffix.lower()
             extracted_images = []
@@ -188,15 +386,34 @@ async def upload_pdfs(
             if file_ext == ".pdf":
                 # Use enhanced OCR processor
                 ocr_processor = get_pdf_ocr_processor()
+
+                # Security: reject encrypted/password PDFs (not reliably extractable)
+                if _is_encrypted_pdf(file_path):
+                    results.append({
+                        "filename": file.filename,
+                        "status": "error",
+                        "error": "Encrypted/password-protected PDF is not supported. Please upload an unlocked PDF.",
+                        "chunks": 0,
+                        "characters": 0,
+                        "file_size_mb": len(content) / 1024 / 1024
+                    })
+                    continue
+
                 pdf_result = ocr_processor.extract_pdf_with_images(
                     file_path,
                     extract_images=extract_images,
                     use_ocr=ocr_enabled,
+                    force_ocr=force_ocr,
+                    ocr_lang=ocr_lang,
+                    ocr_dpi=ocr_dpi,
+                    ocr_preprocess=ocr_preprocess,
                     document_id=doc_uuid
                 )
                 text_content = pdf_result['text']
                 extracted_images = pdf_result.get('images', [])
                 extraction_method = pdf_result.get('method', 'text')
+                if pdf_result.get("ocr_applied"):
+                    _update_upload_metrics(ocr_applied_count=1)
                 
                 logger.info(f"[EXTRACT] {file.filename}: {len(text_content)} chars, {len(extracted_images)} images, method={extraction_method}")
             elif file_ext == ".txt":
@@ -205,6 +422,12 @@ async def upload_pdfs(
                 text_content = await extract_word_text(file_path)
             else:
                 text_content = ""
+
+            # Text normalization improves retrieval quality and reduces noisy duplicates
+            text_content = normalize_extracted_text(
+                text_content,
+                remove_repeated_lines=(quality_mode in {"balanced", "high"})
+            )
             
             if not text_content.strip():
                 results.append({
@@ -229,8 +452,7 @@ async def upload_pdfs(
                 })
                 continue
             
-            # Generate unique document ID
-            doc_uuid = str(uuid.uuid4())
+            # doc_uuid already generated above
             
             # Process content
             if use_full_content:
@@ -267,7 +489,24 @@ async def upload_pdfs(
                     uploaded_by_id=current_user.id
                 )
                 db.add(db_doc)
-                db.commit()
+                try:
+                    db.commit()
+                except IntegrityError:
+                    db.rollback()
+                    existing = db.query(KnowledgeDocument).filter(KnowledgeDocument.file_hash == file_hash).first()
+                    results.append({
+                        "filename": file.filename,
+                        "status": "skipped",
+                        "reason": "Duplicate detected during concurrent upload",
+                        "existing_document_id": existing.document_id if existing else None,
+                    })
+                    continue
+
+                canonical_path = _persist_canonical_text(doc_uuid, text_content)
+                if canonical_path:
+                    logger.info(f"[CANONICAL] Saved text: {canonical_path}")
+
+                _ensure_processing_status(db, doc_uuid, total_chunks=1)
                 
                 results.append({
                     "filename": file.filename,
@@ -284,7 +523,21 @@ async def upload_pdfs(
                 })
             else:
                 # Intelligent chunking with reduced overlap for speed
-                chunks = smart_chunk_text(text_content, chunk_size=chunk_size, overlap=50)
+                profile = {
+                    "fast": {"max_chunk": 4500, "max_chunks": 300, "overlap": 30},
+                    "balanced": {"max_chunk": 3500, "max_chunks": 500, "overlap": 50},
+                    "high": {"max_chunk": 2500, "max_chunks": 800, "overlap": 80},
+                }[quality_mode]
+
+                # Use larger chunks for large documents to avoid timeout
+                effective_chunk_size = max(chunk_size, min(profile["max_chunk"], len(text_content) // 200 + 500))
+                chunks = smart_chunk_text(text_content, chunk_size=effective_chunk_size, overlap=profile["overlap"])
+                
+                # Cap chunks to prevent timeout on very large PDFs
+                MAX_CHUNKS = profile["max_chunks"]
+                if len(chunks) > MAX_CHUNKS:
+                    logger.warning(f"[CHUNK] {file.filename}: {len(chunks)} chunks, capping at {MAX_CHUNKS}")
+                    chunks = chunks[:MAX_CHUNKS]
                 
                 chunk_ids = []
                 for i, chunk in enumerate(chunks):
@@ -322,7 +575,24 @@ async def upload_pdfs(
                     uploaded_by_id=current_user.id
                 )
                 db.add(db_doc)
-                db.commit()
+                try:
+                    db.commit()
+                except IntegrityError:
+                    db.rollback()
+                    existing = db.query(KnowledgeDocument).filter(KnowledgeDocument.file_hash == file_hash).first()
+                    results.append({
+                        "filename": file.filename,
+                        "status": "skipped",
+                        "reason": "Duplicate detected during concurrent upload",
+                        "existing_document_id": existing.document_id if existing else None,
+                    })
+                    continue
+
+                canonical_path = _persist_canonical_text(doc_uuid, text_content)
+                if canonical_path:
+                    logger.info(f"[CANONICAL] Saved text: {canonical_path}")
+
+                _ensure_processing_status(db, doc_uuid, total_chunks=len(chunks))
                 
                 results.append({
                     "filename": file.filename,
@@ -336,6 +606,8 @@ async def upload_pdfs(
                     "size_mb": len(content) / 1024 / 1024,
                     "images_extracted": len(extracted_images),
                     "extraction_method": extraction_method,
+                    "quality_mode": quality_mode,
+                    "duplicate_mode": duplicate_mode,
                     "embedding_status": "queued_for_background_processing",
                     "info": f"Extracted via {extraction_method}. {len(extracted_images)} images saved. {len(chunks)} chunks queued for embeddings."
                 })
@@ -362,8 +634,20 @@ async def upload_pdfs(
     
     # Summary
     successful = sum(1 for r in results if r["status"] == "success")
-    failed = len(results) - successful
+    skipped = sum(1 for r in results if r["status"] == "skipped")
+    failed = sum(1 for r in results if r["status"] == "error")
     total_chunks = sum(r.get("chunks", 0) for r in results)
+
+    elapsed = max(0.001, (datetime.utcnow() - req_started).total_seconds())
+    prev_avg = float(UPLOAD_METRICS.get("avg_processing_seconds", 0.0) or 0.0)
+    prev_count = int(UPLOAD_METRICS.get("total_upload_requests", 1) or 1)
+    new_avg = ((prev_avg * max(prev_count - 1, 0)) + elapsed) / max(prev_count, 1)
+    _update_upload_metrics(
+        total_successful=successful,
+        total_failed=failed,
+        total_skipped=skipped,
+        avg_processing_seconds=new_avg,
+    )
     
     return {
         "message": f"Processed {len(files)} files: {successful} successful, {failed} failed",
@@ -375,6 +659,18 @@ async def upload_pdfs(
             "total_size_mb": total_size / 1024 / 1024
         },
         "results": results,
+        "metrics": {
+            "request_processing_seconds": round(elapsed, 3),
+            "quality_mode": quality_mode,
+            "duplicate_mode": duplicate_mode,
+            "ocr": {
+                "enabled": ocr_enabled,
+                "forced": force_ocr,
+                "lang": ocr_lang,
+                "dpi": ocr_dpi,
+                "preprocess": ocr_preprocess
+            }
+        },
         "status_check_endpoints": {
             "all_uploads": "/api/medical/knowledge/upload-status",
             "specific_upload": "/api/medical/knowledge/upload-status/{document_id}"
@@ -1871,3 +2167,130 @@ async def get_queue_status(db: Session = Depends(get_db)):
             status_code=500,
             detail=f"Failed to get queue status: {str(e)}"
         )
+
+
+@router.get("/metrics/uploads")
+async def get_upload_metrics(current_user: User = Depends(get_current_user)):
+    """Operational metrics for upload quality/speed monitoring."""
+    return {
+        "status": "ok",
+        "metrics": UPLOAD_METRICS,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@router.get("/runtime-info")
+async def get_runtime_info(current_user: User = Depends(get_current_user)):
+    """Runtime diagnostics for compatibility hardening."""
+    import sys
+    return {
+        "python_version": sys.version,
+        "python_major_minor": f"{sys.version_info.major}.{sys.version_info.minor}",
+        "recommended_python": "3.11 or 3.12",
+        "is_recommended": (sys.version_info.major == 3 and sys.version_info.minor in {11, 12}),
+        "warning": "Some ML dependencies can be unstable on 3.14+" if not (sys.version_info.major == 3 and sys.version_info.minor in {11, 12}) else None
+    }
+
+
+@router.post("/retry-failed/{document_id}")
+async def retry_failed_document(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Retry a failed queued document."""
+    status = db.query(DocumentProcessingStatus).filter(
+        DocumentProcessingStatus.document_id == document_id
+    ).first()
+    if not status:
+        raise HTTPException(status_code=404, detail="Processing status not found")
+
+    if status.status not in {"failed", "completed"}:
+        return {
+            "status": "ignored",
+            "message": f"Document is currently '{status.status}' and cannot be retried now",
+            "document_id": document_id
+        }
+
+    status.status = "queued"
+    status.progress_percent = 0
+    status.current_chunk = 0
+    status.error_message = None
+    status.completed_at = None
+    status.started_at = None
+    status.retry_count = (status.retry_count or 0)
+    db.commit()
+
+    return {
+        "status": "queued",
+        "message": "Document queued for retry",
+        "document_id": document_id
+    }
+
+
+@router.post("/reprocess/{document_id}")
+async def reprocess_document(
+    document_id: str,
+    force_ocr: bool = False,
+    ocr_lang: str = "eng",
+    ocr_dpi: int = 300,
+    ocr_preprocess: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Re-extract text and re-queue document processing with optional forced OCR."""
+    doc = db.query(KnowledgeDocument).filter(
+        KnowledgeDocument.document_id == document_id
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = Path(doc.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Source file is missing")
+
+    file_ext = Path(doc.filename).suffix.lower()
+    if file_ext != ".pdf":
+        raise HTTPException(status_code=400, detail="Reprocess endpoint currently supports PDF only")
+
+    ocr_processor = get_pdf_ocr_processor()
+    extraction = ocr_processor.extract_pdf_with_images(
+        file_path,
+        extract_images=True,
+        use_ocr=True,
+        force_ocr=force_ocr,
+        ocr_lang=ocr_lang,
+        ocr_dpi=ocr_dpi,
+        ocr_preprocess=ocr_preprocess,
+        document_id=document_id
+    )
+    text_content = normalize_extracted_text(extraction.get("text", ""), remove_repeated_lines=True)
+    if not text_content:
+        raise HTTPException(status_code=500, detail="Reprocessing produced empty text")
+
+    _persist_canonical_text(document_id, text_content)
+
+    # Recompute rough chunk count for status planning
+    chunks = smart_chunk_text(text_content, chunk_size=2500, overlap=50)
+    doc.text_length = len(text_content)
+    doc.chunk_count = len(chunks)
+    doc.is_indexed = False
+    doc.indexed_at = None
+    db.commit()
+
+    _ensure_processing_status(db, document_id=document_id, total_chunks=max(1, len(chunks)), processing_type="reprocess")
+
+    return {
+        "status": "queued",
+        "document_id": document_id,
+        "message": "Document reprocessed and queued",
+        "extraction_method": extraction.get("method"),
+        "text_length": len(text_content),
+        "estimated_chunks": len(chunks),
+        "ocr": {
+            "force_ocr": force_ocr,
+            "ocr_lang": ocr_lang,
+            "ocr_dpi": ocr_dpi,
+            "ocr_preprocess": ocr_preprocess
+        }
+    }

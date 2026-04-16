@@ -11,6 +11,10 @@ import {
   FormControlLabel,
   Switch,
   TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
   Grid,
   Card,
   CardContent,
@@ -26,6 +30,8 @@ import {
   Article as ArticleIcon,
   CheckCircle as SuccessIcon,
   Error as ErrorIcon,
+  Replay as RetryIcon,
+  AutoFixHigh as ReprocessIcon,
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import apiClient from '../services/apiClient';
@@ -53,6 +59,11 @@ const KnowledgeBaseUpload: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [useFullContent, setUseFullContent] = useState(true);
   const [chunkSize, setChunkSize] = useState(1000);
+  const [extractImages, setExtractImages] = useState(true);
+  const [ocrEnabled, setOcrEnabled] = useState(true);
+  const [forceOcr, setForceOcr] = useState(false);
+  const [qualityMode, setQualityMode] = useState<'fast' | 'balanced' | 'high'>('balanced');
+  const [duplicateMode, setDuplicateMode] = useState<'skip' | 'replace' | 'allow'>('skip');
   const [uploadResults, setUploadResults] = useState<any>(null);
   const [statistics, setStatistics] = useState<any>(null);
   const [currentUploadingFile, setCurrentUploadingFile] = useState<string>('');
@@ -142,12 +153,32 @@ const KnowledgeBaseUpload: React.FC = () => {
       'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
     },
-    maxSize: 50 * 1024 * 1024, // 50MB
+    maxSize: 1024 * 1024 * 1024, // 1GB
     multiple: true,
   });
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const retryFile = async (index: number) => {
+    const target = files[index];
+    if (!target) return;
+    setFiles((prev) => prev.map((f, i) => i === index ? { ...f, status: 'pending', progress: 0, error: undefined, statusMessage: 'Ready to retry' } : f));
+    await uploadFiles();
+  };
+
+  const reprocessFileWithForceOCR = async (index: number) => {
+    const target = files[index];
+    if (!target?.documentId) return;
+    try {
+      await apiClient.post(`/api/medical/knowledge/reprocess/${target.documentId}?force_ocr=true&ocr_preprocess=true&ocr_dpi=350`);
+      setFiles((prev) => prev.map((f, i) => i === index ? { ...f, status: 'processing', progress: 15, statusMessage: '[REPROCESS] Queued with force OCR' } : f));
+      setPollingActive(true);
+      setUploadedDocumentIds((prev) => Array.from(new Set([...prev, target.documentId as string])));
+    } catch (e: any) {
+      setFiles((prev) => prev.map((f, i) => i === index ? { ...f, status: 'error', statusMessage: `[ERROR] Reprocess failed: ${e?.response?.data?.detail || e?.message || 'unknown error'}` } : f));
+    }
   };
 
   const uploadFiles = async () => {
@@ -157,14 +188,24 @@ const KnowledgeBaseUpload: React.FC = () => {
     setUploadResults(null);
 
     try {
+      const pendingFiles = files.filter((f) => f.status === 'pending' || f.status === 'error');
+      const hasLargeFiles = pendingFiles.some((f) => f.file.size > 200 * 1024 * 1024);
+
       const formData = new FormData();
       
-      files.forEach((fileData) => {
+      pendingFiles.forEach((fileData) => {
         formData.append('files', fileData.file);
       });
       
       formData.append('use_full_content', String(useFullContent));
       formData.append('chunk_size', String(chunkSize));
+      formData.append('extract_images', String(extractImages));
+      formData.append('ocr_enabled', String(ocrEnabled));
+      formData.append('force_ocr', String(forceOcr));
+      formData.append('ocr_preprocess', String(true));
+      formData.append('ocr_dpi', String(qualityMode === 'high' ? 350 : 300));
+      formData.append('quality_mode', qualityMode);
+      formData.append('duplicate_mode', duplicateMode);
 
       // Update status to uploading with initial message
       setFiles((prev) =>
@@ -176,31 +217,72 @@ const KnowledgeBaseUpload: React.FC = () => {
         }))
       );
 
-      const response = await apiClient.post('/api/medical/knowledge/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = progressEvent.total
-            ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
-            : 0;
-          
-          let statusMessage = '[UP] Uploading file to server...';
-          if (percentCompleted > 80) {
-            statusMessage = '[GEAR] Processing and extracting text...';
-          } else if (percentCompleted > 50) {
-            statusMessage = '[UP] Uploading... Almost there!';
-          }
-          
-          setFiles((prev) =>
-            prev.map((f) => ({ 
-              ...f, 
-              progress: percentCompleted,
-              statusMessage: f.status === 'uploading' ? statusMessage : f.statusMessage
-            }))
-          );
-        },
-      });
+      let response: any;
+      if (hasLargeFiles && pendingFiles.length === 1) {
+        const largeFd = new FormData();
+        largeFd.append('file', pendingFiles[0].file);
+        response = await apiClient.post('/api/medical/knowledge/upload-large', largeFd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = progressEvent.total
+              ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
+              : 0;
+            setFiles((prev) =>
+              prev.map((f) => ({ ...f, progress: percentCompleted, statusMessage: '[UP] Large-file streaming upload...' }))
+            );
+          },
+        });
+
+        // Normalize upload-large response shape to existing structure
+        response = {
+          data: {
+            results: [
+              {
+                filename: pendingFiles[0].file.name,
+                status: response?.data?.processing_result?.status === 'success' ? 'success' : 'error',
+                chunks: response?.data?.processing_result?.chunks_processed || 0,
+                characters: undefined,
+                document_id: undefined,
+                info: response?.data?.message,
+                error: response?.data?.processing_result?.error,
+              },
+            ],
+            summary: {
+              successful: response?.data?.processing_result?.status === 'success' ? 1 : 0,
+              failed: response?.data?.processing_result?.status === 'success' ? 0 : 1,
+              total_chunks_created: response?.data?.processing_result?.chunks_processed || 0,
+              total_size_mb: response?.data?.file_size_mb || 0,
+            },
+            message: response?.data?.message || 'Large file upload completed',
+          },
+        };
+      } else {
+        response = await apiClient.post('/api/medical/knowledge/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = progressEvent.total
+              ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
+              : 0;
+            
+            let statusMessage = '[UP] Uploading file to server...';
+            if (percentCompleted > 80) {
+              statusMessage = '[GEAR] Processing and extracting text...';
+            } else if (percentCompleted > 50) {
+              statusMessage = '[UP] Uploading... Almost there!';
+            }
+            
+            setFiles((prev) =>
+              prev.map((f) => ({ 
+                ...f, 
+                progress: percentCompleted,
+                statusMessage: f.status === 'uploading' ? statusMessage : f.statusMessage
+              }))
+            );
+          },
+        });
+      }
 
       // Processing phase
       setFiles((prev) =>
@@ -229,21 +311,39 @@ const KnowledgeBaseUpload: React.FC = () => {
 
       // Update file statuses based on results
       setFiles((prev) =>
-        prev.map((fileData, index) => {
-          const result = response.data.results[index];
+        prev.map((fileData) => {
+          const result = response.data.results?.find(
+            (r: any) => r.filename === fileData.file.name
+          );
+          if (!result) return { ...fileData, status: 'error' as const, progress: 100, statusMessage: '[ERROR] No response from server for this file' };
           const info = result.info ? `\n${result.info}` : '';
-          return {
-            ...fileData,
-            status: result.status === 'success' ? 'success' : 'error',
-            progress: 100,
-            error: result.error,
-            chunks: result.chunks,
-            characters: result.characters,
-            documentId: result.document_id,
-            statusMessage: result.status === 'success' 
-              ? `[OK] Document queued - background processing started${info}` 
-              : `[ERROR] ${result.error}`,
-          };
+          if (result.status === 'success') {
+            return {
+              ...fileData,
+              status: 'success' as const,
+              progress: 100,
+              chunks: result.chunks,
+              characters: result.characters,
+              documentId: result.document_id,
+              statusMessage: `[OK] Document queued - background processing started${info}`,
+            };
+          } else if (result.status === 'skipped') {
+            return {
+              ...fileData,
+              status: 'success' as const,
+              progress: 100,
+              statusMessage: `[SKIP] Already uploaded: ${result.reason || 'Duplicate document'}`,
+            };
+          } else {
+            const errorMsg = result.error || result.detail || result.reason || 'Unknown error';
+            return {
+              ...fileData,
+              status: 'error' as const,
+              progress: 100,
+              error: errorMsg,
+              statusMessage: `[ERROR] ${errorMsg}`,
+            };
+          }
         })
       );
 
@@ -358,6 +458,69 @@ const KnowledgeBaseUpload: React.FC = () => {
             }
           />
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={extractImages}
+                onChange={(e) => setExtractImages(e.target.checked)}
+                disabled={uploading}
+              />
+            }
+            label="Extract medical images/charts from PDF"
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={ocrEnabled}
+                onChange={(e) => setOcrEnabled(e.target.checked)}
+                disabled={uploading}
+              />
+            }
+            label="Enable OCR fallback for scanned pages"
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={forceOcr}
+                onChange={(e) => setForceOcr(e.target.checked)}
+                disabled={uploading || !ocrEnabled}
+              />
+            }
+            label="Force OCR on all pages (higher quality, slower)"
+          />
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <FormControl sx={{ minWidth: 220 }} disabled={uploading}>
+              <InputLabel id="quality-mode-label">Quality Mode</InputLabel>
+              <Select
+                labelId="quality-mode-label"
+                value={qualityMode}
+                label="Quality Mode"
+                onChange={(e) => setQualityMode(e.target.value as 'fast' | 'balanced' | 'high')}
+              >
+                <MenuItem value="fast">Fast (optimized throughput)</MenuItem>
+                <MenuItem value="balanced">Balanced (recommended)</MenuItem>
+                <MenuItem value="high">High quality (deeper processing)</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl sx={{ minWidth: 220 }} disabled={uploading}>
+              <InputLabel id="duplicate-mode-label">Duplicate Handling</InputLabel>
+              <Select
+                labelId="duplicate-mode-label"
+                value={duplicateMode}
+                label="Duplicate Handling"
+                onChange={(e) => setDuplicateMode(e.target.value as 'skip' | 'replace' | 'allow')}
+              >
+                <MenuItem value="skip">Skip duplicates</MenuItem>
+                <MenuItem value="replace">Replace previous duplicate</MenuItem>
+                <MenuItem value="allow">Allow duplicates</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+
           {!useFullContent && (
             <TextField
               label="Chunk Size (characters)"
@@ -405,7 +568,7 @@ const KnowledgeBaseUpload: React.FC = () => {
             <Chip label="DOCX" size="small" />
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-            Max 50MB per file - Max 20 files - Max 200MB total
+            Max 1GB per file - Max 20 files - Server-side large upload optimization enabled
           </Typography>
         </Box>
       </Paper>
@@ -437,18 +600,19 @@ const KnowledgeBaseUpload: React.FC = () => {
                 <ArticleIcon sx={{ mr: 2, color: 'primary.main' }} />
                 <ListItemText
                   primary={fileData.file.name}
+                  secondaryTypographyProps={{ component: 'div' }}
                   secondary={
                     <span>
                       <Typography variant="caption" component="span" display="block">
                         {formatFileSize(fileData.file.size)}
                       </Typography>
                       {(fileData.status === 'uploading' || fileData.status === 'processing') && (
-                        <Box sx={{ mt: 1 }}>
-                          <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                            <Typography variant="caption" color="primary" fontWeight={600}>
+                        <Box sx={{ display: 'block', mt: 0.5 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
+                            <Typography variant="caption" color="primary" fontWeight={600} component="span">
                               {fileData.statusMessage || 'Processing...'}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" component="span">
                               {fileData.progress}%
                             </Typography>
                           </Box>
@@ -484,7 +648,19 @@ const KnowledgeBaseUpload: React.FC = () => {
                     </IconButton>
                   )}
                   {fileData.status === 'success' && <SuccessIcon color="success" />}
-                  {fileData.status === 'error' && <ErrorIcon color="error" />}
+                  {fileData.status === 'error' && (
+                    <Stack direction="row" spacing={1}>
+                      <IconButton edge="end" onClick={() => retryFile(index)} title="Retry upload">
+                        <RetryIcon color="warning" />
+                      </IconButton>
+                      {fileData.documentId && (
+                        <IconButton edge="end" onClick={() => reprocessFileWithForceOCR(index)} title="Reprocess with force OCR">
+                          <ReprocessIcon color="primary" />
+                        </IconButton>
+                      )}
+                      <ErrorIcon color="error" />
+                    </Stack>
+                  )}
                 </ListItemSecondaryAction>
               </ListItem>
             ))}
