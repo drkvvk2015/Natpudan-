@@ -7,10 +7,51 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$rootDir = "D:\Users\CNSHO\Documents\GitHub\Natpudan-"
+$rootDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 $backendDir = Join-Path $rootDir "backend"
 $frontendDir = Join-Path $rootDir "frontend"
-$venvPython = Join-Path $rootDir ".venv311\Scripts\python.exe"
+$venvCandidates = @(
+    (Join-Path $rootDir ".venv311\Scripts\python.exe"),
+    (Join-Path $rootDir ".venv\Scripts\python.exe"),
+    (Join-Path $backendDir ".venv\Scripts\python.exe")
+)
+$venvPython = $null
+
+function Resolve-PythonInterpreter {
+    foreach ($candidate in $venvCandidates) {
+        if (Test-Path $candidate) {
+            try {
+                & $candidate --version | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    return $candidate
+                }
+            }
+            catch {
+                # Ignore broken interpreter shims and continue searching
+            }
+        }
+    }
+
+    $launcher = Get-Command py -ErrorAction SilentlyContinue
+    if ($launcher) {
+        try {
+            $py311 = & py -3.11 -c "import sys; print(sys.executable)" 2>$null
+            if ($LASTEXITCODE -eq 0 -and $py311) {
+                return $py311.Trim()
+            }
+        }
+        catch {
+            # Ignore and fall through
+        }
+    }
+
+    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+    if ($pythonCmd) {
+        return $pythonCmd.Source
+    }
+
+    return $null
+}
 
 function Write-Status {
     param([string]$Message, [string]$Type = "Info")
@@ -87,11 +128,38 @@ VITE_WS_URL=ws://127.0.0.1:8000
         Write-Status "  Frontend .env created" "Success"
     }
     
-    # Check Python virtual environment
-    if (-not (Test-Path $venvPython)) {
-        Write-Status "  Python virtual environment not found!" "Error"
-        Write-Status "  Run: python -m venv .venv" "Info"
+    # Resolve Python interpreter (venv preferred, then py launcher/system python)
+    $script:venvPython = Resolve-PythonInterpreter
+    if (-not $script:venvPython) {
+        Write-Status "  No working Python interpreter found." "Error"
+        Write-Status "  Install Python 3.11+ and create venv: py -3.11 -m venv .venv311" "Info"
         return $false
+    }
+    Write-Status "  Python interpreter: $script:venvPython" "Success"
+
+    # Validate critical backend imports and auto-install dependencies if needed
+    Write-Status "  Checking backend dependencies..." "Info"
+    $importCheck = & $script:venvPython -c "import fastapi,uvicorn,sqlalchemy; print('ok')" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Status "  Missing backend dependencies. Installing from requirements..." "Warning"
+        Push-Location $backendDir
+        try {
+            & $script:venvPython -m pip install --upgrade pip
+            & $script:venvPython -m pip install -r requirements.txt
+            & $script:venvPython -m pip install -r requirements-db.txt
+        }
+        finally {
+            Pop-Location
+        }
+
+        $retryImport = & $script:venvPython -c "import fastapi,uvicorn,sqlalchemy; print('ok')" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Status "  Backend dependency check still failing: $retryImport" "Error"
+            return $false
+        }
+        Write-Status "  Backend dependencies installed" "Success"
+    } else {
+        Write-Status "  Backend dependencies are available" "Success"
     }
     
     # Check Node modules
@@ -124,6 +192,13 @@ Write-Status "Ports cleared" "Success"
 if (-not $NoAutoFix) {
     if (-not (Repair-Environment)) {
         Write-Status "`nEnvironment repair failed. Exiting..." "Error"
+        exit 1
+    }
+}
+elseif (-not $venvPython) {
+    $venvPython = Resolve-PythonInterpreter
+    if (-not $venvPython) {
+        Write-Status "`nNo working Python interpreter found. Exiting..." "Error"
         exit 1
     }
 }

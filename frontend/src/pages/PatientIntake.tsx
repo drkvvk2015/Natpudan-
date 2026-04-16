@@ -44,27 +44,27 @@ import {
   Assessment as AssessmentIcon,
   Description as ReportIcon,
 } from '@mui/icons-material'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, type Variants } from 'framer-motion'
 import { savePatientIntake, getPatientIntake, updatePatientIntake, generatePatientIntakeReport, downloadPDF } from '../services/api'
 import RiskAssessment from '../components/RiskAssessment'
 import MedicalTimeline from '../components/MedicalTimeline'
 
 // Animation variants
-const sectionVariants = {
+const sectionVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { 
     opacity: 1, 
     y: 0,
-    transition: { duration: 0.4, ease: 'easeOut' }
+    transition: { duration: 0.4, ease: 'easeOut' as const }
   }
 }
 
-const chipVariants = {
+const chipVariants: Variants = {
   hidden: { scale: 0, opacity: 0 },
   visible: { 
     scale: 1, 
     opacity: 1,
-    transition: { type: 'spring', stiffness: 500, damping: 30 }
+    transition: { type: 'spring' as const, stiffness: 500, damping: 30 }
   },
   exit: { 
     scale: 0, 
@@ -73,7 +73,7 @@ const chipVariants = {
   }
 }
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, x: 20 },
   visible: { 
     opacity: 1, 

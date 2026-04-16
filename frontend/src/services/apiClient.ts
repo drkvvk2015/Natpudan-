@@ -12,6 +12,14 @@ const apiClient = axios.create({
   timeout: 300000, // 5 minute timeout for large uploads
 });
 
+const createRequestId = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `req-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 // Add retry count to request config
 interface RetryConfig extends InternalAxiosRequestConfig {
   _retry?: number;
@@ -22,20 +30,13 @@ interface RetryConfig extends InternalAxiosRequestConfig {
 apiClient.interceptors.request.use(
   (config: RetryConfig) => {
     const token = localStorage.getItem('token');
+    config.headers['X-Request-ID'] = createRequestId();
     
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
-      console.log('[KEY] API Request Interceptor:', {
-        url: config.url,
-        token: `${token.substring(0, 20)}...`,
-        authHeaderSet: true,
-        fullAuthHeader: config.headers['Authorization'].substring(0, 30) + '...'
-      });
-    } else {
-      console.warn('[WARNING] API Request WITHOUT token:', {
-        url: config.url,
-        hasToken: false
-      });
+      if (import.meta.env.DEV) {
+        console.log('[Natpudan AI] Authenticated API request', { url: config.url });
+      }
     }
     
     // Initialize retry count
@@ -74,7 +75,9 @@ apiClient.interceptors.response.use(
       // Exponential backoff: 1s, 2s, 4s
       const delay = Math.min(1000 * Math.pow(2, config._retry - 1), 4000);
       
-      console.log(`Retrying request (attempt ${config._retry}/3) after ${delay}ms...`);
+      if (import.meta.env.DEV) {
+        console.log(`Retrying request (attempt ${config._retry}/3) after ${delay}ms...`);
+      }
       
       await new Promise(resolve => setTimeout(resolve, delay));
       

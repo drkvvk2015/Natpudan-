@@ -45,6 +45,55 @@ pip install -r requirements-db.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+### Backend Environment Self-Repair (Windows)
+
+If backend startup fails due to Python/venv mismatch (for example a broken `.venv311`), run the built-in repair script:
+
+```powershell
+cd backend
+.\repair-backend-env.ps1 -Install
+```
+
+Optional: include test smoke check:
+
+```powershell
+.\repair-backend-env.ps1 -Install -RunTests
+```
+
+Test-only dependencies are tracked in `backend/requirements-test.txt`.
+
+For API integration/auth flow tests (starts local API automatically):
+
+```powershell
+.\repair-backend-env.ps1 -RunIntegrationTests
+```
+
+`backend/pytest.ini` excludes non-deterministic/manual tests (`test_openai.py`, `test_auth.py`) from default `pytest` runs.
+
+### Professional Dev Workflow
+
+- CI pipeline: `.github/workflows/ci.yml`
+- Dependency automation: `.github/dependabot.yml`
+- Backend smoke repair: `backend/repair-backend-env.ps1`
+- Database migrations: `backend/migrate.ps1`
+- Frontend typecheck focuses on platform/core files; the production build remains the full-app validation gate.
+
+Common migration commands:
+
+```powershell
+cd backend
+.\migrate.ps1 -Command current
+.\migrate.ps1 -Command revision -Message "describe schema change"
+.\migrate.ps1 -Command upgrade
+```
+
+### Observability
+
+- Backend logs now include request correlation IDs via `X-Request-ID`
+- Optional Sentry support:
+  - Backend: `SENTRY_DSN`
+  - Frontend: `VITE_SENTRY_DSN`
+
 Backend will be available at: `http://localhost:8000`
 
 ### Frontend Setup (React + Vite)

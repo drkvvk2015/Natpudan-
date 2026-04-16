@@ -4,18 +4,29 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 from typing import Generator
-import os
 
-# Simple SQLite database - no external dependencies
-DATABASE_URL = "sqlite:///./natpudan.db"
+from app.core.config import settings
 
-# Create engine - lazy connection
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-    pool_pre_ping=False,  # Disable pre-ping to avoid connection attempts at import time
-)
+DATABASE_URL = settings.get_database_url()
+
+engine_kwargs = {"pool_pre_ping": True}
+
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs.update(
+        {
+            "connect_args": {"check_same_thread": False},
+            "poolclass": StaticPool,
+        }
+    )
+else:
+    engine_kwargs.update(
+        {
+            "pool_size": settings.DATABASE_POOL_SIZE,
+            "max_overflow": settings.DATABASE_MAX_OVERFLOW,
+        }
+    )
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

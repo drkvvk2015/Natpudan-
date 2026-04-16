@@ -44,10 +44,14 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             'react-vendor': ['react', 'react-dom', 'react-router-dom'],
             'mui-vendor': ['@mui/material', '@emotion/react', '@emotion/styled'],
+            'recharts-vendor': ['recharts'],
+            'motion-vendor': ['framer-motion'],
+            'icons-vendor': ['@mui/icons-material', 'lucide-react'],
+            'upload-vendor': ['react-dropzone', 'file-saver'],
           },
         },
       },
-      chunkSizeWarningLimit: 600,
+      chunkSizeWarningLimit: 450,
     },
     esbuild: {
       drop: mode === 'production' ? ['console', 'debugger'] : [],

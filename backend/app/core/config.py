@@ -1,14 +1,14 @@
-"""
-Production configuration with validation and environment-specific settings
-"""
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-from typing import List, Optional
-import secrets
+"""Production configuration with validation and environment-specific settings."""
 
-# Load environment variables
-load_dotenv()
+import os
+import secrets
+from pathlib import Path
+from typing import List, Optional
+
+from dotenv import load_dotenv
+
+# Load backend/.env explicitly so startup is deterministic across shells/working dirs.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
 class Settings:
@@ -17,6 +17,7 @@ class Settings:
     # Environment
     ENVIRONMENT: str = os.getenv('ENVIRONMENT', 'development')
     DEBUG: bool = os.getenv('DEBUG', 'False').lower() == 'true'
+    FAIL_FAST_CONFIG: bool = os.getenv('FAIL_FAST_CONFIG', 'False').lower() == 'true'
     
     # API Configuration
     APP_NAME: str = "Physician AI Assistant"
@@ -34,7 +35,7 @@ class Settings:
     # CORS
     CORS_ORIGINS: List[str] = os.getenv(
         'CORS_ORIGINS', 
-        'http://localhost:3000,http://localhost:3001'
+        'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'
     ).split(',')
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: List[str] = ["*"]
@@ -43,7 +44,7 @@ class Settings:
     # Database
     DATABASE_URL: str = os.getenv(
         'DATABASE_URL', 
-        'sqlite:///./physician_ai.db'
+        'sqlite:///./natpudan.db'
     )
     DATABASE_POOL_SIZE: int = int(os.getenv('DATABASE_POOL_SIZE', '10'))
     DATABASE_MAX_OVERFLOW: int = int(os.getenv('DATABASE_MAX_OVERFLOW', '20'))
@@ -86,9 +87,11 @@ class Settings:
     # Monitoring
     ENABLE_METRICS: bool = os.getenv('ENABLE_METRICS', 'True').lower() == 'true'
     SENTRY_DSN: Optional[str] = os.getenv('SENTRY_DSN')
+    SENTRY_TRACES_SAMPLE_RATE: float = float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0.1'))
     
     # Logging
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
+    LOG_JSON: bool = os.getenv('LOG_JSON', 'True').lower() == 'true'
     LOG_FORMAT: str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     LOG_FILE: str = 'physician_ai.log'
     
@@ -101,6 +104,13 @@ class Settings:
         # Check critical API keys
         if not cls.OPENAI_API_KEY:
             warnings.append("OPENAI_API_KEY not set. AI features will be limited.")
+
+        if cls.SECRET_KEY.startswith('your-') or cls.SECRET_KEY == 'change-me-to-a-strong-random-secret':
+            message = "SECRET_KEY is using a placeholder value."
+            if cls.is_production() or cls.FAIL_FAST_CONFIG:
+                errors.append(message)
+            else:
+                warnings.append(message)
         
         # Validate SECRET_KEY for production
         if cls.ENVIRONMENT == 'production':

@@ -1,5 +1,4 @@
 import apiClient from './apiClient'
-import { AxiosError, AxiosResponse } from 'axios'
 
 // Note: apiClient is imported from ./apiClient and already has:
 // - Configured baseURL, timeout, headers

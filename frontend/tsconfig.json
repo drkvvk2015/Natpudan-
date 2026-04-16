@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "target": "ES2022",
     "useDefineForClassFields": true,
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
@@ -19,5 +18,6 @@
     "types": ["vite/client"]
   },
   "include": ["src"],
+  "exclude": ["src/pages/OAuthCallback_old.tsx"],
   "references": []
 }

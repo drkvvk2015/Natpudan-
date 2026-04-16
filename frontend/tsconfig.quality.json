@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/monitoring.ts",
+    "src/services/apiClient.ts"
+  ]
+}

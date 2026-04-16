@@ -1,4 +1,5 @@
 import React from 'react';
+import './ErrorBoundary.css';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -8,7 +9,7 @@ interface ErrorBoundaryState {
 }
 
 export class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBoundaryState> {
-  private retryTimeout: NodeJS.Timeout | null = null;
+  private retryTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(props: React.PropsWithChildren) {
     super(props);
@@ -80,74 +81,31 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
       const { error, autoRetrying, errorCount } = this.state;
       
       return (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          minHeight: '100vh',
-          padding: '20px',
-          background: '#f5f5f5'
-        }}>
-          <div style={{ 
-            background: 'white', 
-            padding: '40px', 
-            borderRadius: '8px', 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            maxWidth: '600px',
-            textAlign: 'center'
-          }}>
-            <h2 style={{ color: '#d32f2f', marginBottom: '16px' }}>[WARNING] Something went wrong</h2>
+        <div className="error-boundary-root">
+          <div className="error-boundary-card">
+            <h2 className="error-boundary-title">[WARNING] Something went wrong</h2>
             
             {autoRetrying && (
-              <div style={{ 
-                background: '#e3f2fd', 
-                padding: '12px', 
-                borderRadius: '4px', 
-                marginBottom: '16px',
-                color: '#1976d2'
-              }}>
+              <div className="error-boundary-banner retry">
                 🔄 Auto-retry in progress... (Attempt {errorCount}/3)
               </div>
             )}
 
             {this.isNetworkError(error) && !autoRetrying && (
-              <div style={{ 
-                background: '#fff3e0', 
-                padding: '12px', 
-                borderRadius: '4px', 
-                marginBottom: '16px',
-                color: '#ed6c02'
-              }}>
+              <div className="error-boundary-banner network">
                 [WARNING] Network connection issue. Check if backend server is running.
               </div>
             )}
 
-            <pre style={{ 
-              background: '#f5f5f5', 
-              padding: '16px', 
-              borderRadius: '4px',
-              overflow: 'auto',
-              marginBottom: '24px',
-              textAlign: 'left',
-              fontSize: '14px'
-            }}>
+            <pre className="error-boundary-message">
               {String(error?.message || 'Unknown error')}
             </pre>
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <div className="error-boundary-actions">
               <button 
                 onClick={() => this.setState({ hasError: false, error: null, errorCount: 0 })}
                 disabled={autoRetrying}
-                style={{
-                  padding: '10px 20px',
-                  background: autoRetrying ? '#ccc' : '#1976d2',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: autoRetrying ? 'not-allowed' : 'pointer',
-                  fontSize: '16px'
-                }}
+                className={`error-boundary-button primary${autoRetrying ? ' disabled' : ''}`}
               >
                 🔄 Try Again
               </button>
@@ -155,25 +113,13 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
               <button 
                 onClick={() => window.location.reload()}
                 disabled={autoRetrying}
-                style={{
-                  padding: '10px 20px',
-                  background: 'white',
-                  color: '#1976d2',
-                  border: '1px solid #1976d2',
-                  borderRadius: '4px',
-                  cursor: autoRetrying ? 'not-allowed' : 'pointer',
-                  fontSize: '16px'
-                }}
+                className={`error-boundary-button secondary${autoRetrying ? ' disabled' : ''}`}
               >
                 🔃 Reload Page
               </button>
             </div>
 
-            <p style={{ 
-              marginTop: '24px', 
-              fontSize: '12px', 
-              color: '#666' 
-            }}>
+            <p className="error-boundary-footer">
               [OK] Error logged to auto-correction system
             </p>
           </div>

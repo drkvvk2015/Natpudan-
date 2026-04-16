@@ -1,11 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
-import DiagnosticCheck from './components/DiagnosticCheck'
 import ErrorBoundary from './components/ErrorBoundary'
+import { initializeMonitoring } from './monitoring'
 import './global.css'
 
-console.log('[Natpudan AI] Main.tsx loaded successfully');
+initializeMonitoring();
 
 // PWA imports - wrapped in try/catch for safety
 try {
@@ -22,7 +22,7 @@ try {
       });
 
       // Setup install prompt
-      setupInstallPrompt((prompt) => {
+      setupInstallPrompt(() => {
         console.log('[Natpudan AI] App can be installed');
       });
 

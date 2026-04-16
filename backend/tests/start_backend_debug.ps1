@@ -7,8 +7,10 @@ Write-Host ("=" * 59) -ForegroundColor Cyan
 
 $ErrorActionPreference = "Continue"
 
-# Navigate to backend directory
-Set-Location "D:\Users\CNSHO\Documents\GitHub\Natpudan-\backend"
+# Navigate to backend directory (repo-relative)
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$backendDir = Resolve-Path (Join-Path $scriptDir "..")
+Set-Location $backendDir
 
 Write-Host "`n[1/5] Checking Python..." -ForegroundColor Yellow
 python --version

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { Box, CircularProgress } from '@mui/material'
 
 interface PublicRouteProps {
-  children: JSX.Element
+  children: React.ReactElement
 }
 
 const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {

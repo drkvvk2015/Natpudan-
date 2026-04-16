@@ -6,7 +6,7 @@ import { Box, CircularProgress } from '@mui/material'
 type Role = 'staff' | 'doctor' | 'admin'
 
 interface ProtectedRouteProps {
-  children: JSX.Element
+  children: React.ReactElement
   allowedRoles?: Role[]
 }
 

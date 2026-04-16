@@ -163,7 +163,7 @@ export default function TreatmentPlan() {
         treatment_goals: treatmentGoals,
         clinical_notes: clinicalNotes,
         medications,
-        follow_ups,
+        follow_ups: followUps,
       }
 
       const newPlan = await createTreatmentPlan(planData)

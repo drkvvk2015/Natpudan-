@@ -467,17 +467,20 @@ export default function ClinicalCaseSheet() {
   const handlePatientSelection = async (patient: any) => {
     try {
       const patientData = await getPatientIntake(patient.intake_id)
+      const patientDataAny = patientData as any
+      const [firstNameFromFull = '', ...lastNameParts] = (patientData.name || '').split(' ')
+      const lastNameFromFull = lastNameParts.join(' ')
       
       // Populate form with patient data
-      setFirstName(patientData.first_name || '')
-      setLastName(patientData.last_name || '')
+      setFirstName(patientDataAny.first_name || firstNameFromFull || '')
+      setLastName(patientDataAny.last_name || lastNameFromFull || '')
       setAge(patientData.age?.toString() || '')
       setSex(patientData.gender || '')
-      setAddress(patientData.address || '')
-      setUhid(patientData.uhid || '')
+      setAddress(patientDataAny.address || '')
+      setUhid(patientDataAny.uhid || patientData.intake_id || '')
       
       // Set risk level for badge display
-      setSelectedPatientRisk(patientData.risk_level || 'medium')
+      setSelectedPatientRisk(patientDataAny.risk_level || 'medium')
       
       setSelectedPatientId(patient.intake_id)
       setShowPatientSelector(false)
@@ -526,7 +529,7 @@ export default function ClinicalCaseSheet() {
       const fullHistory = [
         presentHistory.onset && `Onset: ${presentHistory.onset}`,
         presentHistory.chronology?.length && `Timeline: ${presentHistory.chronology.join(' -> ')}`,
-        enhancedHistory.medicalHistory?.length && `Past Medical History: ${enhancedHistory.medicalHistory.map(h => `${h.condition} (${h.diagnosedYear})`).join(', ')}`,
+        enhancedHistory.medicalHistory?.length && `Past Medical History: ${enhancedHistory.medicalHistory.map(h => `${h.condition} (${h.duration} ${h.durationUnit})`).join(', ')}`,
         enhancedHistory.smokingHistory?.isSmoker && `Smoking: ${enhancedHistory.smokingHistory.packsPerDay} packs/day for ${enhancedHistory.smokingHistory.yearsSmoked} years (${enhancedHistory.smokingHistory.packYears} pack-years)`,
         familyHistory?.length && `Family History: ${familyHistory.join(', ')}`,
         Object.values(reviewOfSystems).some(arr => arr?.length) && `Review of Systems: ${Object.entries(reviewOfSystems).filter(([_, symptoms]) => symptoms?.length).map(([system, symptoms]) => `${system}: ${symptoms.join(', ')}`).join('; ')}`
@@ -645,7 +648,7 @@ export default function ClinicalCaseSheet() {
           spo2: vitalSigns.oxygenSaturation,
         },
         differential_diagnoses: (liveDiagnosis.differential_diagnoses || []).map(d => ({
-          name: d.diagnosis || d.disease_name,
+          name: d.diagnosis || d.disease_name || 'Unknown diagnosis',
           confidence: d.confidence || 0,
           icd_code: d.icd_code,
           supporting_findings: d.supporting_evidence || [],

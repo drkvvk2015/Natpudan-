@@ -13,31 +13,21 @@ from fastapi import FastAPI, APIRouter, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 import time
 import psutil
 import logging
-import logging.handlers
-import traceback
 import asyncio
-import sys
 
-# Configure logging with UTF-8 encoding for Windows compatibility
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(levelname)s] %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-# Force UTF-8 for stdout/stderr on Windows
-if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-if hasattr(sys.stderr, 'reconfigure'):
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+from app.core.config import settings
+from app.logging_config import setup_logging, get_logger
+from app.middleware.request_context import RequestContextMiddleware
+from app.monitoring import init_monitoring
+from app.schemas.system import RootResponse, HealthResponse, DetailedHealthResponse
 
-logger = logging.getLogger(__name__)
+setup_logging(settings.LOG_LEVEL)
+logger = get_logger(__name__)
 
 # Import error correction system
 from app.services.error_corrector import get_error_corrector
@@ -53,7 +43,8 @@ from app.api.analytics import router as analytics_router
 from app.api.fhir import router as fhir_router
 from app.api.health import router as health_router
 from app.api.knowledge_base import router as knowledge_router
-from app.database import init_db
+from app.database import init_db, SessionLocal
+from sqlalchemy import text
 
 # Track application start time for uptime calculation
 START_TIME = time.time()
@@ -69,6 +60,8 @@ service_health = {
 async def lifespan(app: FastAPI):
     """Manage application lifespan with graceful startup/shutdown"""
     logger.info("[STARTING] Natpudan AI Medical Assistant...")
+    settings.validate()
+    init_monitoring()
     
     # Startup: Initialize services with error handling
     try:
@@ -139,6 +132,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_middleware(RequestContextMiddleware)
+
 # Add global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -181,32 +176,62 @@ async def global_exception_handler(request: Request, exc: Exception):
 # CORS middleware - allow frontend origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000"
-    ],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"]
 )
 
-@app.get("/")
-def root() -> Dict[str, Any]:
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    started_at = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+    logger.info(
+        "request_completed method=%s path=%s status=%s duration_ms=%s",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
 
-@app.get("/health")
+
+@app.get("/", response_model=RootResponse)
+def root() -> Dict[str, Any]:
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+@app.get("/health", response_model=HealthResponse)
 def health() -> Dict[str, Any]:
-    return {
-        "status": "healthy" if service_health["database"] else "degraded",
-        "service": "api",
-        "services": service_health,
-        "timestamp": datetime.utcnow().isoformat()
+    # Fallback probe so health works reliably in tests and warm/cold starts.
+    db_healthy = service_health["database"]
+    if not db_healthy:
+        db = None
+        try:
+            db = SessionLocal()
+            db.execute(text("SELECT 1"))
+            db_healthy = True
+            service_health["database"] = True
+        except Exception:
+            db_healthy = False
+        finally:
+            if db is not None:
+                db.close()
+
+    current_services = {
+        **service_health,
+        "database": db_healthy,
     }
 
-@app.get("/health/detailed")
+    return {
+        "status": "healthy" if db_healthy else "degraded",
+        "service": "api",
+        "services": current_services,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.get("/health/detailed", response_model=DetailedHealthResponse)
 def detailed_health() -> Dict[str, Any]:
     """Detailed health check with system metrics."""
     try:
@@ -238,7 +263,7 @@ def detailed_health() -> Dict[str, Any]:
             "cache_status": "active",
             "assistant_status": "operational",
             "knowledge_base_status": "ready",
-            "last_check_in": datetime.utcnow().isoformat()
+            "last_check_in": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         return {
@@ -251,7 +276,7 @@ def detailed_health() -> Dict[str, Any]:
             "cache_status": "unknown",
             "assistant_status": "unknown",
             "knowledge_base_status": "unknown",
-            "last_check_in": datetime.utcnow().isoformat(),
+            "last_check_in": datetime.now(timezone.utc).isoformat(),
             "error": str(e)
         }
 
@@ -834,14 +859,14 @@ def trigger_queue_processing() -> Dict[str, Any]:
         return {
             "status": "success",
             "result": result,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         logger.error(f"[QUEUE] Error triggering processing: {e}")
         return {
             "status": "error",
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 # Middleware to periodically check queue (on every request)

@@ -13,7 +13,10 @@
     "start": "cd frontend && npm run dev",
     "dev": "cd frontend && npm run dev",
     "lint": "cd frontend && npm run lint",
-    "test": "cd frontend && npm test"
+    "typecheck": "cd frontend && npm run typecheck",
+    "test": "cd frontend && npm test",
+    "test:backend": "powershell -ExecutionPolicy Bypass -File backend/repair-backend-env.ps1 -RunTests",
+    "security:frontend": "cd frontend && npm run audit"
   },
   "workspaces": [
     "frontend"

@@ -1,0 +1,26 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "alembic",
+    "asyncpg",
+    "capacitor",
+    "psutil",
+    "pydantic",
+    "pytest",
+    "uvicorn",
+    "venv",
+    "natpudan",
+    "fastapi",
+    "sentry",
+    "faiss"
+  ],
+  "ignorePaths": [
+    "node_modules",
+    "frontend/node_modules",
+    ".venv",
+    ".venv311",
+    "dist",
+    "*.lock"
+  ]
+}
