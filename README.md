@@ -4,7 +4,7 @@ A production-ready FastAPI + React full-stack application for medical profession
 
 ## Features
 
-✅ **AI Chat Assistant** - OpenAI GPT-4 integration for medical consultations  
+✅ **AI Chat Assistant** - OpenAI GPT-4 / Local TinyLLama / Ollama integration for medical consultations  
 ✅ **AI Diagnosis** - Intelligent clinical case analysis and recommendations  
 ✅ **Discharge Summary** - AI-powered generation with voice typing support  
 ✅ **Role-Based Access Control** - Staff, Doctor, and Admin roles with fine-grained permissions  
@@ -186,6 +186,20 @@ Natpudan uses three role levels with hierarchical permissions:
 
 ## Configuration
 
+### AI Provider Options
+
+The app supports multiple AI providers with automatic fallback:
+
+| Provider | Best For | Setup | Cost | Privacy |
+|----------|----------|-------|------|---------|
+| **TinyLLama** (Embedded) | Development, demos, privacy-first | ~5 min | 🆓 Free | ✅ 100% local |
+| **Ollama** (Local) | Production, better accuracy | ~15 min | 🆓 Free | ✅ 100% local |
+| **OpenAI** | Critical medical decisions, best accuracy | API key | 💰 Per-token | ⚠️ API-based |
+
+**Quick Start:** Use `AI_PROVIDER=auto` to automatically try embedded → ollama → openai
+
+**TinyLLama Setup:** See [TINYLLAMA_SETUP.md](TINYLLAMA_SETUP.md) for complete instructions
+
 ### Backend Environment Variables
 
 Create `backend/.env` file with the following:
@@ -208,6 +222,19 @@ ACCESS_TOKEN_EXPIRE_MINUTES=1440
 # OpenAI (Required for all AI features)
 OPENAI_API_KEY=sk-proj-your-key-here
 OPENAI_MODEL=gpt-4o
+
+# AI Provider Configuration (Optional - for local/embedded models)
+# Options: "auto" (embedded→ollama→openai), "embedded" (TinyLLama), "ollama", "openai"
+AI_PROVIDER=auto
+
+# For TinyLLama Embedded Model (lightweight, local, no API key needed)
+# Download guide: See TINYLLAMA_SETUP.md
+EMBEDDED_MODEL_PATH=models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf  # Optional
+MODEL_GPU_LAYERS=0  # 0 for CPU only, 10-33 for GPU acceleration
+
+# For Ollama Server (if running locally)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=mistral
 
 # Application URLs
 FRONTEND_URL=http://localhost:5173
