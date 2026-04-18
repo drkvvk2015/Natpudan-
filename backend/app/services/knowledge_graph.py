@@ -340,32 +340,32 @@ class MedicalKnowledgeGraph:
     ) -> str:
         """
         Generate simple text visualization of subgraph.
-        
+
         Args:
             center_node_id: Center node
             max_distance: Distance from center
-            
+
         Returns:
             Text representation
         """
         if center_node_id not in self.nodes:
             return "Node not found"
-        
+
         center = self.nodes[center_node_id]
         lines = [
             f"Knowledge Graph around: {center['label']} ({center['type']})",
             "=" * 60,
             ""
         ]
-        
+
         # Get related concepts
         related = self.get_related_concepts(center_node_id, max_distance)
-        
+
         # Group by type
         by_type = defaultdict(list)
         for node in related:
             by_type[node["type"]].append(node)
-        
+
         # Display by type
         for node_type, nodes in by_type.items():
             lines.append(f"{node_type.upper()}:")
@@ -373,8 +373,173 @@ class MedicalKnowledgeGraph:
                 distance = node.get("distance", 0)
                 lines.append(f"  {'  ' * distance}→ {node['label']}")
             lines.append("")
-        
+
         return "\n".join(lines)
+
+    def get_subgraph(
+        self,
+        node_id: str,
+        max_distance: int = 2
+    ) -> Dict[str, Any]:
+        """
+        Get subgraph centered on a node with max distance.
+
+        Args:
+            node_id: Center node ID
+            max_distance: Maximum distance from center
+
+        Returns:
+            {
+                center: node,
+                nodes: [nodes in subgraph],
+                edges: [edges in subgraph],
+                statistics: {...}
+            }
+        """
+        if node_id not in self.nodes:
+            return {
+                "error": "Node not found",
+                "node_id": node_id,
+                "nodes": [],
+                "edges": []
+            }
+
+        center_node = self.nodes[node_id]
+
+        # Find all nodes within distance
+        visited = {node_id}
+        queue = [(node_id, 0)]
+        subgraph_nodes = {node_id: center_node}
+
+        while queue:
+            current_id, distance = queue.pop(0)
+
+            if distance >= max_distance:
+                continue
+
+            # Explore neighbors
+            neighbors = self.get_neighbors(current_id, direction="both")
+            for neighbor in neighbors:
+                neighbor_id = neighbor["id"]
+                if neighbor_id not in visited:
+                    visited.add(neighbor_id)
+                    subgraph_nodes[neighbor_id] = neighbor
+                    queue.append((neighbor_id, distance + 1))
+
+        # Find edges within subgraph
+        subgraph_edges = []
+        for edge in self.edges:
+            if edge["source"] in subgraph_nodes and edge["target"] in subgraph_nodes:
+                subgraph_edges.append(edge)
+
+        # Calculate statistics
+        node_types = defaultdict(int)
+        for node in subgraph_nodes.values():
+            node_types[node["type"]] += 1
+
+        relation_types = defaultdict(int)
+        for edge in subgraph_edges:
+            relation_types[edge["relation"]] += 1
+
+        return {
+            "center": center_node,
+            "nodes": list(subgraph_nodes.values()),
+            "edges": subgraph_edges,
+            "statistics": {
+                "total_nodes": len(subgraph_nodes),
+                "total_edges": len(subgraph_edges),
+                "node_types": dict(node_types),
+                "relation_types": dict(relation_types),
+                "max_distance": max_distance
+            }
+        }
+
+    def export_for_d3(
+        self,
+        node_id: Optional[str] = None,
+        max_distance: int = 2
+    ) -> Dict[str, Any]:
+        """
+        Export graph in D3.js-compatible format (nodes/links).
+
+        Args:
+            node_id: Optional center node for subgraph (None = full graph)
+            max_distance: Distance for subgraph export
+
+        Returns:
+            {
+                nodes: [{id, label, type, size, color}],
+                links: [{source, target, relation, value}]
+            }
+        """
+        # Get subgraph or full graph
+        if node_id and node_id in self.nodes:
+            subgraph_data = self.get_subgraph(node_id, max_distance)
+            nodes = subgraph_data.get("nodes", [])
+            edges = subgraph_data.get("edges", [])
+        else:
+            nodes = list(self.nodes.values())
+            edges = self.edges
+
+        # Convert to D3 format
+        d3_nodes = []
+        node_id_map = {}  # Map internal IDs to D3 indices
+
+        for i, node in enumerate(nodes):
+            node_id_map[node["id"]] = i
+
+            # Assign color based on node type
+            color_map = {
+                "disease": "#FF6B6B",
+                "medication": "#4ECDC4",
+                "symptom": "#FFE66D",
+                "procedure": "#95E1D3",
+                "default": "#A8E6CF"
+            }
+
+            color = color_map.get(node.get("type", "default"), color_map["default"])
+
+            # Size based on frequency/connections
+            connections = len(self.edges_by_source.get(node["id"], [])) + \
+                         len(self.edges_by_target.get(node["id"], []))
+            size = 10 + (connections * 2)  # Base size + connections
+
+            d3_nodes.append({
+                "id": node["id"],
+                "label": node.get("label", node["id"]),
+                "type": node.get("type", "unknown"),
+                "size": size,
+                "color": color,
+                "properties": node.get("properties", {})
+            })
+
+        # Convert edges to D3 links
+        d3_links = []
+        for edge in edges:
+            source_idx = node_id_map.get(edge["source"])
+            target_idx = node_id_map.get(edge["target"])
+
+            if source_idx is not None and target_idx is not None:
+                d3_links.append({
+                    "source": source_idx,
+                    "target": target_idx,
+                    "relation": edge.get("relation", "related"),
+                    "value": edge.get("properties", {}).get("strength", 1),
+                    "properties": edge.get("properties", {})
+                })
+
+        return {
+            "nodes": d3_nodes,
+            "links": d3_links,
+            "statistics": {
+                "total_nodes": len(d3_nodes),
+                "total_links": len(d3_links),
+                "node_types": {
+                    nt: sum(1 for n in d3_nodes if n["type"] == nt)
+                    for nt in set(n["type"] for n in d3_nodes)
+                }
+            }
+        }
 
 
 # Global instance

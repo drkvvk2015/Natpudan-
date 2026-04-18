@@ -1,27 +1,48 @@
 # Natpudan AI Medical Assistant
 
-A production-ready **FastAPI + React/TypeScript** full-stack medical AI application with intelligent diagnostics, role-based access control, and comprehensive patient management.
+A production-ready **FastAPI + React/TypeScript** full-stack medical AI application with intelligent diagnostics, role-based access control, comprehensive patient management, and **enterprise-grade predictive analytics**.
+
+## 🚀 What's New in v2.0
+
+| Feature | Description |
+|---------|-------------|
+| **Voice → Auto Documentation** | Record consultations, auto-transcribe with Whisper, generate SOAP notes |
+| **Wearable Integration** | Connect Fitbit/Apple Watch/Garmin, real-time vital sign monitoring |
+| **Predictive Readmission Alerts** | ML-powered risk scoring with intervention recommendations |
+| **Knowledge Graph Visualization** | Interactive D3.js medical concept explorer |
+| **Ambient Transcription** | WebSocket real-time transcription during consultations |
+| **XAI Explainability** | Transparent AI reasoning with feature importance |
+| **AI Treatment Recommender** | Evidence-based treatment pathways |
+| **Clinical Trial Matcher** | Auto-match patients to eligible trials |
+| **FHIR Healthcare Connector** | Full HL7/FHIR interoperability |
+| **Multi-Language AI** | 50+ language medical translation |
+
+---
 
 ## Features
 
 | Category | Capability |
 |----------|-----------|
 | **AI** | GPT-4 chat, clinical diagnosis, discharge summaries, OCR medical report parsing |
-| **Knowledge Base** | Vector search (FAISS), hybrid BM25+vector, RAG queries, PubMed integration |
+| **Voice AI** | Whisper transcription, SOAP note generation, ambient transcription |
+| **Predictive ML** | Readmission risk prediction, patient trajectory forecasting |
+| **Wearables** | Fitbit/Apple/Garmin OAuth, real-time vitals, background sync |
+| **Knowledge Base** | Vector search (FAISS), hybrid BM25+vector, RAG queries, **interactive graph visualization** |
 | **PDF Engine** | Large PDF upload, OCR extraction (Tesseract/pdf2image), duplicate detection, background processing queue |
 | **Patient Management** | Intake forms, medical timeline, treatment plans, medication follow-ups |
 | **Reports** | OPD case sheet PDF, prescription PDF, medical history PDF generation |
-| **Analytics** | Demographics, disease trends, risk assessment, treatment outcomes |
+| **Analytics** | Demographics, disease trends, risk assessment, treatment outcomes, **disease heatmaps** |
 | **Drug Checker** | Real-time interaction warnings with severity classification |
+| **Alerts** | Clinical alerts with severity levels, acknowledgment tracking, intervention recommendations |
 | **Authentication** | JWT + OAuth2 (Google, GitHub, Microsoft), multi-tab sync |
-| **FHIR** | Healthcare interoperability standard (patient resources, observations, conditions) |
+| **FHIR** | Healthcare interoperability standard (patient resources, observations, conditions), **HL7 import** |
 | **Multi-Platform** | Web PWA, Android/iOS (Capacitor), Windows/Linux Desktop (Electron) |
 
 ## Tech Stack
 
-- **Backend**: FastAPI, SQLAlchemy, SQLite/PostgreSQL, OpenAI API
-- **Frontend**: React 18, TypeScript, Vite 7, MUI v5, React Router v6
-- **AI/ML**: OpenAI GPT-4, FAISS vector embeddings, TinyLLama (local), Ollama (local)
+- **Backend**: FastAPI, SQLAlchemy, SQLite/PostgreSQL, OpenAI API, scikit-learn
+- **Frontend**: React 18, TypeScript, Vite 7, MUI v5, React Router v6, Recharts, D3.js
+- **AI/ML**: OpenAI GPT-4, Whisper, FAISS vector embeddings, TinyLLama (local), Ollama (local)
 - **PDF**: PyMuPDF, Tesseract OCR, pdf2image
 - **Deploy**: Docker Compose, Capacitor (mobile), Electron (desktop)
 
@@ -55,7 +76,7 @@ python -m venv .venv311
 pip install -r backend/requirements.txt
 
 # Configure environment
-Copy-Item backend/.env.example backend/.env
+Copy-Item backend/.env.template backend/.env
 # Edit backend/.env — add OPENAI_API_KEY and SECRET_KEY
 
 # Start backend
@@ -94,14 +115,20 @@ SECRET_KEY=your-secret-key   # python -c "import secrets; print(secrets.token_ur
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-# OpenAI (required for full AI features)
+# OpenAI (required for AI features including Voice transcription)
 OPENAI_API_KEY=sk-proj-your-key-here
 OPENAI_MODEL=gpt-4o
+WHISPER_MODEL=whisper-1
 
 # AI Provider fallback chain: embedded -> ollama -> openai
 AI_PROVIDER=auto
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=mistral
+
+# Wearable Integration (optional)
+FITBIT_CLIENT_ID=
+FITBIT_CLIENT_SECRET=
+FITBIT_REDIRECT_URI=http://localhost:5173/api/wearable/callback/fitbit
 
 # Optional OAuth
 GOOGLE_CLIENT_ID=
@@ -132,6 +159,9 @@ VITE_WS_URL=ws://localhost:8000
 | Patient Intake | YES | YES | YES |
 | AI Chat | YES | YES | YES |
 | AI Diagnosis | - | YES | YES |
+| **Voice Documentation** | - | YES | YES |
+| **Wearable Integration** | - | YES | YES |
+| **Knowledge Graph** | - | YES | YES |
 | Knowledge Base | - | YES | YES |
 | Drug Interaction Checker | - | YES | YES |
 | Treatment Plans | - | YES | YES |
@@ -150,6 +180,12 @@ VITE_WS_URL=ws://localhost:8000
 | `/api/chat` | AI chat conversations |
 | `/api/medical/diagnosis` | AI diagnosis from symptoms |
 | `/api/medical/knowledge` | Knowledge base search, RAG, hybrid search |
+| `/api/voice` | **Voice upload, transcription, SOAP generation** |
+| `/api/voice/consultation` | **WebSocket ambient transcription** |
+| `/api/predictions` | **Readmission risk, alerts, high-risk patients** |
+| `/api/wearable` | **Device OAuth, sync, vitals data** |
+| `/api/knowledge-graph` | **D3.js graph export, concept search, paths** |
+| `/api/features` | **XAI, treatment recommender, clinical trials, genomics** |
 | `/api/reports` | OPD case sheet, prescription, medical history PDFs |
 | `/api/treatment` | Treatment plan management |
 | `/api/timeline` | Patient medical timeline |
@@ -157,6 +193,42 @@ VITE_WS_URL=ws://localhost:8000
 | `/api/fhir` | FHIR resources |
 | `/health` | Health check |
 | `/health/detailed` | System metrics (CPU, memory, disk) |
+
+---
+
+## v2.0 Feature Details
+
+### Voice → Auto Documentation
+- Upload audio recordings (WAV, MP3, M4A, OGG, FLAC)
+- Transcription via OpenAI Whisper API
+- Automatic medical entity extraction (symptoms, medications, conditions)
+- SOAP note auto-generation with RAG grounding
+- Create discharge summaries from voice
+
+### Wearable Data Integration
+- OAuth 2.0 for Fitbit, Apple Health, Garmin
+- Background sync worker (5-minute intervals)
+- Real-time heart rate, steps, sleep, SpO2 monitoring
+- Time-series data visualization with Recharts
+
+### Predictive Readmission Alerts
+- Logistic regression model with 11 patient features
+- Risk scoring: Critical/High/Medium/Low
+- Feature importance for interpretability
+- Automated intervention recommendations
+- Alert acknowledgment tracking
+
+### Knowledge Graph Visualization
+- Interactive D3.js force-directed graph
+- Disease → Symptom → Medication relationships
+- Path finding between medical concepts
+- SVG export for documentation
+
+### Ambient Transcription
+- WebSocket real-time audio streaming
+- Live transcription during consultations
+- Auto-population of conversation history
+- Entity extraction on-the-fly
 
 ---
 
@@ -195,22 +267,57 @@ pytest tests/test_api.py -v   # specific file
 Natpudan-/
 ├── backend/
 │   ├── app/
-│   │   ├── api/          # Route handlers (auth, chat, diagnosis, knowledge_base, reports...)
-│   │   ├── services/     # Business logic (OCR, vector KB, drug interactions, RAG...)
-│   │   ├── models.py     # SQLAlchemy ORM models
-│   │   ├── database.py   # DB session management + auto-migrations
-│   │   └── main.py       # FastAPI app entrypoint
+│   │   ├── api/              # Route handlers
+│   │   │   ├── voice.py              # Voice upload & SOAP generation
+│   │   │   ├── voice_consul.py       # WebSocket ambient transcription
+│   │   │   ├── predictions.py        # Readmission risk & alerts
+│   │   │   ├── wearable_auth.py      # Wearable OAuth
+│   │   │   ├── knowledge_graph_viz.py # D3 graph export
+│   │   │   └── ...
+│   │   ├── services/         # Business logic
+│   │   │   ├── voice_transcriber.py  # Whisper integration
+│   │   │   ├── voice_to_soap.py      # SOAP note generation
+│   │   │   ├── readmission_predictor.py # ML prediction
+│   │   │   ├── ml_trainer.py         # Model training
+│   │   │   ├── alert_generator.py    # Clinical alerts
+│   │   │   ├── wearable_sync.py      # Device data sync
+│   │   │   └── ...
+│   │   ├── models.py         # SQLAlchemy ORM models
+│   │   ├── database.py       # DB session management + auto-migrations
+│   │   └── main.py           # FastAPI app entrypoint
+│   ├── .env.template         # Environment configuration template
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/        # React page components
-│   │   ├── components/   # Shared UI components
-│   │   ├── services/     # API clients (apiClient, opdCaseSheetService...)
-│   │   └── context/      # Auth context
+│   │   ├── pages/
+│   │   │   ├── VoiceDocumentation.tsx    # Voice recording UI
+│   │   │   ├── WearableIntegration.tsx   # Device management
+│   │   │   ├── KnowledgeGraphVisualizer.tsx # D3 graph
+│   │   │   └── ...
+│   │   ├── components/
+│   │   │   ├── AlertsWidget.tsx          # Clinical alerts widget
+│   │   │   └── ...
+│   │   ├── services/         # API clients
+│   │   └── context/          # Auth context
 │   └── vite.config.ts
+├── INTEGRATION_GUIDE.md      # Feature integration instructions
+├── DEPLOYMENT_TESTING_GUIDE.md # Deployment & testing procedures
+├── IMPLEMENTATION_SUMMARY.md # Complete technical overview
 ├── start-app.ps1             # One-command dev startup (Windows)
 └── docker-compose.yml        # Production deployment
 ```
+
+---
+
+## Database Models (v2.0)
+
+| Model | Description |
+|-------|-------------|
+| `VoiceRecording` | Audio files, transcriptions, SOAP linkage |
+| `WearableDeviceAuth` | OAuth tokens for wearable devices |
+| `WearableDeviceData` | Time-series vital measurements |
+| `WearableSyncLog` | Sync audit trail |
+| `Alert` | Clinical alerts with severity & recommendations |
 
 ---
 
@@ -221,7 +328,7 @@ Backend auto-tries 8001. Update `VITE_API_BASE_URL` in `frontend/.env` if needed
 
 **Missing Python packages**
 ```powershell
-pip install fastapi uvicorn sqlalchemy python-jose[cryptography] passlib[bcrypt] python-multipart pydantic-settings psutil openai PyMuPDF faiss-cpu Pillow pytesseract pdf2image
+pip install -r backend/requirements.txt
 ```
 
 **Android build fails**
@@ -229,6 +336,20 @@ Requires Android Studio with SDK. Set the `ANDROID_HOME` environment variable.
 
 **AI features not working**
 Set `OPENAI_API_KEY` in `backend/.env`. Use `AI_PROVIDER=auto` to fall back to local models (Ollama/TinyLLama).
+
+**Voice transcription fails**
+Ensure `OPENAI_API_KEY` is valid. Check audio file size < 25MB.
+
+**Wearable sync not working**
+Verify OAuth credentials. Check `backend/logs/` for WEARABLE errors.
+
+---
+
+## Documentation
+
+- **INTEGRATION_GUIDE.md** - Feature-by-feature setup instructions
+- **DEPLOYMENT_TESTING_GUIDE.md** - Development setup, testing, production deployment
+- **IMPLEMENTATION_SUMMARY.md** - Complete technical overview of all 15 features
 
 ---
 

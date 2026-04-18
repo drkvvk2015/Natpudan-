@@ -33,6 +33,9 @@ import {
   Api as ApiIcon,
   Logout as LogoutIcon,
   CloudUpload,
+  Mic as VoiceIcon,
+  Watch as WearableIcon,
+  GraphicEq as GraphicsIcon,
 } from '@mui/icons-material'
 
 const DRAWER_WIDTH = 260
@@ -75,6 +78,9 @@ export default function Layout({ children }: LayoutProps) {
     { text: 'Patient List', icon: <PersonAdd />, path: '/patients' },
     { text: 'Discharge Summary', icon: <AssessmentIcon />, path: '/discharge-summary' },
     { text: 'Clinical Case Sheet', icon: <DiagnosisIcon />, path: '/diagnosis' },
+    { text: 'Voice Documentation', icon: <VoiceIcon />, path: '/voice-documentation' },
+    { text: 'Wearable Devices', icon: <WearableIcon />, path: '/wearable-integration' },
+    { text: 'Medical Knowledge', icon: <GraphicsIcon />, path: '/knowledge-graph' },
     { text: 'Analytics', icon: <AssessmentIcon />, path: '/analytics' },
     { text: 'FHIR API', icon: <ApiIcon />, path: '/fhir' },
     { text: 'Drug Checker', icon: <DrugIcon />, path: '/drugs' },

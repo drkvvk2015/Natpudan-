@@ -28,6 +28,9 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const DischargeSummaryPage = lazy(() => import('./pages/DischargeSummaryPage'))
+const VoiceDocumentation = lazy(() => import('./pages/VoiceDocumentation'))
+const WearableIntegration = lazy(() => import('./pages/WearableIntegration'))
+const KnowledgeGraphVisualizer = lazy(() => import('./pages/KnowledgeGraphVisualizer'))
 
 const theme = createTheme({})
 
@@ -68,6 +71,9 @@ function App() {
               <Route path="/treatment-plan/:patientId/*" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><TreatmentPlan /></Layout></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute allowedRoles={["admin"]}><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
               <Route path="/fhir" element={<ProtectedRoute allowedRoles={["admin"]}><Layout><FHIRExplorer /></Layout></ProtectedRoute>} />
+              <Route path="/voice-documentation" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><VoiceDocumentation /></Layout></ProtectedRoute>} />
+              <Route path="/wearable-integration" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><WearableIntegration /></Layout></ProtectedRoute>} />
+              <Route path="/knowledge-graph" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><KnowledgeGraphVisualizer /></Layout></ProtectedRoute>} />
             </Routes>
           </Suspense>
         </Router>

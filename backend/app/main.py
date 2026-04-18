@@ -44,6 +44,11 @@ from app.api.fhir import router as fhir_router
 from app.api.health import router as health_router
 from app.api.knowledge_base import router as knowledge_router
 from app.api.reports import router as reports_router
+from app.api.predictions import router as predictions_router
+from app.api.voice import router as voice_router
+from app.api.voice_consul import router as voice_consul_router
+from app.api.knowledge_graph_viz import router as knowledge_graph_viz_router
+from app.api.wearable_auth import router as wearable_auth_router
 from app.database import init_db, SessionLocal
 from sqlalchemy import text
 
@@ -72,14 +77,103 @@ async def _queue_worker_loop(interval_seconds: int = 5):
             logger.warning(f"[QUEUE] Worker loop iteration failed: {e}")
         await asyncio.sleep(interval_seconds)
 
+
+# Dedicated async wearable sync worker task
+_wearable_worker_task: asyncio.Task | None = None
+
+
+async def _wearable_sync_loop(interval_seconds: int = 300):
+    """Run wearable device data sync in a dedicated background loop (5-min intervals)."""
+    from app.services.wearable_sync import get_wearable_sync
+    from app.database import SessionLocal
+    from app.models import WearableDeviceAuth
+    from datetime import datetime, timedelta
+
+    logger.info(f"[WEARABLE] Sync worker loop started (interval={interval_seconds}s)")
+
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                # Find all active devices due for sync
+                now = datetime.utcnow()
+                due_devices = db.query(WearableDeviceAuth).filter(
+                    WearableDeviceAuth.is_active == True,
+                    WearableDeviceAuth.is_revoked == False,
+                    WearableDeviceAuth.auto_sync_enabled == True
+                ).all()
+
+                for auth in due_devices:
+                    # Check if sync is due
+                    if auth.last_sync_at:
+                        next_sync = auth.last_sync_at + timedelta(minutes=auth.sync_interval_minutes)
+                        if now < next_sync:
+                            continue
+
+                    # Trigger sync for this device
+                    try:
+                        wearable_sync = get_wearable_sync()
+
+                        if auth.device_type == "fitbit":
+                            result = await wearable_sync.fetch_fitbit_data(
+                                access_token=auth.access_token,
+                                user_id=auth.device_user_id,
+                                data_type="heart_rate"
+                            )
+
+                            if result.get("success"):
+                                # Import data
+                                import_result = await wearable_sync.import_wearable_data(
+                                    db=db,
+                                    patient_intake_id=auth.patient_intake_id,
+                                    device_type="fitbit",
+                                    data_entries=[
+                                        {
+                                            "data_category": "heart_rate",
+                                            "measurement_date": datetime.utcnow(),
+                                            "value": d.get("value"),
+                                            "unit": d.get("unit", "bpm"),
+                                            "confidence": 0.95
+                                        }
+                                        for d in result.get("data", [])
+                                    ]
+                                )
+
+                                auth.last_sync_at = datetime.utcnow()
+                                auth.sync_error_count = 0
+                                logger.info(
+                                    f"[WEARABLE] Synced {import_result.get('imported_count', 0)} records "
+                                    f"from {auth.device_type} (patient {auth.patient_intake_id})"
+                                )
+                            else:
+                                auth.sync_error_count = (auth.sync_error_count or 0) + 1
+                                logger.warning(f"[WEARABLE] Sync error for {auth.device_type}: {result.get('error')}")
+
+                    except Exception as e:
+                        logger.error(f"[WEARABLE] Error syncing device {auth.auth_id}: {e}")
+                        auth.sync_error_count = (auth.sync_error_count or 0) + 1
+
+                db.commit()
+
+            except Exception as e:
+                logger.error(f"[WEARABLE] Sync loop error: {e}")
+                db.rollback()
+            finally:
+                db.close()
+
+        except Exception as e:
+            logger.warning(f"[WEARABLE] Sync loop iteration failed: {e}")
+
+        await asyncio.sleep(interval_seconds)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan with graceful startup/shutdown"""
-    global _queue_worker_task
+    global _queue_worker_task, _wearable_worker_task
     logger.info("[STARTING] Natpudan AI Medical Assistant...")
     settings.validate()
     init_monitoring()
-    
+
     # Startup: Initialize services with error handling
     try:
         # Initialize database
@@ -89,7 +183,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"[ERROR] Database initialization failed: {e}")
         error_corrector.log_error(e, {"operation": "database_init"})
-    
+
     # Check OpenAI API
     try:
         import os
@@ -101,7 +195,7 @@ async def lifespan(app: FastAPI):
             logger.warning("[WARNING] OpenAI API key not configured - AI features will be limited")
     except Exception as e:
         logger.error(f"[ERROR] OpenAI check failed: {e}")
-    
+
     # Pre-load knowledge base (optional)
     try:
         from app.services.vector_knowledge_base import get_vector_knowledge_base
@@ -110,7 +204,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"[OK] Knowledge base loaded ({kb.document_count} documents)")
     except Exception as e:
         logger.warning(f"[WARNING] Knowledge base not available: {e}")
-    
+
     # Initialize upload queue processor
     try:
         from app.services.upload_queue_processor import get_queue_processor
@@ -123,11 +217,18 @@ async def lifespan(app: FastAPI):
         logger.info("[OK] Dedicated queue worker task started")
     except Exception as e:
         logger.error(f"[ERROR] Queue processor initialization failed: {e}")
-    
+
+    # Initialize wearable device sync worker
+    try:
+        _wearable_worker_task = asyncio.create_task(_wearable_sync_loop(interval_seconds=300))
+        logger.info("[OK] Wearable device sync worker started (5-min intervals)")
+    except Exception as e:
+        logger.error(f"[ERROR] Wearable sync initialization failed: {e}")
+
     logger.info(f"[STARTED] Application started - Services: DB={service_health['database']}, OpenAI={service_health['openai']}, KB={service_health['knowledge_base']}")
-    
+
     yield  # Application runs
-    
+
     # Shutdown: Cleanup
     logger.info("[STOPPING] Natpudan AI Medical Assistant...")
     try:
@@ -145,9 +246,19 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
             logger.info("[OK] Dedicated queue worker task stopped")
+
+        # Stop wearable sync worker
+        if _wearable_worker_task and not _wearable_worker_task.done():
+            _wearable_worker_task.cancel()
+            try:
+                await _wearable_worker_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("[OK] Wearable sync worker task stopped")
+
     except Exception as e:
-        logger.warning(f"Warning stopping queue processor: {e}")
-    
+        logger.warning(f"Warning stopping processors: {e}")
+
     try:
         # Close database connections
         from app.database import engine
@@ -873,7 +984,12 @@ api_router.include_router(analytics_router, prefix="/analytics", tags=["analytic
 api_router.include_router(fhir_router, prefix="/fhir", tags=["fhir"])
 api_router.include_router(health_router, tags=["health"])
 api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
+api_router.include_router(knowledge_graph_viz_router, prefix="/api/knowledge-graph", tags=["knowledge-graph"])
 api_router.include_router(reports_router, prefix="/reports", tags=["reports"])
+api_router.include_router(predictions_router, prefix="/api", tags=["predictions"])
+api_router.include_router(voice_router, prefix="/api", tags=["voice"])
+api_router.include_router(voice_consul_router, prefix="/api", tags=["voice-consultation"])
+api_router.include_router(wearable_auth_router, prefix="/api", tags=["wearable"])
 # Background task for processing upload queue
 _last_queue_process = 0
 _queue_process_interval = 10  # Process queue every 10 seconds

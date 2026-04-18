@@ -1,6 +1,6 @@
 """Database models for Natpudan AI - Consolidated from app/models.py and app/database/models.py"""
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum, JSON, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum, JSON, UniqueConstraint, Float
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -465,7 +465,7 @@ class DocumentProcessingStatus(Base):
 class ExtractedImage(Base):
     """Model for storing extracted PDF images with metadata"""
     __tablename__ = "extracted_images"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     image_id = Column(String, unique=True, index=True)  # Unique identifier
     document_id = Column(String, ForeignKey("knowledge_documents.document_id"), index=True)
@@ -478,17 +478,238 @@ class ExtractedImage(Base):
     size_bytes = Column(Integer)  # File size
     width = Column(Integer, nullable=True)
     height = Column(Integer, nullable=True)
-    
+
     # OCR/AI analysis (for future use)
     ocr_text = Column(Text, nullable=True)  # OCR'd text from image
     caption = Column(Text, nullable=True)  # AI-generated caption
     tags = Column(JSON, nullable=True)  # Image tags/labels
-    
+
     # Timestamps
     extracted_at = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     document = relationship("KnowledgeDocument", back_populates="extracted_images")
-    
+
     def __repr__(self):
         return f"<ExtractedImage(id={self.image_id}, doc={self.document_id}, page={self.page_number})>"
+
+
+# ==================== Voice Recording Models ====================
+
+class VoiceRecording(Base):
+    """Voice recording model for consultation transcriptions"""
+    __tablename__ = "voice_recordings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    recording_id = Column(String(36), unique=True, index=True, nullable=False)  # UUID
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True, index=True)
+    patient_intake_id = Column(Integer, ForeignKey("patient_intakes.id"), nullable=True, index=True)
+
+    # Audio file metadata
+    file_path = Column(String(512), nullable=False)
+    file_size = Column(Integer, nullable=True)  # Bytes
+    duration_seconds = Column(Float, nullable=True)
+    audio_quality = Column(String(50), nullable=True)  # "16khz", "44.1khz", etc.
+    audio_format = Column(String(10), default="wav", nullable=False)  # wav, mp3, ogg, etc.
+
+    # Transcription & Analysis
+    raw_transcription = Column(Text, nullable=True)  # Raw speech-to-text from Whisper
+    processed_transcription = Column(Text, nullable=True)  # Cleaned/corrected version
+    transcription_confidence = Column(Float, nullable=True)  # 0-1 confidence score
+    medical_entities = Column(JSON, nullable=True)  # [{type: "symptom", value: "fever", confidence: 0.95}]
+
+    # Sentiment & Intent (for future use)
+    sentiment = Column(String(20), nullable=True)  # "positive", "negative", "neutral"
+    intent = Column(String(50), nullable=True)  # "complaint", "question", "follow_up", etc.
+
+    # SOAP note generation
+    soap_note_id = Column(Integer, ForeignKey("discharge_summaries.id"), nullable=True)
+
+    # Metadata
+    source = Column(String(50), default="consultation", nullable=False)  # consultation, patient_upload, etc.
+    is_processed = Column(Boolean, default=False)
+    processing_error = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    processed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    conversation = relationship("Conversation", foreign_keys=[conversation_id])
+    patient = relationship("PatientIntake", foreign_keys=[patient_intake_id])
+    soap_note = relationship("DischargeSummary", foreign_keys=[soap_note_id])
+
+    def __repr__(self):
+        return f"<VoiceRecording(id={self.recording_id}, duration={self.duration_seconds}s)>"
+
+
+# ==================== Alert Models ====================
+
+class Alert(Base):
+    """Alert model for clinical and system alerts"""
+    __tablename__ = "alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_intake_id = Column(Integer, ForeignKey("patient_intakes.id"), nullable=True, index=True)
+    treatment_plan_id = Column(Integer, ForeignKey("treatment_plans.id"), nullable=True, index=True)
+
+    # Alert classification
+    alert_type = Column(String(50), nullable=False, index=True)  # readmission_risk, drug_interaction, lab_abnormality, prediction, etc.
+    severity = Column(String(20), nullable=False, default="medium", index=True)  # low, medium, high, critical
+
+    # Alert content
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    recommended_action = Column(Text, nullable=True)
+
+    # Risk/Prediction data (JSON for extensibility)
+    risk_score = Column(String, nullable=True)  # e.g., "0.75" for 75% risk
+    risk_factors = Column(JSON, nullable=True)  # e.g., [{factor: "diabetes", importance: 0.8}, ...]
+
+    # Acknowledgment tracking
+    is_acknowledged = Column(Boolean, default=False, index=True)
+    acknowledged_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledgment_notes = Column(Text, nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime, default=func.now(), nullable=False, index=True)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    expires_at = Column(DateTime, nullable=True)  # Alert auto-dismisses after expiration
+
+    # Relationships
+    patient = relationship("PatientIntake", foreign_keys=[patient_intake_id])
+    treatment_plan = relationship("TreatmentPlan", foreign_keys=[treatment_plan_id])
+    acknowledged_by = relationship("User", foreign_keys=[acknowledged_by_id])
+
+    def __repr__(self):
+        return f"<Alert(id={self.id}, type={self.alert_type}, severity={self.severity})>"
+
+
+# ==================== Wearable Device Data Models ====================
+
+class WearableDeviceData(Base):
+    """Wearable device data model for syncing Fitbit, Apple Health, Garmin, etc."""
+    __tablename__ = "wearable_device_data"
+
+    id = Column(Integer, primary_key=True, index=True)
+    data_id = Column(String(36), unique=True, index=True, nullable=False)  # UUID
+
+    # Device info
+    patient_intake_id = Column(Integer, ForeignKey("patient_intakes.id"), nullable=False, index=True)
+    device_type = Column(String(50), nullable=False)  # fitbit, apple_health, garmin, samsung_health, oura
+    device_name = Column(String(100), nullable=True)  # e.g., "Fitbit Sense"
+    device_id = Column(String(100), nullable=True)  # Device serial or unique ID
+
+    # Data type
+    data_category = Column(String(50), nullable=False, index=True)  # heart_rate, steps, sleep, blood_pressure, temperature, etc.
+    measurement_type = Column(String(50), nullable=True)  # resting, active, peak, etc.
+
+    # Measurements
+    value = Column(Float, nullable=True)  # Numeric value
+    unit = Column(String(20), nullable=True)  # bpm, steps, minutes, mmHg, etc.
+    min_value = Column(Float, nullable=True)  # For ranges
+    max_value = Column(Float, nullable=True)
+
+    # Time-series
+    measurement_date = Column(DateTime, nullable=False, index=True)  # When measurement was taken
+    start_time = Column(DateTime, nullable=True)  # For period measurements (sleep, activity)
+    end_time = Column(DateTime, nullable=True)
+
+    # Data quality
+    data_source = Column(String(100), nullable=True)  # raw_device, filtered, calculated
+    confidence = Column(Float, nullable=True)  # 0-1 confidence score
+    quality_flags = Column(JSON, nullable=True)  # [{flag: "outlier", severity: "low"}]
+
+    # Metadata
+    raw_data = Column(JSON, nullable=True)  # Store raw API response for debugging
+    sync_status = Column(String(20), default="completed")  # pending, completed, error
+    sync_error = Column(Text, nullable=True)
+    synced_at = Column(DateTime, default=func.now(), nullable=False, index=True)
+
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    patient = relationship("PatientIntake", foreign_keys=[patient_intake_id])
+
+    def __repr__(self):
+        return f"<WearableDeviceData(id={self.data_id}, type={self.device_type}, category={self.data_category})>"
+
+
+class WearableDeviceAuth(Base):
+    """OAuth credentials for wearable device integration"""
+    __tablename__ = "wearable_device_auth"
+
+    id = Column(Integer, primary_key=True, index=True)
+    auth_id = Column(String(36), unique=True, index=True, nullable=False)  # UUID
+
+    # Patient association
+    patient_intake_id = Column(Integer, ForeignKey("patient_intakes.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # Device info
+    device_type = Column(String(50), nullable=False, index=True)  # fitbit, apple_health, garmin
+    device_user_id = Column(String(100), nullable=False)  # Device-specific user ID
+
+    # OAuth tokens
+    access_token = Column(Text, nullable=False)
+    refresh_token = Column(Text, nullable=True)
+    token_type = Column(String(20), default="Bearer")
+    expires_at = Column(DateTime, nullable=True)
+
+    # Scope and permissions
+    scopes = Column(Text, nullable=True)  # Comma-separated scopes requested
+    permissions = Column(JSON, nullable=True)  # Actual permissions granted
+
+    # Sync configuration
+    auto_sync_enabled = Column(Boolean, default=True)
+    last_sync_at = Column(DateTime, nullable=True, index=True)
+    sync_interval_minutes = Column(Integer, default=5)  # Sync every 5 minutes
+    sync_error_count = Column(Integer, default=0)
+
+    # Status
+    is_active = Column(Boolean, default=True, index=True)
+    is_revoked = Column(Boolean, default=False)
+    revoked_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    patient = relationship("PatientIntake", foreign_keys=[patient_intake_id])
+    user = relationship("User", foreign_keys=[user_id])
+
+    def __repr__(self):
+        return f"<WearableDeviceAuth(device={self.device_type}, patient={self.patient_intake_id}, active={self.is_active})>"
+
+
+class WearableSyncLog(Base):
+    """Log of wearable device sync attempts for debugging"""
+    __tablename__ = "wearable_sync_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    log_id = Column(String(36), unique=True, index=True, nullable=False)
+
+    # Auth reference
+    auth_id = Column(String(36), ForeignKey("wearable_device_auth.auth_id"), nullable=False, index=True)
+
+    # Sync details
+    sync_started_at = Column(DateTime, default=func.now(), nullable=False)
+    sync_completed_at = Column(DateTime, nullable=True)
+    duration_seconds = Column(Float, nullable=True)
+
+    # Results
+    status = Column(String(20), nullable=False)  # success, partial, error
+    records_synced = Column(Integer, default=0)
+    records_failed = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+
+    # Data range
+    data_start_date = Column(DateTime, nullable=True)
+    data_end_date = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=func.now())
+
+    def __repr__(self):
+        return f"<WearableSyncLog(auth_id={self.auth_id}, status={self.status}, synced={self.records_synced})>"
