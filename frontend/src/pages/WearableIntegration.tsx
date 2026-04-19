@@ -22,6 +22,7 @@ import {
   TableRow,
   Chip,
   CircularProgress,
+  Divider,
 } from "@mui/material";
 import {
   Watch,
@@ -32,7 +33,7 @@ import {
   Delete,
 } from "@mui/icons-material";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
-import axios from "axios";
+import apiClient from "../services/apiClient";
 
 interface WearableDevice {
   device_id: string;
@@ -77,7 +78,7 @@ const WearableIntegration: React.FC = () => {
 
   const loadDevices = async () => {
     try {
-      const response = await axios.get("/api/wearable/devices");
+      const response = await apiClient.get("/api/wearable/devices");
       setDevices(response.data.devices || []);
       if (response.data.today_stats) {
         setTodayStats(response.data.today_stats);
@@ -98,7 +99,7 @@ const WearableIntegration: React.FC = () => {
   const startOAuthFlow = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
+      const response = await apiClient.get(
         `/api/wearable/auth/${selectedDeviceType}/url`
       );
       if (response.data.auth_url) {
@@ -115,7 +116,7 @@ const WearableIntegration: React.FC = () => {
   const syncNow = async () => {
     setSyncInProgress(true);
     try {
-      const response = await axios.post("/api/wearable/sync-now");
+      const response = await apiClient.post("/api/wearable/sync-now");
       setSuccess("Wearable data synced successfully!");
       await loadDevices();
     } catch (err: any) {
@@ -128,7 +129,7 @@ const WearableIntegration: React.FC = () => {
   const deleteDevice = async (deviceId: string) => {
     if (window.confirm("Are you sure you want to disconnect this device?")) {
       try {
-        await axios.delete(`/api/wearable/devices/${deviceId}`);
+        await apiClient.delete(`/api/wearable/devices/${deviceId}`);
         setSuccess("Device disconnected");
         await loadDevices();
       } catch (err: any) {

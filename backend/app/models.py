@@ -391,7 +391,7 @@ class KnowledgeDocument(Base):
     __table_args__ = (
         UniqueConstraint("file_hash", name="uq_knowledge_documents_file_hash"),
     )
-    
+
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(String(36), unique=True, index=True, nullable=False)  # UUID
     filename = Column(String(255), nullable=False)
@@ -399,33 +399,64 @@ class KnowledgeDocument(Base):
     file_hash = Column(String(64), nullable=False)  # SHA-256 hash
     file_size = Column(Integer, nullable=False)
     extension = Column(String(10), nullable=False)
-    
+
     # Content metadata
     text_length = Column(Integer, default=0)
     chunk_count = Column(Integer, default=0)
-    
+
     # Indexing status
     is_indexed = Column(Boolean, default=False)
     indexed_at = Column(DateTime, nullable=True)
     indexing_error = Column(Text, nullable=True)
-    
+
     # Metadata
     source = Column(String(100), nullable=True)  # e.g., "CDC", "WHO", "PubMed"
     category = Column(String(100), nullable=True)  # e.g., "Clinical Guidelines", "Research Paper"
     tags = Column(Text, nullable=True)  # JSON array of tags
     description = Column(Text, nullable=True)
-    
+
     # User tracking
     uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     uploaded_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     uploaded_by = relationship("User", foreign_keys=[uploaded_by_id])
     extracted_images = relationship("ExtractedImage", back_populates="document", cascade="all, delete-orphan")
-    
+    chunks = relationship("KnowledgeChunk", back_populates="document", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<KnowledgeDocument(id={self.document_id}, filename={self.filename})>"
+
+
+class KnowledgeChunk(Base):
+    """Knowledge base chunk model for storing document chunks with embeddings"""
+    __tablename__ = "knowledge_chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chunk_id = Column(String(36), unique=True, index=True, nullable=False)  # UUID
+    document_id = Column(String(36), ForeignKey("knowledge_documents.document_id"), nullable=False, index=True)
+
+    # Chunk content
+    chunk_index = Column(Integer, nullable=False)
+    text_content = Column(Text, nullable=False)
+    text_length = Column(Integer, nullable=False)
+
+    # Embedding metadata
+    embedding_id = Column(String(100), nullable=True)  # Reference to embedding in vector store
+    embedding_model = Column(String(50), nullable=True)
+
+    # Additional metadata (attribute name cannot be `metadata` in Declarative models)
+    chunk_metadata = Column("metadata", JSON, nullable=True)  # Flexible metadata storage
+
+    # Timestamps
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    # Relationships
+    document = relationship("KnowledgeDocument", back_populates="chunks")
+
+    def __repr__(self):
+        return f"<KnowledgeChunk(id={self.chunk_id}, doc={self.document_id}, idx={self.chunk_index})>"
 
 class DocumentProcessingStatus(Base):
     """Track processing status of uploaded documents during background embedding"""

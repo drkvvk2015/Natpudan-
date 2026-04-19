@@ -2,15 +2,22 @@
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import List, Optional
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import User
+from app.api.auth_new import get_current_user
+from app.crud import (
+    create_conversation,
+    get_user_conversations,
+    get_conversation,
+    delete_conversation as delete_conversation_db,
+    create_message,
+    get_conversation_messages,
+)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
-
-# In-memory storage (replace with database in production)
-conversations_db: Dict[int, Dict[str, Any]] = {}
-next_conversation_id = 1
-next_message_id = 1
 
 
 class ChatMessageRequest(BaseModel):
@@ -47,102 +54,104 @@ class ConversationDetails(BaseModel):
 
 
 @router.post("/message", response_model=ChatMessageResponse)
-async def send_message(request: ChatMessageRequest):
+async def send_message(
+    request: ChatMessageRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Send a chat message and get AI response."""
-    global next_conversation_id, next_message_id
-    
     # Get or create conversation
     conversation_id = request.conversation_id
-    if conversation_id is None or conversation_id not in conversations_db:
-        conversation_id = next_conversation_id
-        next_conversation_id += 1
-        conversations_db[conversation_id] = {
-            "id": conversation_id,
-            "title": request.message[:50] + "..." if len(request.message) > 50 else request.message,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-            "messages": []
-        }
-    
-    # Add user message
-    user_message = {
-        "id": next_message_id,
-        "role": "user",
-        "content": request.message,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    next_message_id += 1
-    conversations_db[conversation_id]["messages"].append(user_message)
-    
-    # Generate AI response (stub implementation)
-    # TODO: Integrate with actual AI/LLM service
+    conversation = None
+    if conversation_id is not None:
+        conversation = get_conversation(db, conversation_id, current_user.id)
+
+    if conversation is None:
+        title = request.message[:50] + "..." if len(request.message) > 50 else request.message
+        conversation = create_conversation(db, user_id=current_user.id, title=title)
+
+    create_message(db, conversation.id, "user", request.message)
+
+    # Generate deterministic fallback response for local/test environments.
     ai_response_content = generate_ai_response(request.message)
-    
-    ai_message = {
-        "id": next_message_id,
-        "role": "assistant",
-        "content": ai_response_content,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    next_message_id += 1
-    conversations_db[conversation_id]["messages"].append(ai_message)
-    
-    # Update conversation timestamp
-    conversations_db[conversation_id]["updated_at"] = datetime.utcnow().isoformat()
-    
+
+    ai_message = create_message(db, conversation.id, "assistant", ai_response_content)
+
     return {
-        "message": ai_message,
-        "conversation_id": conversation_id
+        "message": {
+            "id": ai_message.id,
+            "role": ai_message.role,
+            "content": ai_message.content,
+            "timestamp": ai_message.created_at.isoformat(),
+        },
+        "conversation_id": conversation.id,
     }
 
 
 @router.get("/history", response_model=List[Conversation])
-async def get_conversations():
-    """Get list of all conversations."""
-    conversations = []
-    for conv_id, conv in conversations_db.items():
-        conversations.append({
-            "id": conv["id"],
-            "title": conv["title"],
-            "created_at": conv["created_at"],
-            "updated_at": conv["updated_at"],
-            "message_count": len(conv["messages"])
-        })
-    
-    # Sort by updated_at descending
-    conversations.sort(key=lambda x: x["updated_at"], reverse=True)
+async def get_conversations_with_user(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    conversations = [
+        {
+            "id": conv.id,
+            "title": conv.title or "Untitled conversation",
+            "created_at": conv.created_at.isoformat(),
+            "updated_at": conv.updated_at.isoformat(),
+            "message_count": len(conv.messages),
+        }
+        for conv in get_user_conversations(db, current_user.id)
+    ]
     return conversations
 
 
 @router.get("/history/{conversation_id}", response_model=ConversationDetails)
-async def get_conversation(conversation_id: int):
+async def get_conversation_detail(
+    conversation_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Get a specific conversation with all messages."""
-    if conversation_id not in conversations_db:
+    conversation = get_conversation(db, conversation_id, current_user.id)
+    if conversation is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found"
         )
-    
-    conv = conversations_db[conversation_id]
+
+    messages = get_conversation_messages(db, conversation.id)
     return {
-        "id": conv["id"],
-        "title": conv["title"],
-        "created_at": conv["created_at"],
-        "updated_at": conv["updated_at"],
-        "messages": conv["messages"]
+        "id": conversation.id,
+        "title": conversation.title or "Untitled conversation",
+        "created_at": conversation.created_at.isoformat(),
+        "updated_at": conversation.updated_at.isoformat(),
+        "messages": [
+            {
+                "id": message.id,
+                "role": message.role,
+                "content": message.content,
+                "timestamp": message.created_at.isoformat(),
+            }
+            for message in messages
+        ],
     }
 
 
 @router.delete("/history/{conversation_id}")
-async def delete_conversation(conversation_id: int):
+async def delete_conversation(
+    conversation_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Delete a conversation."""
-    if conversation_id not in conversations_db:
+    deleted = delete_conversation_db(db, conversation_id, current_user.id)
+    if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found"
         )
-    
-    del conversations_db[conversation_id]
+
     return {"message": "Conversation deleted successfully"}
 
 

@@ -7,7 +7,7 @@ Added fallback: if FAISS or OpenAI client unavailable, perform simple keyword se
 import logging
 import os
 import pickle
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 import numpy as np
 from datetime import datetime
@@ -218,7 +218,7 @@ class VectorKnowledgeBase:
         chunks_added = 0
         documents_batch = []
         
-        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings_batch)):
+        for i, (chunk, _emb) in enumerate(zip(chunks, embeddings_batch, strict=False)):
             # Store chunk with metadata
             chunk_metadata = metadata.copy()
             chunk_metadata.update({
@@ -349,7 +349,7 @@ class VectorKnowledgeBase:
         
         # Collect results
         results = []
-        for distance, idx in zip(distances[0], indices[0]):
+        for distance, idx in zip(distances[0], indices[0], strict=False):
             if idx >= len(self.documents):
                 continue
             

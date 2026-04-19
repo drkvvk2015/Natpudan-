@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Box,
   Paper,
@@ -59,7 +59,8 @@ import {
   Science as LabIcon,
   Biotech as BiologyIcon,
 } from '@mui/icons-material'
-import axios from 'axios'
+import apiClient from '../services/apiClient'
+import { useLiveDiagnosis } from '../hooks/useLiveDiagnosis'
 import PatientSelector from '../components/PatientSelector'
 import EnhancedMedicalHistory, { type MedicalHistoryItem, type SmokingHistory } from '../components/EnhancedMedicalHistory'
 import { OPDCaseSheetService } from '../services/opdCaseSheetService'
@@ -315,11 +316,6 @@ export default function ClinicalCaseSheet() {
   const [assessment, setAssessment] = useState('')
   const [plan, setPlan] = useState('')
 
-  // AI Diagnosis state
-  const [liveDiagnosis, setLiveDiagnosis] = useState<LiveDiagnosisResponse | null>(null)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const debounceTimerRef = useRef<number | null>(null)
-
   // Helper functions for complaints
   const addComplaint = () => {
     const newComplaint: Complaint = {
@@ -502,76 +498,48 @@ export default function ClinicalCaseSheet() {
     }
   }, [vitalSigns.height, vitalSigns.weight])
 
-  // Live diagnosis with debouncing
-  const fetchLiveDiagnosis = useCallback(async () => {
-    // Only fetch if we have at least one complaint
-    if (complaints.every(c => !c.complaint.trim())) {
-      setLiveDiagnosis(null)
-      return
+  const hasComplaints = (complaints || []).some(c => c.complaint?.trim())
+
+  const buildLiveDiagnosisPayload = useCallback(() => {
+    const vitalSignsObj: Record<string, string> = {}
+    if (vitalSigns.bloodPressure) vitalSignsObj.BP = vitalSigns.bloodPressure
+    if (vitalSigns.pulse) vitalSignsObj.HR = vitalSigns.pulse
+    if (vitalSigns.temperature) vitalSignsObj.TEMP = vitalSigns.temperature
+    if (vitalSigns.oxygenSaturation) vitalSignsObj.SPO2 = vitalSigns.oxygenSaturation
+    if (vitalSigns.respiratoryRate) vitalSignsObj.RR = vitalSigns.respiratoryRate
+
+    const anthropometry: Record<string, string> = {}
+    if (vitalSigns.height) anthropometry.height = vitalSigns.height
+    if (vitalSigns.weight) anthropometry.weight = vitalSigns.weight
+    if (vitalSigns.bmi) anthropometry.bmi = vitalSigns.bmi
+
+    const fullHistory = [
+      presentHistory.onset && `Onset: ${presentHistory.onset}`,
+      presentHistory.chronology?.length && `Timeline: ${presentHistory.chronology.join(' -> ')}`,
+      enhancedHistory.medicalHistory?.length && `Past Medical History: ${enhancedHistory.medicalHistory.map(h => `${h.condition} (${h.duration} ${h.durationUnit})`).join(', ')}`,
+      enhancedHistory.smokingHistory?.isSmoker && `Smoking: ${enhancedHistory.smokingHistory.packsPerDay} packs/day for ${enhancedHistory.smokingHistory.yearsSmoked} years (${enhancedHistory.smokingHistory.packYears} pack-years)`,
+      familyHistory?.length && `Family History: ${familyHistory.join(', ')}`,
+      Object.values(reviewOfSystems).some(arr => arr?.length) && `Review of Systems: ${Object.entries(reviewOfSystems).filter(([_, symptoms]) => symptoms?.length).map(([system, symptoms]) => `${system}: ${symptoms.join(', ')}`).join('; ')}`
+    ].filter(Boolean).join('\n\n')
+
+    return {
+      complaints: (complaints || []).filter(c => c.complaint?.trim()).map(c => ({
+        complaint: c.complaint,
+        duration: c.duration,
+        severity: c.severity
+      })),
+      patient_history: fullHistory,
+      vital_signs: vitalSignsObj,
+      anthropometry,
+      clinical_findings: clinicalFindings,
     }
+  }, [clinicalFindings, complaints, enhancedHistory, familyHistory, presentHistory, reviewOfSystems, vitalSigns])
 
-    setIsAnalyzing(true)
-    try {
-      // Prepare vital signs
-      const vitalSignsObj: any = {}
-      if (vitalSigns.bloodPressure) vitalSignsObj.BP = vitalSigns.bloodPressure
-      if (vitalSigns.pulse) vitalSignsObj.HR = vitalSigns.pulse
-      if (vitalSigns.temperature) vitalSignsObj.TEMP = vitalSigns.temperature
-      if (vitalSigns.oxygenSaturation) vitalSignsObj.SPO2 = vitalSigns.oxygenSaturation
-      if (vitalSigns.respiratoryRate) vitalSignsObj.RR = vitalSigns.respiratoryRate
-
-      const anthropometry: any = {}
-      if (vitalSigns.height) anthropometry.height = vitalSigns.height
-      if (vitalSigns.weight) anthropometry.weight = vitalSigns.weight
-      if (vitalSigns.bmi) anthropometry.bmi = vitalSigns.bmi
-
-      // Build comprehensive history string
-      const fullHistory = [
-        presentHistory.onset && `Onset: ${presentHistory.onset}`,
-        presentHistory.chronology?.length && `Timeline: ${presentHistory.chronology.join(' -> ')}`,
-        enhancedHistory.medicalHistory?.length && `Past Medical History: ${enhancedHistory.medicalHistory.map(h => `${h.condition} (${h.duration} ${h.durationUnit})`).join(', ')}`,
-        enhancedHistory.smokingHistory?.isSmoker && `Smoking: ${enhancedHistory.smokingHistory.packsPerDay} packs/day for ${enhancedHistory.smokingHistory.yearsSmoked} years (${enhancedHistory.smokingHistory.packYears} pack-years)`,
-        familyHistory?.length && `Family History: ${familyHistory.join(', ')}`,
-        Object.values(reviewOfSystems).some(arr => arr?.length) && `Review of Systems: ${Object.entries(reviewOfSystems).filter(([_, symptoms]) => symptoms?.length).map(([system, symptoms]) => `${system}: ${symptoms.join(', ')}`).join('; ')}`
-      ].filter(Boolean).join('\n\n')
-
-      const response = await axios.post('/api/medical/live-diagnosis', {
-        complaints: (complaints || []).filter(c => c.complaint?.trim()).map(c => ({
-          complaint: c.complaint,
-          duration: c.duration,
-          severity: c.severity
-        })),
-        patient_history: fullHistory,
-        vital_signs: vitalSignsObj,
-        anthropometry: anthropometry,
-        clinical_findings: clinicalFindings
-      })
-
-      setLiveDiagnosis(response.data)
-    } catch (error) {
-      console.error('Error in live diagnosis:', error)
-      setLiveDiagnosis(null)
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }, [complaints, presentHistory, enhancedHistory, familyHistory, reviewOfSystems, vitalSigns, clinicalFindings])
-
-  // Debounce live diagnosis
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
-    }
-
-    debounceTimerRef.current = window.setTimeout(() => {
-      fetchLiveDiagnosis()
-    }, 1500)
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
-    }
-  }, [fetchLiveDiagnosis])
+  const { liveDiagnosis, isAnalyzing } = useLiveDiagnosis<LiveDiagnosisResponse>({
+    isEnabled: hasComplaints,
+    buildPayload: buildLiveDiagnosisPayload,
+    delayMs: 1500,
+  })
 
   // Missing state and functions needed for the complete functionality
   const [treatmentPlan, setTreatmentPlan] = useState<any | null>(null)
@@ -585,7 +553,7 @@ export default function ClinicalCaseSheet() {
 
     try {
       const primaryDiagnosis = liveDiagnosis.differential_diagnoses[0]
-      const response = await axios.post('/api/treatment-plans/suggest', {
+      const response = await apiClient.post('/api/medical/live-diagnosis/suggest-treatment', {
         diagnosis: primaryDiagnosis.diagnosis || primaryDiagnosis.disease_name,
         patient_age: parseInt(age) || undefined,
         patient_gender: sex,
@@ -607,7 +575,7 @@ export default function ClinicalCaseSheet() {
 
     try {
       const primaryDiagnosis = liveDiagnosis.differential_diagnoses[0]
-      const response = await axios.post('/api/prescription/generate', {
+      const response = await apiClient.post('/api/prescription/generate', {
         diagnosis: primaryDiagnosis.diagnosis || primaryDiagnosis.disease_name,
         patient_age: parseInt(age) || undefined,
         patient_weight: parseFloat(vitalSigns.weight) || undefined,

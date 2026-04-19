@@ -1,19 +1,23 @@
 """Wearable Device Sync Service"""
 import logging
 from datetime import datetime
+from typing import Any, Dict, List
+
+from sqlalchemy.orm import Session
+
 logger = logging.getLogger(__name__)
-_wearable_sync = None
+_wearable_sync: "WearableSync | None" = None
 
 class WearableSync:
-    def __init__(self):
+    def __init__(self) -> None:
         pass
-    
-    async def fetch_fitbit_data(self, access_token: str, user_id: str, data_type: str = "heart_rate"):
+
+    async def fetch_fitbit_data(self, access_token: str, user_id: str, data_type: str = "heart_rate") -> Dict[str, Any]:
         try:
             import requests
             headers = {"Authorization": f"Bearer {access_token}"}
             url = f"https://api.fitbit.com/1/user/{user_id}/activities/heart/date/today/1d.json"
-            resp = requests.get(url, headers=headers)
+            resp = requests.get(url, headers=headers, timeout=30)
             if resp.status_code == 200:
                 data = resp.json().get('activities-heart', [])
                 return {"success": True, "data": data}
@@ -21,8 +25,8 @@ class WearableSync:
         except Exception as e:
             logger.error(f"[WEARABLE] Fitbit fetch error: {e}")
             return {"success": False, "error": str(e)}
-    
-    async def import_wearable_data(self, db, patient_intake_id: int, device_type: str, data_entries: list):
+
+    async def import_wearable_data(self, db: Session, patient_intake_id: int, device_type: str, data_entries: List[Dict[str, Any]]) -> Dict[str, Any]:
         try:
             from app.models import WearableDeviceData
             import uuid

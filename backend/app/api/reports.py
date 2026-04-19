@@ -635,7 +635,6 @@ async def generate_prescription(request: dict):
     """Generate prescription PDF"""
     try:
         # Implementation for prescription-only PDF
-        generator = EnhancedPDFGenerator()
         # Add prescription-specific generation logic here
         
         return {"message": "Prescription PDF generation endpoint - to be implemented"}
@@ -648,7 +647,6 @@ async def generate_medical_history(request: dict):
     """Generate medical history PDF"""
     try:
         # Implementation for medical history PDF
-        generator = EnhancedPDFGenerator()
         # Add medical history-specific generation logic here
         
         return {"message": "Medical history PDF generation endpoint - to be implemented"}

@@ -184,7 +184,6 @@ class PDFOCRProcessor:
                     image_ext = base_image["ext"]
                     
                     # Generate unique image filename
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     image_hash = hashlib.md5(image_bytes).hexdigest()[:8]
                     doc_id_prefix = f"{document_id}_" if document_id else ""
                     image_filename = f"{doc_id_prefix}{pdf_name}_p{page_num + 1}_img{img_index + 1}_{image_hash}.{image_ext}"
@@ -261,7 +260,7 @@ class PDFOCRProcessor:
                 }
             
             # Convert PDF to images
-            logger.info(f"[OCR] Converting PDF to images for OCR...")
+            logger.info("[OCR] Converting PDF to images for OCR...")
             images = convert_from_path(str(pdf_path), dpi=max(150, min(600, int(ocr_dpi))))
             
             text_parts = []
@@ -329,7 +328,7 @@ class PDFOCRProcessor:
                 import pytesseract
                 pytesseract.get_tesseract_version()
                 instructions['tesseract_available'] = True
-            except:
+            except Exception:
                 instructions['instructions'].append({
                     'component': 'Tesseract OCR',
                     'status': 'missing',
@@ -356,7 +355,7 @@ class PDFOCRProcessor:
                 from pdf2image import convert_from_path
                 # Try a dummy conversion to check poppler
                 instructions['poppler_available'] = True
-            except:
+            except Exception:
                 instructions['instructions'].append({
                     'component': 'Poppler',
                     'status': 'missing',

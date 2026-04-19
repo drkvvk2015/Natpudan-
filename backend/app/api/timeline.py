@@ -118,51 +118,48 @@ async def get_patient_timeline(
                     event_type="intake",
                     date=patient.created_at,
                     title="Patient Intake Created",
-                    description=f"Patient {patient.name} (UHID: {patient.uhid}) registered in the system",
+                    description=f"Patient {patient.name} (ID: {patient.intake_id}) registered in the system",
                     status="completed",
                     related_id=patient.intake_id,
                     metadata={
                         "age": patient.age,
-                        "sex": patient.sex,
-                        "uhid": patient.uhid,
-                        "contact": patient.contact_number
+                        "gender": patient.gender,
+                        "intake_id": patient.intake_id,
                     }
                 ))
         
         # 2. TRAVEL HISTORY EVENTS
         if not filter_types or 'travel' in filter_types:
             travel_records = db.query(TravelHistory).filter(
-                TravelHistory.intake_id == patient_intake_id
+                TravelHistory.patient_intake_id == patient_intake_id
             ).all()
-            
+
             for travel in travel_records:
-                travel_date = format_date(travel.travel_date)
+                travel_date = format_date(travel.departure_date)
                 if (not filter_start or travel_date >= filter_start) and \
                    (not filter_end or travel_date <= filter_end):
                     events.append(create_event(
                         event_id=f"travel-{travel.id}",
                         event_type="travel",
-                        date=travel.travel_date,
+                        date=travel.departure_date,
                         title=f"Travel to {travel.destination}",
-                        description=f"Patient traveled to {travel.destination} ({travel.country}). Purpose: {travel.purpose}. Duration: {travel.duration_days} days",
+                        description=f"Patient traveled to {travel.destination}. Purpose: {travel.purpose}. Duration: {travel.duration or 'N/A'}",
                         status="completed",
                         related_id=str(travel.id),
                         metadata={
                             "destination": travel.destination,
-                            "country": travel.country,
                             "purpose": travel.purpose,
-                            "duration_days": travel.duration_days
+                            "duration": travel.duration
                         }
                     ))
         
         # 3. FAMILY HISTORY EVENTS
         if not filter_types or 'family_history' in filter_types:
             family_records = db.query(FamilyHistory).filter(
-                FamilyHistory.intake_id == patient_intake_id
+                FamilyHistory.patient_intake_id == patient_intake_id
             ).all()
-            
+
             for family in family_records:
-                # Use patient intake date for family history (since no specific date)
                 family_date = format_date(patient.created_at)
                 if (not filter_start or family_date >= filter_start) and \
                    (not filter_end or family_date <= filter_end):
@@ -170,12 +167,12 @@ async def get_patient_timeline(
                         event_id=f"family-{family.id}",
                         event_type="family_history",
                         date=patient.created_at,
-                        title=f"Family Medical History: {family.relation}",
-                        description=f"{family.relation} - {family.condition}. Notes: {family.notes or 'N/A'}",
+                        title=f"Family Medical History: {family.family_relationship}",
+                        description=f"{family.family_relationship} - {family.condition}. Notes: {family.notes or 'N/A'}",
                         status="noted",
                         related_id=str(family.id),
                         metadata={
-                            "relation": family.relation,
+                            "relationship": family.family_relationship,
                             "condition": family.condition,
                             "notes": family.notes
                         }

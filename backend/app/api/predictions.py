@@ -6,7 +6,7 @@ Exposes ML prediction endpoints for readmission risk, drug interactions, etc.
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 import logging
 
 from app.database import SessionLocal
@@ -62,7 +62,6 @@ def predict_readmission_risk(
             raise HTTPException(status_code=404, detail="Patient not found")
 
         # Build patient data dict
-        import json
         patient_data = {
             "age": patient.age,
             "bmi": patient.bmi,
@@ -80,7 +79,7 @@ def predict_readmission_risk(
                 FamilyHistory.patient_intake_id == patient_intake_id
             ).all()
             patient_data["family_history"] = [r.condition for r in family_records]
-        except:
+        except Exception:
             pass
 
         # Get current/last treatment plan
@@ -102,7 +101,7 @@ def predict_readmission_risk(
                     # Count active medications
                     meds = db.query(Medication).filter(
                         Medication.treatment_plan_id == treatment_plan_id,
-                        Medication.is_active == True
+                        Medication.is_active.is_(True)
                     ).all()
                     patient_data["medication_count"] = len(meds)
 
@@ -112,7 +111,7 @@ def predict_readmission_risk(
                         TreatmentPlan.id < treatment_plan_id
                     ).count()
                     patient_data["previous_readmissions"] = max(0, prev_plans - 1)
-            except:
+            except Exception:
                 pass
 
         # Predict
@@ -146,7 +145,7 @@ def predict_readmission_risk(
         raise
     except Exception as e:
         logger.error(f"[PREDICTIONS] Error predicting readmission: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/readmission-risk/{patient_intake_id}")
@@ -185,7 +184,7 @@ def get_model_stats() -> Dict:
         }
     except Exception as e:
         logger.error(f"[PREDICTIONS] Error getting model stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/train-model")
@@ -201,7 +200,7 @@ def train_model(db: Session = Depends(get_db)) -> Dict:
         result = trainer.train_readmission_model(db)
 
         if result.get("status") == "success":
-            logger.info(f"[PREDICTIONS] Model training completed successfully")
+            logger.info("[PREDICTIONS] Model training completed successfully")
             logger.info(f"  Accuracy: {result['metrics']['accuracy']:.3f}")
             logger.info(f"  AUC-ROC: {result['metrics']['auc_roc']:.3f}")
             return {"success": True, **result}
@@ -210,7 +209,7 @@ def train_model(db: Session = Depends(get_db)) -> Dict:
 
     except Exception as e:
         logger.error(f"[PREDICTIONS] Error training model: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/alerts/high-risk-patients")
@@ -238,7 +237,7 @@ def get_high_risk_patients(
         }
     except Exception as e:
         logger.error(f"[PREDICTIONS] Error getting high-risk patients: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/alerts/patient/{patient_intake_id}")
@@ -276,7 +275,7 @@ def get_patient_alerts(
         }
     except Exception as e:
         logger.error(f"[PREDICTIONS] Error getting patient alerts: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/alerts/{alert_id}/acknowledge")
@@ -316,4 +315,4 @@ def acknowledge_alert(
         raise
     except Exception as e:
         logger.error(f"[PREDICTIONS] Error acknowledging alert: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

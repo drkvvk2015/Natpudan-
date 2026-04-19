@@ -11,7 +11,7 @@ This system monitors the application for errors and automatically attempts to fi
 
 import logging
 import traceback
-from typing import Optional, Dict, Any, Callable
+from typing import Dict, Any, Callable
 from datetime import datetime
 import psutil
 import time
@@ -111,7 +111,7 @@ class ErrorCorrector:
                     if hasattr(kb, 'clear_cache'):
                         kb.clear_cache()
                         logger.info("Knowledge base cache cleared")
-                except:
+                except Exception:
                     pass
             
             return True
@@ -178,7 +178,7 @@ class ErrorCorrector:
                         try:
                             proc = psutil.Process(conn.pid)
                             logger.warning(f"Process {conn.pid} is using port {port}: {proc.name()}")
-                        except:
+                        except Exception:
                             pass
             
             return False

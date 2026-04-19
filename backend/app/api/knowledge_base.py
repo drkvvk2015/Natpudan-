@@ -4,13 +4,10 @@ Supports: Multiple PDF uploads, Full text extraction, Intelligent chunking
 """
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-import os
 import logging
 from pathlib import Path
-import shutil
 from datetime import datetime
 import re
 import unicodedata
@@ -43,9 +40,10 @@ async def test_kb():
 MAX_FILE_SIZE = 1024 * 1024 * 1024  # 1GB per file (increased for large medical textbooks)
 MAX_TOTAL_SIZE = 5 * 1024 * 1024 * 1024  # 5GB total
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".doc", ".docx"}
-UPLOAD_DIR = Path("data/knowledge_base/uploads")
+_backend_dir = Path(__file__).resolve().parent.parent.parent
+UPLOAD_DIR = _backend_dir / "data" / "knowledge_base" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-CANONICAL_TEXT_DIR = Path("data/knowledge_base/text")
+CANONICAL_TEXT_DIR = _backend_dir / "data" / "knowledge_base" / "text"
 CANONICAL_TEXT_DIR.mkdir(parents=True, exist_ok=True)
 
 UPLOAD_METRICS: Dict[str, Any] = {
@@ -137,9 +135,9 @@ def infer_year_from_name(name: str) -> Optional[int]:
     return None
 
 # Import large PDF processor
-from app.services.large_pdf_processor import get_large_pdf_processor
-from app.services.error_corrector import get_error_corrector, with_auto_correction
-from app.services.pdf_ocr_processor import get_pdf_ocr_processor
+from app.services.large_pdf_processor import get_large_pdf_processor  # noqa: E402
+from app.services.error_corrector import get_error_corrector  # noqa: E402
+from app.services.pdf_ocr_processor import get_pdf_ocr_processor  # noqa: E402
 
 
 class PDFProcessingRequest(BaseModel):
@@ -152,7 +150,7 @@ class PDFProcessingRequest(BaseModel):
 
 
 def normalize_extracted_text(text: str, remove_repeated_lines: bool = True) -> str:
-    """Normalize extracted text for better indexing quality.
+    r"""Normalize extracted text for better indexing quality.
 
     - Unicode normalize (NFKC)
     - Fix line-break hyphenation (e.g., medi-\ncal -> medical)
@@ -199,6 +197,33 @@ def _normalize_filename_for_match(filename: str) -> str:
     # Remove timestamp prefixes like 20260416_123000_
     name = re.sub(r"^\d{8}_\d{6}_", "", name)
     return name
+
+
+def _build_preview_chunks(text: str, chunk_size: int = 1200, max_chunks: int = 10) -> List[Dict[str, Any]]:
+    """Build lightweight preview chunks from canonical text when chunk rows are unavailable."""
+    if not text:
+        return []
+
+    previews: List[Dict[str, Any]] = []
+    start = 0
+    chunk_index = 0
+    while start < len(text) and chunk_index < max_chunks:
+        end = min(start + chunk_size, len(text))
+        piece = text[start:end].strip()
+        if piece:
+            previews.append(
+                {
+                    "chunk_id": f"preview-{chunk_index}",
+                    "chunk_index": chunk_index,
+                    "text": piece,
+                    "text_length": len(piece),
+                    "metadata": {"source": "canonical_text_preview"},
+                }
+            )
+            chunk_index += 1
+        start = end
+
+    return previews
 
 
 class SearchRequest(BaseModel):
@@ -867,7 +892,7 @@ async def add_to_knowledge_base(kb, text: str, source: str, metadata: Dict[str, 
         
         # Generate a pending task ID
         import hashlib
-        task_id = hashlib.md5(f"{source}{datetime.now().isoformat()}".encode()).hexdigest()[:16]
+        task_id = hashlib.md5(f"{source}{datetime.now().isoformat()}".encode(), usedforsecurity=False).hexdigest()[:16]
         pending_file = temp_dir / f"{task_id}.json"
         
         import json
@@ -893,7 +918,7 @@ async def add_to_knowledge_base(kb, text: str, source: str, metadata: Dict[str, 
     except Exception as e:
         logger.error(f"Failed to queue KB document: {e}")
         import hashlib
-        doc_id = hashlib.md5(f"{source}{text[:100]}".encode()).hexdigest()[:12]
+        doc_id = hashlib.md5(f"{source}{text[:100]}".encode(), usedforsecurity=False).hexdigest()[:12]
         return doc_id
 
 
@@ -972,7 +997,7 @@ async def get_statistics():
         enhanced_stats = enhanced_kb.get_statistics()
         
         # Use database count as primary source
-        enhanced_doc_count = db_doc_count
+        _enhanced_doc_count = db_doc_count  # noqa: F841
 
         # Uploads directory (files uploaded via API/UI)
         upload_files = [f for f in UPLOAD_DIR.glob("*") if f.is_file()]
@@ -1079,7 +1104,6 @@ async def get_statistics():
     except Exception as e:
         # Convert exception to ASCII-safe message without using str() which may trigger rich formatting
         import traceback
-        import sys
         tb_lines = traceback.format_exception(type(e), e, e.__traceback__)
         # Convert each line to ASCII
         safe_tb = []
@@ -1087,13 +1111,13 @@ async def get_statistics():
             try:
                 safe_line = line.encode('ascii', errors='replace').decode('ascii')
                 safe_tb.append(safe_line)
-            except:
+            except Exception:
                 safe_tb.append("Error in exception formatting")
         
         error_msg = "Unknown error"
         try:
             error_msg = repr(e).encode('ascii', errors='replace').decode('ascii')
-        except:
+        except Exception:
             error_msg = "Error occurred"
         
         logger.error(f"Error getting statistics: {error_msg}\nTraceback:\n{''.join(safe_tb)}")
@@ -1244,7 +1268,7 @@ async def search_knowledge_base(request: SearchRequest):
         }
     except Exception as e:
         logger.error(f"Search error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}") from e
 
 
 @router.post("/search/evaluate")
@@ -1434,7 +1458,7 @@ async def delete_document(
         }
     except Exception as e:
         logger.error(f"Error deleting document: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/upload-large")
@@ -1518,7 +1542,7 @@ async def upload_large_pdf(
         raise
     except Exception as e:
         logger.error(f"Error processing large PDF: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}") from e
 
 
 @router.get("/processor-stats")
@@ -1554,7 +1578,7 @@ async def clear_processor_cache(
         }
     except Exception as e:
         logger.error(f"Error clearing cache: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.delete("/documents/clear-all")
@@ -1585,7 +1609,7 @@ async def clear_all_documents(
     except Exception as e:
         db.rollback()
         logger.error(f"Error clearing knowledge base: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/error-report")
@@ -1596,7 +1620,7 @@ async def get_error_report(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/documents/list")
-async def list_documents(
+async def list_documents_with_metadata(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_user),
@@ -1644,10 +1668,12 @@ async def get_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     
-    # Get chunks for this document
-    chunks = db.query(KnowledgeChunk).filter(
-        KnowledgeChunk.document_id == doc.document_id
-    ).order_by(KnowledgeChunk.chunk_index).all()
+    canonical_path = CANONICAL_TEXT_DIR / f"{doc.document_id}.txt"
+    canonical_text = ""
+    if canonical_path.exists():
+        canonical_text = canonical_path.read_text(encoding="utf-8", errors="ignore")
+
+    preview_chunks = _build_preview_chunks(canonical_text)
     
     return {
         "id": doc.document_id,
@@ -1660,17 +1686,8 @@ async def get_document(
         "uploaded_at": doc.uploaded_at.isoformat(),
         "uploaded_by": doc.uploaded_by.email if doc.uploaded_by else None,
         "is_indexed": doc.is_indexed,
-        "chunks": [
-            {
-                "chunk_id": chunk.chunk_id,
-                "chunk_index": chunk.chunk_index,
-                "text": chunk.text_content,
-                "text_length": len(chunk.text_content),
-                "metadata": chunk.metadata
-            }
-            for chunk in chunks[:10]  # Limit to first 10 chunks for performance
-        ],
-        "total_chunks": len(chunks)
+        "chunks": preview_chunks,
+        "total_chunks": doc.chunk_count if doc.chunk_count is not None else len(preview_chunks)
     }
 
 
@@ -1721,7 +1738,7 @@ async def search_pubmed_online(
         }
     except Exception as e:
         logger.error(f"Error searching PubMed: {e}")
-        raise HTTPException(status_code=500, detail=f"PubMed search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"PubMed search failed: {str(e)}") from e
 
 
 @router.get("/online/guidelines")
@@ -1762,7 +1779,7 @@ async def get_clinical_guidelines(
         }
     except Exception as e:
         logger.error(f"Error fetching guidelines: {e}")
-        raise HTTPException(status_code=500, detail=f"Guidelines fetch failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Guidelines fetch failed: {str(e)}") from e
 
 
 @router.get("/online/drug-info")
@@ -1792,7 +1809,7 @@ async def get_drug_information(
         }
     except Exception as e:
         logger.error(f"Error fetching drug info: {e}")
-        raise HTTPException(status_code=500, detail=f"Drug info fetch failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Drug info fetch failed: {str(e)}") from e
 
 
 @router.get("/online/status")
@@ -1861,7 +1878,7 @@ async def clear_online_cache(current_user: User = Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"Error clearing online cache: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/search/enhanced")
@@ -1882,7 +1899,7 @@ async def enhanced_search(
     Returns: Text results + images + verification status
     """
     try:
-        from app.services.enhanced_kb_processor import EnhancedKBProcessor, enhance_kb_search
+        from app.services.enhanced_kb_processor import EnhancedKBProcessor
         
         # Get KB services
         kb_service = get_local_knowledge_base()
@@ -1906,7 +1923,7 @@ async def enhanced_search(
         
     except Exception as e:
         logger.error(f"Enhanced search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/images/{document_id}")
@@ -1938,7 +1955,7 @@ async def get_document_images(
         
     except Exception as e:
         logger.error(f"Error getting document images: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/extract-images/{document_id}")
@@ -2002,7 +2019,7 @@ async def extract_document_images(
         
     except Exception as e:
         logger.error(f"Error extracting images: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/reset")

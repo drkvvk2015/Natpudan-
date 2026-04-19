@@ -17,8 +17,9 @@ from datetime import datetime
 from app.database import SessionLocal
 from app.services.voice_transcriber import get_voice_transcriber
 from app.services.voice_to_soap import get_voice_to_soap
+from app.api.auth_new import get_current_user
 from app.models import VoiceRecording, Conversation, PatientIntake, DischargeSummary
-from app.schemas.discharge import DischargeSummaryCreate
+from app.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -106,13 +107,13 @@ async def upload_voice_recording(
         )
 
         # Get patient context for database
-        patient_context = None
+        _patient_context = None
         if patient_intake_id:
             patient = db.query(PatientIntake).filter(
                 PatientIntake.id == patient_intake_id
             ).first()
             if patient:
-                patient_context = {
+                _patient_context = {
                     "age": patient.age,
                     "gender": patient.gender,
                     "family_history": []
@@ -165,7 +166,8 @@ async def upload_voice_recording(
 @router.post("/generate-documentation")
 def generate_documentation(
     payload: Dict[str, Any],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict:
     """
     Generate final SOAP note and discharge summary from voice recording
@@ -240,7 +242,7 @@ def generate_documentation(
 
         # Build discharge summary text
         discharge = DischargeSummary(
-            created_by_id=1,  # TODO: Get from current user context
+            created_by_id=current_user.id,
             patient_name=patient.name,
             patient_age=patient.age,
             patient_gender=patient.gender,

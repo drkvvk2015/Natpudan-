@@ -1,32 +1,34 @@
 """FastAPI application entrypoint.
 
-This file was reconstructed after repository history cleanup to satisfy
-existing tests that import `app.main:app` and expect a set of medical,
-prescription, and diagnostic endpoints. The implementations here are
-minimal stubs that return deterministic structures required by tests.
-
-TODO: Replace stub logic with real service integrations (knowledge base,
-diagnosis engine, ICD code provider, etc.).
+This module prioritizes test compatibility and stable API behavior while the
+service layer continues to evolve. Endpoints here should remain deterministic,
+well-validated, and operational across local and CI environments.
 """
 
-from fastapi import FastAPI, APIRouter, File, UploadFile, HTTPException, Request
+from fastapi import FastAPI, APIRouter, File, UploadFile, HTTPException, Request, status
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response as StarletteResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from typing import List, Dict, Any
+from fastapi.responses import JSONResponse, RedirectResponse
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 import time
+import os
 import psutil
 import logging
-import asyncio
 
 from app.core.config import settings
 from app.logging_config import setup_logging, get_logger
 from app.middleware.request_context import RequestContextMiddleware
-from app.monitoring import init_monitoring
+from app.middleware.rate_limiter import RateLimiter
+from app.monitoring import record_http_metrics, render_prometheus_metrics
+from app.telemetry import instrument_fastapi_app
 from app.schemas.system import RootResponse, HealthResponse, DetailedHealthResponse
+from app.container import register_api_routers
+from app.lifespan import app_lifespan
 
-setup_logging(settings.LOG_LEVEL)
+setup_logging(getattr(logging, settings.LOG_LEVEL, logging.INFO))
 logger = get_logger(__name__)
 
 # Import error correction system
@@ -34,22 +36,7 @@ from app.services.error_corrector import get_error_corrector
 
 error_corrector = get_error_corrector()
 
-from app.api.auth_new import router as auth_router
-from app.api.chat_new import router as chat_router
-from app.api.discharge import router as discharge_router
-from app.api.treatment import router as treatment_router
-from app.api.timeline import router as timeline_router
-from app.api.analytics import router as analytics_router
-from app.api.fhir import router as fhir_router
-from app.api.health import router as health_router
-from app.api.knowledge_base import router as knowledge_router
-from app.api.reports import router as reports_router
-from app.api.predictions import router as predictions_router
-from app.api.voice import router as voice_router
-from app.api.voice_consul import router as voice_consul_router
-from app.api.knowledge_graph_viz import router as knowledge_graph_viz_router
-from app.api.wearable_auth import router as wearable_auth_router
-from app.database import init_db, SessionLocal
+from app.database import SessionLocal
 from sqlalchemy import text
 
 # Track application start time for uptime calculation
@@ -62,218 +49,21 @@ service_health = {
     "knowledge_base": False
 }
 
-# Dedicated async queue worker task (more reliable than request-triggered processing)
-_queue_worker_task: asyncio.Task | None = None
-
-
-async def _queue_worker_loop(interval_seconds: int = 5):
-    """Run upload queue processing in a dedicated background loop."""
-    from app.services.upload_queue_processor import process_upload_queue
-    logger.info(f"[QUEUE] Dedicated worker loop started (interval={interval_seconds}s)")
-    while True:
-        try:
-            process_upload_queue()
-        except Exception as e:
-            logger.warning(f"[QUEUE] Worker loop iteration failed: {e}")
-        await asyncio.sleep(interval_seconds)
-
-
-# Dedicated async wearable sync worker task
-_wearable_worker_task: asyncio.Task | None = None
-
-
-async def _wearable_sync_loop(interval_seconds: int = 300):
-    """Run wearable device data sync in a dedicated background loop (5-min intervals)."""
-    from app.services.wearable_sync import get_wearable_sync
-    from app.database import SessionLocal
-    from app.models import WearableDeviceAuth
-    from datetime import datetime, timedelta
-
-    logger.info(f"[WEARABLE] Sync worker loop started (interval={interval_seconds}s)")
-
-    while True:
-        try:
-            db = SessionLocal()
-            try:
-                # Find all active devices due for sync
-                now = datetime.utcnow()
-                due_devices = db.query(WearableDeviceAuth).filter(
-                    WearableDeviceAuth.is_active == True,
-                    WearableDeviceAuth.is_revoked == False,
-                    WearableDeviceAuth.auto_sync_enabled == True
-                ).all()
-
-                for auth in due_devices:
-                    # Check if sync is due
-                    if auth.last_sync_at:
-                        next_sync = auth.last_sync_at + timedelta(minutes=auth.sync_interval_minutes)
-                        if now < next_sync:
-                            continue
-
-                    # Trigger sync for this device
-                    try:
-                        wearable_sync = get_wearable_sync()
-
-                        if auth.device_type == "fitbit":
-                            result = await wearable_sync.fetch_fitbit_data(
-                                access_token=auth.access_token,
-                                user_id=auth.device_user_id,
-                                data_type="heart_rate"
-                            )
-
-                            if result.get("success"):
-                                # Import data
-                                import_result = await wearable_sync.import_wearable_data(
-                                    db=db,
-                                    patient_intake_id=auth.patient_intake_id,
-                                    device_type="fitbit",
-                                    data_entries=[
-                                        {
-                                            "data_category": "heart_rate",
-                                            "measurement_date": datetime.utcnow(),
-                                            "value": d.get("value"),
-                                            "unit": d.get("unit", "bpm"),
-                                            "confidence": 0.95
-                                        }
-                                        for d in result.get("data", [])
-                                    ]
-                                )
-
-                                auth.last_sync_at = datetime.utcnow()
-                                auth.sync_error_count = 0
-                                logger.info(
-                                    f"[WEARABLE] Synced {import_result.get('imported_count', 0)} records "
-                                    f"from {auth.device_type} (patient {auth.patient_intake_id})"
-                                )
-                            else:
-                                auth.sync_error_count = (auth.sync_error_count or 0) + 1
-                                logger.warning(f"[WEARABLE] Sync error for {auth.device_type}: {result.get('error')}")
-
-                    except Exception as e:
-                        logger.error(f"[WEARABLE] Error syncing device {auth.auth_id}: {e}")
-                        auth.sync_error_count = (auth.sync_error_count or 0) + 1
-
-                db.commit()
-
-            except Exception as e:
-                logger.error(f"[WEARABLE] Sync loop error: {e}")
-                db.rollback()
-            finally:
-                db.close()
-
-        except Exception as e:
-            logger.warning(f"[WEARABLE] Sync loop iteration failed: {e}")
-
-        await asyncio.sleep(interval_seconds)
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Manage application lifespan with graceful startup/shutdown"""
-    global _queue_worker_task, _wearable_worker_task
-    logger.info("[STARTING] Natpudan AI Medical Assistant...")
-    settings.validate()
-    init_monitoring()
-
-    # Startup: Initialize services with error handling
-    try:
-        # Initialize database
-        init_db()
-        service_health["database"] = True
-        logger.info("[OK] Database initialized successfully")
-    except Exception as e:
-        logger.error(f"[ERROR] Database initialization failed: {e}")
-        error_corrector.log_error(e, {"operation": "database_init"})
-
-    # Check OpenAI API
-    try:
-        import os
-        api_key = os.getenv("OPENAI_API_KEY")
-        if api_key and not api_key.startswith("sk-your"):
-            service_health["openai"] = True
-            logger.info("[OK] OpenAI API configured")
-        else:
-            logger.warning("[WARNING] OpenAI API key not configured - AI features will be limited")
-    except Exception as e:
-        logger.error(f"[ERROR] OpenAI check failed: {e}")
-
-    # Pre-load knowledge base (optional)
-    try:
-        from app.services.vector_knowledge_base import get_vector_knowledge_base
-        kb = get_vector_knowledge_base()
-        service_health["knowledge_base"] = True
-        logger.info(f"[OK] Knowledge base loaded ({kb.document_count} documents)")
-    except Exception as e:
-        logger.warning(f"[WARNING] Knowledge base not available: {e}")
-
-    # Initialize upload queue processor
-    try:
-        from app.services.upload_queue_processor import get_queue_processor
-        processor = get_queue_processor()
-        processor.start()
-        logger.info("[OK] PDF upload queue processor started")
-
-        # Start dedicated background worker loop
-        _queue_worker_task = asyncio.create_task(_queue_worker_loop(interval_seconds=5))
-        logger.info("[OK] Dedicated queue worker task started")
-    except Exception as e:
-        logger.error(f"[ERROR] Queue processor initialization failed: {e}")
-
-    # Initialize wearable device sync worker
-    try:
-        _wearable_worker_task = asyncio.create_task(_wearable_sync_loop(interval_seconds=300))
-        logger.info("[OK] Wearable device sync worker started (5-min intervals)")
-    except Exception as e:
-        logger.error(f"[ERROR] Wearable sync initialization failed: {e}")
-
-    logger.info(f"[STARTED] Application started - Services: DB={service_health['database']}, OpenAI={service_health['openai']}, KB={service_health['knowledge_base']}")
-
-    yield  # Application runs
-
-    # Shutdown: Cleanup
-    logger.info("[STOPPING] Natpudan AI Medical Assistant...")
-    try:
-        # Stop queue processor
-        from app.services.upload_queue_processor import get_queue_processor
-        processor = get_queue_processor()
-        processor.stop()
-        logger.info("[OK] Queue processor stopped")
-
-        # Stop dedicated worker loop
-        if _queue_worker_task and not _queue_worker_task.done():
-            _queue_worker_task.cancel()
-            try:
-                await _queue_worker_task
-            except asyncio.CancelledError:
-                pass
-            logger.info("[OK] Dedicated queue worker task stopped")
-
-        # Stop wearable sync worker
-        if _wearable_worker_task and not _wearable_worker_task.done():
-            _wearable_worker_task.cancel()
-            try:
-                await _wearable_worker_task
-            except asyncio.CancelledError:
-                pass
-            logger.info("[OK] Wearable sync worker task stopped")
-
-    except Exception as e:
-        logger.warning(f"Warning stopping processors: {e}")
-
-    try:
-        # Close database connections
-        from app.database import engine
-        engine.dispose()
-        logger.info("[OK] Database connections closed")
-    except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
-
 app = FastAPI(
     title="Physician AI Assistant",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=app_lifespan
 )
+instrument_fastapi_app(app)
 
 app.add_middleware(RequestContextMiddleware)
+
+if settings.RATE_LIMIT_ENABLED:
+    app.add_middleware(
+        RateLimiter,
+        calls=settings.RATE_LIMIT_CALLS,
+        period=settings.RATE_LIMIT_PERIOD,
+    )
 
 # Add global exception handler
 @app.exception_handler(Exception)
@@ -325,10 +115,16 @@ app.add_middleware(
 )
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
+async def log_requests(request: Request, call_next: RequestResponseEndpoint) -> StarletteResponse:
     started_at = time.perf_counter()
-    response = await call_next(request)
+    response: StarletteResponse = await call_next(request)
     duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+    record_http_metrics(
+        method=request.method,
+        path=request.url.path,
+        status=response.status_code,
+        started_at=started_at,
+    )
     logger.info(
         "request_completed method=%s path=%s status=%s duration_ms=%s",
         request.method,
@@ -360,9 +156,29 @@ def health() -> Dict[str, Any]:
             if db is not None:
                 db.close()
 
+    openai_healthy = service_health["openai"]
+    if not openai_healthy:
+        try:
+            api_key = os.getenv("OPENAI_API_KEY")
+            openai_healthy = bool(api_key and not api_key.startswith("sk-your"))
+            service_health["openai"] = openai_healthy
+        except Exception:
+            openai_healthy = False
+
+    kb_healthy = service_health["knowledge_base"]
+    if not kb_healthy:
+        try:
+            from app.services.vector_knowledge_base import get_vector_knowledge_base
+            kb = get_vector_knowledge_base()
+            kb_healthy = kb is not None
+            service_health["knowledge_base"] = kb_healthy
+        except Exception:
+            kb_healthy = False
+
     current_services = {
-        **service_health,
         "database": db_healthy,
+        "openai": openai_healthy,
+        "knowledge_base": kb_healthy,
     }
 
     return {
@@ -382,7 +198,7 @@ def detailed_health() -> Dict[str, Any]:
         # Get system metrics
         cpu_percent = psutil.cpu_percent(interval=0.5)
         memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
+        disk = psutil.disk_usage(os.path.abspath(os.sep))
         
         return {
             "status": "healthy",
@@ -421,13 +237,21 @@ def detailed_health() -> Dict[str, Any]:
             "error": str(e)
         }
 
+
+@app.get("/metrics")
+def metrics() -> StarletteResponse:
+    """Prometheus metrics endpoint."""
+    payload = render_prometheus_metrics()
+    if payload is None:
+        raise HTTPException(status_code=503, detail="Metrics backend unavailable")
+    return StarletteResponse(content=payload, media_type="text/plain; version=0.0.4")
+
 api_router = APIRouter(prefix="/api")
 
 # ---- Medical / Knowledge Base ----
 from app.services.icd10_service import get_icd10_service
 from app.services.vector_knowledge_base import get_vector_knowledge_base
 from app.services.document_manager import get_document_manager
-from app.services.local_vector_kb import get_local_knowledge_base
 # Futuristic services
 from app.services.hybrid_search import get_hybrid_search
 from app.services.rag_service import get_rag_service
@@ -440,8 +264,8 @@ medical_router = APIRouter(prefix="/medical")
 @medical_router.post("/diagnosis")
 def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Generate diagnosis suggestions from symptoms"""
+    symptoms: List[str] = payload.get("symptoms", [])
     try:
-        symptoms: List[str] = payload.get("symptoms", [])
         
         if not symptoms:
             return {
@@ -484,16 +308,16 @@ def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
 @medical_router.post("/analyze-symptoms")
 def analyze_symptoms(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze symptoms and suggest related conditions"""
+    symptoms: List[Any] = payload.get("symptoms", [])
     try:
-        symptoms = payload.get("symptoms", [])
         
         if not symptoms:
             return {"error": "No symptoms provided", "analysis": []}
         
         # Get ICD-10 suggestions for each symptom
         icd_service = get_icd10_service()
-        analysis = []
-        
+        analysis: List[Dict[str, Any]] = []
+
         for symptom in symptoms:
             codes = icd_service.search_codes(symptom, max_results=3)
             analysis.append({
@@ -558,8 +382,8 @@ def hybrid_search(payload: Dict[str, Any]) -> Dict[str, Any]:
     [STARTING] HYBRID SEARCH: Combines vector similarity + BM25 keyword matching
     Uses Reciprocal Rank Fusion for optimal results
     """
+    query: str = payload.get("query", "")
     try:
-        query = payload.get("query", "")
         top_k = payload.get("top_k", 10)
         alpha = payload.get("alpha", 0.5)  # 0=BM25 only, 1=vector only
         
@@ -593,14 +417,14 @@ def rag_query(payload: Dict[str, Any]) -> Dict[str, Any]:
     [STARTING] RAG: Retrieval-Augmented Generation with GPT-4
     Retrieves relevant documents and generates cited responses
     """
+    query: str = payload.get("query", "")
     try:
-        query = payload.get("query", "")
         max_context = payload.get("max_context_chunks", 5)
-        
+
         # Retrieve relevant documents
         kb = get_vector_knowledge_base()
         retrieved_docs = kb.search(query, top_k=max_context)
-        
+
         # Generate response with RAG
         rag_service = get_rag_service()
         response = rag_service.generate_with_context(
@@ -608,11 +432,12 @@ def rag_query(payload: Dict[str, Any]) -> Dict[str, Any]:
             retrieved_docs=retrieved_docs,
             include_citations=True
         )
-        
+
         return response
     except Exception as e:
         logger.error(f"Error in RAG query: {e}")
         return {"error": str(e), "query": query}
+
 
 @medical_router.post("/knowledge/extract-entities")
 def extract_medical_entities(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -623,28 +448,28 @@ def extract_medical_entities(payload: Dict[str, Any]) -> Dict[str, Any]:
     try:
         text = payload.get("text", "")
         include_summary = payload.get("include_summary", True)
-        
+
         # Extract entities
         extractor = get_entity_extractor()
         entities = extractor.extract_entities(text)
-        
+
         # Extract ICD codes
         icd_codes = extractor.extract_icd_codes(text)
-        
+
         # Extract dosages
         dosages = extractor.extract_dosages(text)
-        
+
         result = {
             "entities": entities,
             "icd_codes": icd_codes,
             "dosages": dosages
         }
-        
+
         # Add summary if requested
         if include_summary:
             summary = extractor.build_medical_summary(entities)
             result["summary"] = summary
-        
+
         return result
     except Exception as e:
         logger.error(f"Error extracting entities: {e}")
@@ -694,7 +519,7 @@ def pubmed_auto_update(payload: Dict[str, Any]) -> Dict[str, Any]:
         pubmed = get_pubmed_integration()
         kb = get_vector_knowledge_base()
         
-        result = pubmed.auto_update_knowledge_base(
+        result: Dict[str, Any] = pubmed.auto_update_knowledge_base(
             vector_kb=kb,
             topics=topics,
             papers_per_topic=papers_per_topic,
@@ -797,9 +622,9 @@ upload_router = APIRouter(prefix="/upload")
 @upload_router.post("/document")
 async def upload_document(
     file: UploadFile = File(...),
-    source: str = None,
-    category: str = None,
-    description: str = None
+    source: Optional[str] = None,
+    category: Optional[str] = None,
+    description: Optional[str] = None
 ):
     """
     Upload a medical document (PDF, DOCX, TXT) to knowledge base.
@@ -811,9 +636,10 @@ async def upload_document(
         
         # Save document
         doc_manager = get_document_manager()
+        filename = file.filename or "unnamed_document"
         doc_info = await doc_manager.save_upload(
             content,
-            file.filename,
+            filename,
             metadata={
                 "source": source,
                 "category": category,
@@ -830,7 +656,7 @@ async def upload_document(
                 content=text_content,
                 metadata={
                     "document_id": doc_info["document_id"],
-                    "filename": file.filename,
+                    "filename": filename,
                     "source": source or "user_upload",
                     "category": category or "general",
                     "description": description
@@ -844,7 +670,7 @@ async def upload_document(
             status_code=200,
             content={
                 "success": True,
-                "message": f"Document '{file.filename}' uploaded and indexed successfully",
+                "message": f"Document '{filename}' uploaded and indexed successfully",
                 "document": doc_info
             }
         )
@@ -855,7 +681,7 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @upload_router.get("/documents")
-def list_documents():
+def list_documents() -> Dict[str, Any]:
     """List all uploaded documents"""
     try:
         doc_manager = get_document_manager()
@@ -871,7 +697,7 @@ def list_documents():
         raise HTTPException(status_code=500, detail=str(e))
 
 @upload_router.get("/documents/{document_id}")
-def get_document(document_id: str):
+def get_document(document_id: str) -> Dict[str, Any]:
     """Get document information"""
     try:
         doc_manager = get_document_manager()
@@ -891,7 +717,7 @@ def get_document(document_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @upload_router.delete("/documents/{document_id}")
-def delete_document(document_id: str):
+def delete_document(document_id: str) -> Dict[str, Any]:
     """Delete a document and remove from knowledge base"""
     try:
         # Delete from document manager
@@ -907,7 +733,7 @@ def delete_document(document_id: str):
         
         return {
             "success": True,
-            "message": f"Document deleted successfully",
+            "message": "Document deleted successfully",
             "chunks_deleted": chunks_deleted
         }
     except HTTPException:
@@ -923,11 +749,40 @@ prescription_router = APIRouter(prefix="/prescription")
 
 @prescription_router.post("/generate-plan")
 def generate_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
-    meds = [
-        {"name": "amoxicillin", "dose": "500mg", "frequency": "TID"},
-        {"name": "acetaminophen", "dose": "650mg", "frequency": "Q6H PRN"},
-    ]
-    return {"medications": meds, "monitoring_advice": "Monitor temperature and respiratory status."}
+    """Generate treatment plan based on patient data and diagnosis."""
+    from app.services.ai_treatment_recommender import get_treatment_recommender
+    from app.services.drug_interactions import get_drug_checker
+
+    diagnosis = payload.get("diagnosis", "")
+    patient_data = payload.get("patient_data", {})
+    medications = payload.get("medications", [])
+
+    if not diagnosis and not medications:
+        return {
+            "medications": [],
+            "monitoring_advice": "Please provide diagnosis or medications."
+        }
+
+    # Get treatment recommendations
+    recommender = get_treatment_recommender()
+    treatment = recommender.recommend_treatment(diagnosis, patient_data)
+
+    # Check drug interactions if multiple medications provided
+    interaction_result = {"interactions": [], "high_risk_warning": False}
+    if len(medications) >= 2:
+        checker = get_drug_checker()
+        interaction_result = checker.check_interactions(medications)
+
+    return {
+        "diagnosis": diagnosis,
+        "medications": treatment.get("primary_pathway", {}).get("medications", []),
+        "alternative_options": treatment.get("alternative_pathways", []),
+        "monitoring_advice": "Monitor temperature and respiratory status.",
+        "interactions": interaction_result.get("interactions", []),
+        "high_risk_warning": interaction_result.get("high_risk_warning", False),
+        "outcome_prediction": treatment.get("outcome_prediction", {}),
+        "clinical_guidelines": treatment.get("clinical_guidelines", [])
+    }
 
 @prescription_router.post("/check-interactions")
 def check_interactions(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -975,21 +830,7 @@ def dosing(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {"drug": drug, "recommended_dose": dose}
 
 api_router.include_router(prescription_router)
-api_router.include_router(auth_router)
-api_router.include_router(chat_router)
-api_router.include_router(discharge_router)
-api_router.include_router(treatment_router, prefix="/treatment", tags=["treatment"])
-api_router.include_router(timeline_router, prefix="/timeline", tags=["timeline"])
-api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
-api_router.include_router(fhir_router, prefix="/fhir", tags=["fhir"])
-api_router.include_router(health_router, tags=["health"])
-api_router.include_router(knowledge_router, prefix="/medical/knowledge", tags=["knowledge-base"])
-api_router.include_router(knowledge_graph_viz_router, prefix="/api/knowledge-graph", tags=["knowledge-graph"])
-api_router.include_router(reports_router, prefix="/reports", tags=["reports"])
-api_router.include_router(predictions_router, prefix="/api", tags=["predictions"])
-api_router.include_router(voice_router, prefix="/api", tags=["voice"])
-api_router.include_router(voice_consul_router, prefix="/api", tags=["voice-consultation"])
-api_router.include_router(wearable_auth_router, prefix="/api", tags=["wearable"])
+register_api_routers(api_router)
 # Background task for processing upload queue
 _last_queue_process = 0
 _queue_process_interval = 10  # Process queue every 10 seconds
@@ -1002,7 +843,7 @@ def trigger_queue_processing() -> Dict[str, Any]:
     """
     try:
         from app.services.upload_queue_processor import process_upload_queue
-        result = process_upload_queue()
+        result: Dict[str, Any] = process_upload_queue()
         return {
             "status": "success",
             "result": result,
@@ -1018,7 +859,7 @@ def trigger_queue_processing() -> Dict[str, Any]:
 
 # Middleware to periodically check queue (on every request)
 @app.middleware("http")
-async def background_queue_processor(request: Request, call_next):
+async def background_queue_processor(request: Request, call_next: RequestResponseEndpoint) -> StarletteResponse:
     """
     Periodically process upload queue on every API request
     This is a simple approach - in production, use a real task scheduler
@@ -1028,7 +869,7 @@ async def background_queue_processor(request: Request, call_next):
     try:
         # Check if it's time to process (every 10 seconds)
         current_time = time.time()
-        if _queue_worker_task is None and current_time - _last_queue_process >= _queue_process_interval:
+        if current_time - _last_queue_process >= _queue_process_interval:
             _last_queue_process = current_time
             
             # Fallback mode only (primary mode is dedicated worker task)
@@ -1041,6 +882,15 @@ async def background_queue_processor(request: Request, call_next):
         logger.warning(f"[MIDDLEWARE] Error in background processor: {e}")
     
     # Continue with the request
-    response = await call_next(request)
+    response: StarletteResponse = await call_next(request)
     return response
+@app.api_route("/api/v1/{full_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
+async def api_v1_compat(full_path: str, request: Request):
+    """Compatibility layer: route legacy /api/v1/* requests to /api/* endpoints."""
+    target = f"/api/{full_path}"
+    if request.url.query:
+        target = f"{target}?{request.url.query}"
+    return RedirectResponse(url=target, status_code=307)
+
+
 app.include_router(api_router)

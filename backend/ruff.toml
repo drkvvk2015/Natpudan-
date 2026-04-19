@@ -1,0 +1,15 @@
+# Ruff linter configuration for Natpudan backend
+# Ignores common false positives for FastAPI patterns
+
+[lint]
+select = ["E", "F", "W", "B", "I"]
+ignore = [
+    "B008",   # Do not perform function calls in argument defaults (FastAPI Depends pattern)
+]
+
+# Exclude test files from certain checks
+[lint.per-file-ignores]
+"tests/**" = ["E4", "E7", "S"]
+"**/tests/**" = ["E4", "E7", "S"]
+"**/test_*.py" = ["E4", "E7", "S"]
+"**/knowledge_base.py" = ["E402"]  # Late imports after function definitions

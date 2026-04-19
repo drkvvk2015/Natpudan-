@@ -94,12 +94,12 @@ class HybridAIService:
             self.embedded_model = Llama(
                 model_path=self.embedded_model_path,
                 n_gpu_layers=self.model_gpu_layers,
-                n_ctx=2048,
+                n_ctx=4096,
                 n_threads=os.cpu_count() or 4,
                 verbose=False,
             )
             self.embedded_available = True
-            logger.info(f"[OK] Embedded model loaded successfully")
+            logger.info("[OK] Embedded model loaded successfully")
         except Exception as e:
             logger.error(f"[ERROR] Failed to load embedded model: {e}")
             self.embedded_available = False
@@ -204,39 +204,64 @@ class HybridAIService:
         max_tokens: int,
         temperature: float,
     ) -> Dict:
-        """Make request to embedded model (TinyLLama via llama-cpp-python)"""
+        """Make request to embedded model (TinyLLama/Gemma/Qwen via llama-cpp-python)"""
         if not self.embedded_model:
             raise Exception("Embedded model not loaded")
-        
-        # Format messages into a single prompt for the model
-        prompt = system_prompt + "\n\n"
-        for msg in messages:
-            role = msg.get("role", "user").upper()
-            content = msg.get("content", "")
-            prompt += f"{role}: {content}\n"
-        prompt += "ASSISTANT:"
-        
+
+        model_name = os.path.basename(self.embedded_model_path).lower()
+
+        # Format prompt based on model type
+        if "gemma" in model_name:
+            # Gemma chat format
+            prompt = f"<start_of_turn>user\n{system_prompt}\n\n"
+            for msg in messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if role == "user":
+                    prompt += f"{content}\n"
+                elif role == "assistant":
+                    prompt += f"<end_of_turn>\n<start_of_turn>model\n{content}<end_of_turn>\n<start_of_turn>user\n"
+            prompt += "<end_of_turn>\n<start_of_turn>model\n"
+            stop_tokens = ["<end_of_turn>", "<start_of_turn>"]
+        elif "qwen" in model_name:
+            # Qwen chat format
+            prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+            for msg in messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+            prompt += "<|im_start|>assistant\n"
+            stop_tokens = ["<|im_end|>", "<|im_start|>"]
+        else:
+            # TinyLLama / generic chat format
+            prompt = system_prompt + "\n\n"
+            for msg in messages:
+                role = msg.get("role", "user").upper()
+                content = msg.get("content", "")
+                prompt += f"{role}: {content}\n"
+            prompt += "ASSISTANT:"
+            stop_tokens = ["USER:", "DOCTOR:", "PATIENT:"]
+
         try:
             logger.debug(f"Calling embedded model with prompt ({len(prompt)} chars)")
-            
-            # Call the embedded model
+
             response = self.embedded_model(
                 prompt,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 top_p=0.95,
-                stop=["USER:", "DOCTOR:", "PATIENT:"]
+                stop=stop_tokens
             )
-            
+
             content = response["choices"][0]["text"].strip()
             logger.debug(f"Embedded model response received ({len(content)} chars)")
-            
+
             return {
                 "content": content,
                 "provider": "embedded",
                 "model": os.path.basename(self.embedded_model_path),
             }
-        
+
         except Exception as e:
             logger.error(f"Embedded model error: {e}")
             raise Exception(f"Embedded model error: {str(e)[:200]}")
@@ -287,7 +312,7 @@ class HybridAIService:
                 }
         
         except httpx.TimeoutException:
-            logger.error(f"Ollama timeout after 60s")
+            logger.error("Ollama timeout after 60s")
             raise Exception("Ollama timeout (60s). Please try with a shorter query.")
         except Exception as e:
             logger.error(f"Ollama request failed: {e}")

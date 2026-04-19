@@ -118,7 +118,7 @@ class MedicalVisualContentService:
         images.append({
             'source': 'MedlinePlus',
             'title': f'{search_term.title()} - Medical Images',
-            'url': f'https://medlineplus.gov/ency/imagepages.htm',
+            'url': 'https://medlineplus.gov/ency/imagepages.htm',
             'icon': '[MEDICAL]',
             'description': 'Trusted medical encyclopedia with anatomical illustrations',
             'type': 'image_gallery'
@@ -189,7 +189,7 @@ class MedicalVisualContentService:
         videos.append({
             'source': 'MedlinePlus Videos',
             'title': f'{search_term.title()} - Patient Education',
-            'url': f'https://medlineplus.gov/videos/',
+            'url': 'https://medlineplus.gov/videos/',
             'icon': '[PATIENT_ED]',
             'description': 'Patient education videos from NIH',
             'type': 'patient_education',

@@ -390,14 +390,26 @@ class EnhancedKnowledgeBase:
         return doc_id
     
     def add_pdf_source(self, pdf_directory: str):
-        """Add PDF documents as a knowledge source (future enhancement)"""
-        # TODO: Implement PDF processing
-        pass
+        """Add PDF documents as a knowledge source.
+
+        This function intentionally raises until the PDF ingestion pipeline is
+        wired to the enhanced source graph.
+        """
+        raise NotImplementedError(
+            "PDF source ingestion is not implemented in EnhancedKnowledgeBase yet. "
+            "Use app.services.pdf_processor with vector_knowledge_base ingestion path."
+        )
     
     def add_pubmed_source(self, api_key: Optional[str] = None):
-        """Add PubMed API as a knowledge source (future enhancement)"""
-        # TODO: Implement PubMed integration
-        pass
+        """Add PubMed API as a knowledge source.
+
+        PubMed ingestion currently flows through `pubmed_integration` and
+        `kb_auto_ingester` orchestration.
+        """
+        raise NotImplementedError(
+            "PubMed source attachment is not implemented in EnhancedKnowledgeBase yet. "
+            "Use app.services.pubmed_integration or kb_auto_ingester."
+        )
 
 
 # Singleton instance

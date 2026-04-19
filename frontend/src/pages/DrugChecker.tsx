@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import apiClient from '../services/apiClient'
 import {
   Box,
   Typography,
@@ -117,20 +118,9 @@ const DrugChecker: React.FC = () => {
     setShowResults(false)
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/prescription/check-interactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-        },
-        body: JSON.stringify({ medications }),
-      })
+      const response = await apiClient.post('/api/prescription/check-interactions', { medications })
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`)
-      }
-
-      const data: CheckResponse = await response.json()
+      const data: CheckResponse = response.data
       setResults(data)
       setShowResults(true)
     } catch (err) {

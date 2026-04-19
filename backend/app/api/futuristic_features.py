@@ -20,7 +20,7 @@ def get_db():
 
 # Feature 2: XAI - Explainable AI
 @router.post("/xai/explain-diagnosis")
-def explain_diagnosis(payload: Dict[str, Any]):
+def explain_diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Explain diagnosis with feature importance and confidence"""
     from app.services.xai_explainer import get_xai_explainer
     try:
@@ -31,11 +31,11 @@ def explain_diagnosis(payload: Dict[str, Any]):
             payload.get("features", {})
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Feature 3: AI Treatment Recommender
 @router.post("/treatment-recommender/recommend")
-def recommend_treatment(payload: Dict[str, Any]):
+def recommend_treatment(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Get evidence-based treatment recommendations"""
     from app.services.ai_treatment_recommender import get_treatment_recommender
     try:
@@ -45,11 +45,11 @@ def recommend_treatment(payload: Dict[str, Any]):
             payload.get("patient_data", {})
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Feature 4: Discharge Planning
 @router.post("/discharge-planning/generate-plan")
-def generate_discharge_plan(payload: Dict[str, Any], db: Session = Depends(get_db)):
+def generate_discharge_plan(payload: Dict[str, Any], db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Generate personalized discharge plan to prevent readmission"""
     from app.services.discharge_planning_engine import get_discharge_planning_engine
     try:
@@ -60,11 +60,11 @@ def generate_discharge_plan(payload: Dict[str, Any], db: Session = Depends(get_d
         )
         return {"success": True, "discharge_plan": plan}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Feature 5: Clinical Trial Matching
 @router.post("/clinical-trials/find-matches")
-def find_matching_trials(payload: Dict[str, Any]):
+def find_matching_trials(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Match patient to relevant clinical trials"""
     from app.services.clinical_trial_matcher import get_clinical_trial_matcher
     try:
@@ -74,11 +74,11 @@ def find_matching_trials(payload: Dict[str, Any]):
             payload.get("patient_data", {})
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Feature 6: Smart Notifications
 @router.post("/notifications/route")
-def route_smart_notification(payload: Dict[str, Any]):
+def route_smart_notification(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Route notification based on context and preferences"""
     from app.services.smart_notification_engine import get_smart_notification_engine
     try:
@@ -90,43 +90,43 @@ def route_smart_notification(payload: Dict[str, Any]):
             payload.get("context", {})
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Feature 7: FHIR/HL7 Healthcare Connector
 @router.get("/fhir-connector/export-patient/{patient_id}")
-def export_patient_fhir(patient_id: int):
+def export_patient_fhir(patient_id: int) -> Dict[str, Any]:
     """Export patient data as FHIR bundle for interoperability"""
     from app.services.fhir_connector import get_fhir_connector
     try:
         connector = get_fhir_connector()
         return connector.export_patient_fhir(patient_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Feature 8 + 4: Real-time Analytics & Predictive Diagnostics
 @router.get("/analytics/disease-heatmap")
-def get_disease_heatmap(region: str = "USA"):
+def get_disease_heatmap(region: str = "USA") -> Dict[str, Any]:
     """Get real-time disease prevalence heatmap"""
     from app.services.realtime_analytics_engine import get_realtime_analytics_engine
     try:
         engine = get_realtime_analytics_engine()
         return engine.get_disease_heatmap(region)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.get("/analytics/patient-trajectory/{patient_id}")
-def predict_patient_trajectory(patient_id: int):
+def predict_patient_trajectory(patient_id: int) -> Dict[str, Any]:
     """Predict patient health trajectory for proactive intervention"""
     from app.services.realtime_analytics_engine import get_realtime_analytics_engine
     try:
         engine = get_realtime_analytics_engine()
         return engine.predict_patient_trajectory(patient_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Feature 9: Multi-Language Medical AI
 @router.post("/multilingual/translate")
-def translate_medical_terms(payload: Dict[str, Any]):
+def translate_medical_terms(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Translate medical terms with context preservation"""
     from app.services.multilingual_ai import get_multilingual_ai
     try:
@@ -137,11 +137,11 @@ def translate_medical_terms(payload: Dict[str, Any]):
             payload.get("target_lang", "es")
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Feature 10: Genomics & Pharmacogenomics
 @router.post("/genomics/drug-gene-interactions")
-def get_drug_gene_interactions(payload: Dict[str, Any]):
+def get_drug_gene_interactions(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Get drug-gene interactions and pharmacogenomic recommendations"""
     from app.services.genomics_service import get_genomics_service
     try:
@@ -151,22 +151,22 @@ def get_drug_gene_interactions(payload: Dict[str, Any]):
             payload.get("genetic_profile", {})
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Bonus: Public Health Surveillance
 @router.get("/surveillance/outbreak-detection")
-def detect_outbreaks(region: str = "USA", disease: str = "COVID-19"):
+def detect_outbreaks(region: str = "USA", disease: str = "COVID-19") -> Dict[str, Any]:
     """Detect disease clusters and outbreaks in real-time"""
     from app.services.public_health_surveillance import get_public_health_surveillance
     try:
         surveillance = get_public_health_surveillance()
         return surveillance.detect_outbreak_clusters(region, disease)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 # Summary endpoint
 @router.get("/status")
-def feature_status():
+def feature_status() -> Dict[str, Any]:
     """Get status of all implemented futuristic features"""
     return {
         "status": "operational",

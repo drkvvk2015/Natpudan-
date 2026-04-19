@@ -24,7 +24,7 @@ class MultilingualAI:
         import langdetect
         try:
             return langdetect.detect(text)
-        except:
+        except Exception:
             return "en"
 
 def get_multilingual_ai() -> MultilingualAI:

@@ -5,6 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline'
 import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
 import Layout from './components/Layout'
+import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
 import PublicRoute from './components/PublicRoute'
 import { AuthProvider } from './context/AuthContext'
@@ -49,33 +50,35 @@ function App() {
           v7_startTransition: true,
           v7_relativeSplatPath: true 
         }}>
-          <FloatingChatBot />
-          <Suspense fallback={routeFallback}>
-            <Routes>
-              <Route path="/" element={<PublicRoute><LoginPage /></PublicRoute>} />
-              <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-              <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
-              <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
-              <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
-              <Route path="/auth/callback" element={<OAuthCallback />} />
-              <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
-              <Route path="/chat" element={<ProtectedRoute><Layout><ChatPage /></Layout></ProtectedRoute>} />
-              <Route path="/discharge-summary" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><DischargeSummaryPage /></Layout></ProtectedRoute>} />
-              <Route path="/diagnosis" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><ClinicalCaseSheet /></Layout></ProtectedRoute>} />
-              <Route path="/drugs" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><DrugChecker /></Layout></ProtectedRoute>} />
-              <Route path="/knowledge" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><KnowledgeBase /></Layout></ProtectedRoute>} />
-              <Route path="/knowledge-upload" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><KnowledgeBaseUpload /></Layout></ProtectedRoute>} />
-              <Route path="/report-parser" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><MedicalReportParser /></Layout></ProtectedRoute>} />
-              <Route path="/patient-intake/*" element={<ProtectedRoute allowedRoles={["staff","doctor","admin"]}><Layout><PatientIntake /></Layout></ProtectedRoute>} />
-              <Route path="/patients" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><PatientList /></Layout></ProtectedRoute>} />
-              <Route path="/treatment-plan/:patientId/*" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><TreatmentPlan /></Layout></ProtectedRoute>} />
-              <Route path="/analytics" element={<ProtectedRoute allowedRoles={["admin"]}><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
-              <Route path="/fhir" element={<ProtectedRoute allowedRoles={["admin"]}><Layout><FHIRExplorer /></Layout></ProtectedRoute>} />
-              <Route path="/voice-documentation" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><VoiceDocumentation /></Layout></ProtectedRoute>} />
-              <Route path="/wearable-integration" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><WearableIntegration /></Layout></ProtectedRoute>} />
-              <Route path="/knowledge-graph" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><KnowledgeGraphVisualizer /></Layout></ProtectedRoute>} />
-            </Routes>
-          </Suspense>
+          <ErrorBoundary>
+            <FloatingChatBot />
+            <Suspense fallback={routeFallback}>
+              <Routes>
+                <Route path="/" element={<PublicRoute><LoginPage /></PublicRoute>} />
+                <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+                <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+                <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+                <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
+                <Route path="/auth/callback" element={<OAuthCallback />} />
+                <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+                <Route path="/chat" element={<ProtectedRoute><Layout><ChatPage /></Layout></ProtectedRoute>} />
+                <Route path="/discharge-summary" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><DischargeSummaryPage /></Layout></ProtectedRoute>} />
+                <Route path="/diagnosis" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><ClinicalCaseSheet /></Layout></ProtectedRoute>} />
+                <Route path="/drugs" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><DrugChecker /></Layout></ProtectedRoute>} />
+                <Route path="/knowledge" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><KnowledgeBase /></Layout></ProtectedRoute>} />
+                <Route path="/knowledge-upload" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><KnowledgeBaseUpload /></Layout></ProtectedRoute>} />
+                <Route path="/report-parser" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><MedicalReportParser /></Layout></ProtectedRoute>} />
+                <Route path="/patient-intake/*" element={<ProtectedRoute allowedRoles={["staff","doctor","admin"]}><Layout><PatientIntake /></Layout></ProtectedRoute>} />
+                <Route path="/patients" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><PatientList /></Layout></ProtectedRoute>} />
+                <Route path="/treatment-plan/:patientId/*" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><TreatmentPlan /></Layout></ProtectedRoute>} />
+                <Route path="/analytics" element={<ProtectedRoute allowedRoles={["admin"]}><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
+                <Route path="/fhir" element={<ProtectedRoute allowedRoles={["admin"]}><Layout><FHIRExplorer /></Layout></ProtectedRoute>} />
+                <Route path="/voice-documentation" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><VoiceDocumentation /></Layout></ProtectedRoute>} />
+                <Route path="/wearable-integration" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><WearableIntegration /></Layout></ProtectedRoute>} />
+                <Route path="/knowledge-graph" element={<ProtectedRoute allowedRoles={["doctor","admin"]}><Layout><KnowledgeGraphVisualizer /></Layout></ProtectedRoute>} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </Router>
       </AuthProvider>
     </ThemeProvider>

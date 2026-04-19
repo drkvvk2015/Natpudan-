@@ -28,7 +28,7 @@ import {
   CheckCircle,
   Error as ErrorIcon,
 } from "@mui/icons-material";
-import axios from "axios";
+import apiClient from "../services/apiClient";
 
 interface MedicalEntity {
   text: string;
@@ -82,7 +82,7 @@ const VoiceDocumentation: React.FC = () => {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (isRecording) {
@@ -137,7 +137,7 @@ const VoiceDocumentation: React.FC = () => {
       const formData = new FormData();
       formData.append("file", audioBlob, "recording.wav");
 
-      const response = await axios.post<TranscriptionResult>(
+      const response = await apiClient.post<TranscriptionResult>(
         "/api/voice/upload",
         formData,
         {
@@ -164,7 +164,7 @@ const VoiceDocumentation: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post("/api/voice/generate-documentation", {
+      const response = await apiClient.post("/api/voice/generate-documentation", {
         recording_id: recordingId,
         edited_transcription: editedTranscript,
       });

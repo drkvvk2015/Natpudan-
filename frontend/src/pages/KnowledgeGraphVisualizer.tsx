@@ -22,7 +22,8 @@ import {
   TableRow,
 } from "@mui/material";
 import { Search, ZoomIn, ZoomOut, Download } from "@mui/icons-material";
-import axios from "axios";
+import apiClient from "../services/apiClient";
+import "./KnowledgeGraphVisualizer.css";
 
 interface GraphNode {
   id: string;
@@ -79,8 +80,8 @@ const KnowledgeGraphVisualizer: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await axios.get("/api/medical/knowledge/graph/search", {
-        params: { concept: query },
+      const response = await apiClient.get("/api/knowledge-graph/search", {
+        params: { query: query },
       });
       setGraphData(response.data);
     } catch (err: any) {
@@ -96,8 +97,8 @@ const KnowledgeGraphVisualizer: React.FC = () => {
 
   const handleNodeClick = async (nodeId: string) => {
     try {
-      const response = await axios.get(
-        `/api/medical/knowledge/graph/node/${nodeId}`
+      const response = await apiClient.get(
+        `/api/knowledge-graph/subgraph/${nodeId}`
       );
       setSelectedNode(response.data);
       setDialogOpen(true);
@@ -125,8 +126,8 @@ const KnowledgeGraphVisualizer: React.FC = () => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(
-          "/api/medical/knowledge/graph/export/d3"
+        const response = await apiClient.get(
+          "/api/knowledge-graph/export/d3"
         );
         setGraphData(response.data);
       } catch (err: any) {
@@ -211,18 +212,15 @@ const KnowledgeGraphVisualizer: React.FC = () => {
             ) : graphData ? (
               <svg
                 ref={svgRef}
-                style={{
-                  width: "100%",
-                  height: 600,
-                  border: "1px solid #e0e0e0",
-                  transform: `scale(${zoom})`,
-                  transformOrigin: "top left",
-                }}
+                className="kgv-svg"
+                width="100%"
+                height={600}
               >
+                <g transform={`scale(${zoom})`}>
                 {/* Draw links */}
-                {graphData.links.map((link, i) => {
-                  const sourceNode = graphData.nodes.find(n => n.id === link.source);
-                  const targetNode = graphData.nodes.find(n => n.id === link.target);
+                {(graphData.links || []).map((link, i) => {
+                  const sourceNode = (graphData.nodes || []).find(n => n.id === link.source);
+                  const targetNode = (graphData.nodes || []).find(n => n.id === link.target);
                   if (!sourceNode || !targetNode) return null;
 
                   // Simple grid layout for demo
@@ -246,7 +244,7 @@ const KnowledgeGraphVisualizer: React.FC = () => {
                 })}
 
                 {/* Draw nodes */}
-                {graphData.nodes.slice(0, 50).map((node, i) => {
+                {(graphData.nodes || []).slice(0, 50).map((node, i) => {
                   const x = (i % 10) * 100 + 50;
                   const y = Math.floor(i / 10) * 100 + 50;
                   const nodeColor = typeColors[node.type] || "#999";
@@ -256,7 +254,7 @@ const KnowledgeGraphVisualizer: React.FC = () => {
                     <g
                       key={node.id}
                       onClick={() => handleNodeClick(node.id)}
-                      style={{ cursor: "pointer" }}
+                      className="kgv-node"
                     >
                       <circle
                         cx={x}
@@ -282,6 +280,7 @@ const KnowledgeGraphVisualizer: React.FC = () => {
                     </g>
                   );
                 })}
+                </g>
               </svg>
             ) : (
               <Box
@@ -341,7 +340,7 @@ const KnowledgeGraphVisualizer: React.FC = () => {
                         Total Nodes
                       </Typography>
                       <Typography variant="h6">
-                        {graphData.nodes.length}
+                        {(graphData.nodes || []).length}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -353,7 +352,7 @@ const KnowledgeGraphVisualizer: React.FC = () => {
                         Total Links
                       </Typography>
                       <Typography variant="h6">
-                        {graphData.links.length}
+                        {(graphData.links || []).length}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -365,7 +364,7 @@ const KnowledgeGraphVisualizer: React.FC = () => {
                         Diseases
                       </Typography>
                       <Typography variant="h6">
-                        {graphData.nodes.filter(n => n.type === "disease").length}
+                        {(graphData.nodes || []).filter(n => n.type === "disease").length}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -377,7 +376,7 @@ const KnowledgeGraphVisualizer: React.FC = () => {
                         Medications
                       </Typography>
                       <Typography variant="h6">
-                        {graphData.nodes.filter(n => n.type === "medication").length}
+                        {(graphData.nodes || []).filter(n => n.type === "medication").length}
                       </Typography>
                     </CardContent>
                   </Card>

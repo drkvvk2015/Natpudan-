@@ -6,9 +6,8 @@ Runs as a background job to continuously improve predictions.
 """
 
 import logging
-import json
 import pickle
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -124,7 +123,7 @@ class MLTrainer:
         Returns:
             Tuple of (X, y, sample_count)
         """
-        from app.models import PatientIntake, TreatmentPlan, FollowUp, FamilyHistory, Medication
+        from app.models import PatientIntake, TreatmentPlan
 
         # Query all treatment plans completed in last 6 months
         cutoff_date = datetime.utcnow() - timedelta(days=180)
@@ -168,13 +167,13 @@ class MLTrainer:
         # Demographics (normalize to 0-1)
         try:
             age = int(patient.age) if patient.age else 60
-        except:
+        except Exception:
             age = 60
         features['age'] = min(age / 100.0, 1.0)
 
         try:
             bmi = patient.bmi if patient.bmi else 25
-        except:
+        except Exception:
             bmi = 25
         features['bmi'] = min(bmi / 50.0, 1.0)
 
@@ -198,10 +197,10 @@ class MLTrainer:
         features['family_history_score'] = min(comorbidity_count / 10.0, 1.0)
 
         # Medications
-        from app.models import Medication
+        from app.models import Medication, TreatmentPlan
         medication_count = db.query(Medication).filter(
             Medication.treatment_plan_id == plan.id,
-            Medication.is_active == True
+            Medication.is_active.is_(True)
         ).count()
         features['medication_count'] = min(medication_count / 10.0, 1.0)
 

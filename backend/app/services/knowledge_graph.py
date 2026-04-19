@@ -88,7 +88,7 @@ class MedicalKnowledgeGraph:
         """
         # Verify nodes exist
         if source_id not in self.nodes or target_id not in self.nodes:
-            logger.warning(f"Cannot add edge: node not found")
+            logger.warning("Cannot add edge: node not found")
             return
         
         edge = {

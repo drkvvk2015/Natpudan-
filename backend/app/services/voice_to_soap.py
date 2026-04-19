@@ -79,7 +79,7 @@ class VoiceToSOAP:
                 }
             }
 
-            logger.info(f"[VOICE_SOAP] Generated SOAP note from transcription")
+            logger.info("[VOICE_SOAP] Generated SOAP note from transcription")
             return soap_note
 
         except Exception as e:

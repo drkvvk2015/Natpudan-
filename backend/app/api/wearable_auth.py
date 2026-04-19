@@ -1,10 +1,9 @@
 """Wearable Device OAuth Router"""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from app.database import get_db
 from app.models import WearableDeviceAuth, PatientIntake
 import uuid
-from datetime import datetime
 
 router = APIRouter(prefix="/wearable", tags=["wearable"])
 
@@ -19,7 +18,7 @@ def start_fitbit_auth(patient_intake_id: int):
     return {"auth_url": auth_url}
 
 @router.get("/callback/fitbit")
-def fitbit_oauth_callback(code: str = Query(...), state: str = Query(...), db: Session = Depends(SessionLocal)):
+def fitbit_oauth_callback(code: str = Query(...), state: str = Query(...), db: Session = Depends(get_db)):
     """Handle Fitbit OAuth callback"""
     try:
         patient_intake_id = int(state)
@@ -42,14 +41,14 @@ def fitbit_oauth_callback(code: str = Query(...), state: str = Query(...), db: S
         return {"success": True, "message": "Fitbit connected"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.get("/devices")
-def list_wearable_devices(patient_intake_id: int, db: Session = Depends(SessionLocal)):
+def list_wearable_devices(patient_intake_id: int, db: Session = Depends(get_db)):
     """List connected wearable devices"""
     devices = db.query(WearableDeviceAuth).filter(
         WearableDeviceAuth.patient_intake_id == patient_intake_id,
-        WearableDeviceAuth.is_active == True
+        WearableDeviceAuth.is_active.is_(True)
     ).all()
     return {
         "devices": [

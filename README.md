@@ -1,8 +1,13 @@
-# Natpudan AI Medical Assistant
+﻿# Natpudan AI Medical Assistant
 
-A production-ready **FastAPI + React/TypeScript** full-stack medical AI application with intelligent diagnostics, role-based access control, comprehensive patient management, and **enterprise-grade predictive analytics**.
+A production-ready **FastAPI + React/TypeScript** full-stack medical AI platform with intelligent diagnostics, role-based access control, comprehensive patient management, and enterprise-grade predictive analytics.
 
-## 🚀 What's New in v2.0
+[![CI](https://github.com/drkvvk2015/Natpudan-/actions/workflows/ci.yml/badge.svg)](https://github.com/drkvvk2015/Natpudan-/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+---
+
+## What's New in v2.0
 
 | Feature | Description |
 |---------|-------------|
@@ -16,6 +21,8 @@ A production-ready **FastAPI + React/TypeScript** full-stack medical AI applicat
 | **Clinical Trial Matcher** | Auto-match patients to eligible trials |
 | **FHIR Healthcare Connector** | Full HL7/FHIR interoperability |
 | **Multi-Language AI** | 50+ language medical translation |
+| **Observability** | Prometheus metrics, OpenTelemetry tracing, Sentry error tracking |
+| **Test Coverage** | Backend pytest suite, Vitest unit tests, Playwright e2e |
 
 ---
 
@@ -27,15 +34,16 @@ A production-ready **FastAPI + React/TypeScript** full-stack medical AI applicat
 | **Voice AI** | Whisper transcription, SOAP note generation, ambient transcription |
 | **Predictive ML** | Readmission risk prediction, patient trajectory forecasting |
 | **Wearables** | Fitbit/Apple/Garmin OAuth, real-time vitals, background sync |
-| **Knowledge Base** | Vector search (FAISS), hybrid BM25+vector, RAG queries, **interactive graph visualization** |
+| **Knowledge Base** | Vector search (FAISS), hybrid BM25+vector, RAG queries, interactive graph visualization |
 | **PDF Engine** | Large PDF upload, OCR extraction (Tesseract/pdf2image), duplicate detection, background processing queue |
 | **Patient Management** | Intake forms, medical timeline, treatment plans, medication follow-ups |
 | **Reports** | OPD case sheet PDF, prescription PDF, medical history PDF generation |
-| **Analytics** | Demographics, disease trends, risk assessment, treatment outcomes, **disease heatmaps** |
+| **Analytics** | Demographics, disease trends, risk assessment, treatment outcomes, disease heatmaps |
 | **Drug Checker** | Real-time interaction warnings with severity classification |
 | **Alerts** | Clinical alerts with severity levels, acknowledgment tracking, intervention recommendations |
 | **Authentication** | JWT + OAuth2 (Google, GitHub, Microsoft), multi-tab sync |
-| **FHIR** | Healthcare interoperability standard (patient resources, observations, conditions), **HL7 import** |
+| **FHIR** | Healthcare interoperability standard (patient resources, observations, conditions), HL7 import |
+| **Observability** | Prometheus `/metrics`, OpenTelemetry tracing, Sentry integration, structured logging |
 | **Multi-Platform** | Web PWA, Android/iOS (Capacitor), Windows/Linux Desktop (Electron) |
 
 ## Tech Stack
@@ -44,6 +52,8 @@ A production-ready **FastAPI + React/TypeScript** full-stack medical AI applicat
 - **Frontend**: React 18, TypeScript, Vite 7, MUI v5, React Router v6, Recharts, D3.js
 - **AI/ML**: OpenAI GPT-4, Whisper, FAISS vector embeddings, TinyLLama (local), Ollama (local)
 - **PDF**: PyMuPDF, Tesseract OCR, pdf2image
+- **Testing**: pytest + coverage (backend), Vitest + Testing Library (frontend), Playwright (e2e)
+- **Observability**: Prometheus, OpenTelemetry, Sentry
 - **Deploy**: Docker Compose, Capacitor (mobile), Electron (desktop)
 
 ---
@@ -57,6 +67,7 @@ cd Natpudan-
 ```
 
 Opens:
+
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
 - **Swagger Docs**: http://localhost:8000/docs
@@ -68,7 +79,7 @@ Opens:
 ### 1. Backend
 
 ```powershell
-# From project root — create & activate Python 3.11 venv
+# Create and activate Python 3.11 venv
 python -m venv .venv311
 .\.venv311\Scripts\Activate.ps1
 
@@ -77,7 +88,7 @@ pip install -r backend/requirements.txt
 
 # Configure environment
 Copy-Item backend/.env.template backend/.env
-# Edit backend/.env — add OPENAI_API_KEY and SECRET_KEY
+# Edit backend/.env -- set OPENAI_API_KEY and SECRET_KEY
 
 # Start backend
 cd backend
@@ -111,11 +122,11 @@ Role:     Admin
 DATABASE_URL=sqlite:///./natpudan.db
 
 # JWT
-SECRET_KEY=your-secret-key   # python -c "import secrets; print(secrets.token_urlsafe(32))"
+SECRET_KEY=your-secret-key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-# OpenAI (required for AI features including Voice transcription)
+# OpenAI (required for AI features including voice transcription)
 OPENAI_API_KEY=sk-proj-your-key-here
 OPENAI_MODEL=gpt-4o
 WHISPER_MODEL=whisper-1
@@ -138,6 +149,10 @@ GITHUB_CLIENT_SECRET=
 MICROSOFT_CLIENT_ID=
 MICROSOFT_CLIENT_SECRET=
 
+# Observability (optional)
+SENTRY_DSN=
+OTEL_EXPORTER_OTLP_ENDPOINT=
+
 FRONTEND_URL=http://localhost:5173
 BACKEND_URL=http://localhost:8000
 ENVIRONMENT=development
@@ -159,9 +174,9 @@ VITE_WS_URL=ws://localhost:8000
 | Patient Intake | YES | YES | YES |
 | AI Chat | YES | YES | YES |
 | AI Diagnosis | - | YES | YES |
-| **Voice Documentation** | - | YES | YES |
-| **Wearable Integration** | - | YES | YES |
-| **Knowledge Graph** | - | YES | YES |
+| Voice Documentation | - | YES | YES |
+| Wearable Integration | - | YES | YES |
+| Knowledge Graph | - | YES | YES |
 | Knowledge Base | - | YES | YES |
 | Drug Interaction Checker | - | YES | YES |
 | Treatment Plans | - | YES | YES |
@@ -180,12 +195,12 @@ VITE_WS_URL=ws://localhost:8000
 | `/api/chat` | AI chat conversations |
 | `/api/medical/diagnosis` | AI diagnosis from symptoms |
 | `/api/medical/knowledge` | Knowledge base search, RAG, hybrid search |
-| `/api/voice` | **Voice upload, transcription, SOAP generation** |
-| `/api/voice/consultation` | **WebSocket ambient transcription** |
-| `/api/predictions` | **Readmission risk, alerts, high-risk patients** |
-| `/api/wearable` | **Device OAuth, sync, vitals data** |
-| `/api/knowledge-graph` | **D3.js graph export, concept search, paths** |
-| `/api/features` | **XAI, treatment recommender, clinical trials, genomics** |
+| `/api/voice` | Voice upload, transcription, SOAP generation |
+| `/api/voice/consultation` | WebSocket ambient transcription |
+| `/api/predictions` | Readmission risk, alerts, high-risk patients |
+| `/api/wearable` | Device OAuth, sync, vitals data |
+| `/api/knowledge-graph` | D3.js graph export, concept search, paths |
+| `/api/features` | XAI, treatment recommender, clinical trials, genomics |
 | `/api/reports` | OPD case sheet, prescription, medical history PDFs |
 | `/api/treatment` | Treatment plan management |
 | `/api/timeline` | Patient medical timeline |
@@ -193,6 +208,43 @@ VITE_WS_URL=ws://localhost:8000
 | `/api/fhir` | FHIR resources |
 | `/health` | Health check |
 | `/health/detailed` | System metrics (CPU, memory, disk) |
+| `/metrics` | Prometheus metrics exposition |
+
+---
+
+## Architecture
+
+```
+                    +------------+
+                    |  Frontend   |  React + TypeScript + Vite
+                    |  (SPA/PWA) |  MUI v5, Recharts, D3.js
+                    +-----+------+
+                          | HTTP / WebSocket
+                    +-----v------+
+                    |  FastAPI    |  JWT auth, CORS, rate limiting
+                    |  Backend    |  Prometheus metrics middleware
+                    +-----+------+
+              +-----------+-----------+
+              |           |           |
+        +-----v---+ +----v----+ +---v------+
+        | API     | |Services | |Background|
+        | Routers | |  Layer  | | Workers  |
+        +---------+ +----+----+ +----------+
+                         |       - Upload queue
+              +----------+-------- - Wearable sync
+              |          |         - KB growth
+        +-----v---+ +---v-----+
+        | OpenAI  | |SQLAlchemy|
+        | FAISS   | |SQLite/PG |
+        | Whisper | +---------+
+        +---------+
+```
+
+**Backend layers**: API routers → Service layer → Persistence (ORM) + Cross-cutting (middleware, monitoring, telemetry).
+
+**Background workers**: Upload queue processing, wearable sync, knowledge base growth — started during app lifespan, stopped on graceful shutdown.
+
+**Deployment targets**: Web/PWA, Android/iOS (Capacitor), Windows/Linux (Electron), Docker.
 
 ---
 
@@ -232,11 +284,34 @@ VITE_WS_URL=ws://localhost:8000
 
 ---
 
+## Testing
+
+```powershell
+# Backend -- all tests with coverage
+cd backend
+pytest --cov=app
+
+# Backend -- specific suite
+pytest tests/test_api.py -v
+pytest tests/test_readmission_predictor.py -v
+pytest tests/test_voice_transcriber.py -v
+pytest tests/integration/ -v
+
+# Frontend -- unit tests (Vitest + Testing Library)
+cd frontend
+npm test
+
+# Frontend -- e2e (Playwright)
+npx playwright test
+```
+
+---
+
 ## Building for Production
 
 ```powershell
 # Web build
-cd frontend ; npm run build:web
+cd frontend && npm run build:web
 
 # Docker (full stack with PostgreSQL)
 docker-compose up --build
@@ -250,61 +325,75 @@ npm run build:windows
 
 ---
 
-## Testing
-
-```powershell
-cd backend
-pytest                        # all tests
-pytest --cov=app              # with coverage
-pytest tests/test_api.py -v   # specific file
-```
-
----
-
 ## Project Structure
 
 ```
 Natpudan-/
-├── backend/
-│   ├── app/
-│   │   ├── api/              # Route handlers
-│   │   │   ├── voice.py              # Voice upload & SOAP generation
-│   │   │   ├── voice_consul.py       # WebSocket ambient transcription
-│   │   │   ├── predictions.py        # Readmission risk & alerts
-│   │   │   ├── wearable_auth.py      # Wearable OAuth
-│   │   │   ├── knowledge_graph_viz.py # D3 graph export
-│   │   │   └── ...
-│   │   ├── services/         # Business logic
-│   │   │   ├── voice_transcriber.py  # Whisper integration
-│   │   │   ├── voice_to_soap.py      # SOAP note generation
-│   │   │   ├── readmission_predictor.py # ML prediction
-│   │   │   ├── ml_trainer.py         # Model training
-│   │   │   ├── alert_generator.py    # Clinical alerts
-│   │   │   ├── wearable_sync.py      # Device data sync
-│   │   │   └── ...
-│   │   ├── models.py         # SQLAlchemy ORM models
-│   │   ├── database.py       # DB session management + auto-migrations
-│   │   └── main.py           # FastAPI app entrypoint
-│   ├── .env.template         # Environment configuration template
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── VoiceDocumentation.tsx    # Voice recording UI
-│   │   │   ├── WearableIntegration.tsx   # Device management
-│   │   │   ├── KnowledgeGraphVisualizer.tsx # D3 graph
-│   │   │   └── ...
-│   │   ├── components/
-│   │   │   ├── AlertsWidget.tsx          # Clinical alerts widget
-│   │   │   └── ...
-│   │   ├── services/         # API clients
-│   │   └── context/          # Auth context
-│   └── vite.config.ts
-├── INTEGRATION_GUIDE.md      # Feature integration instructions
-├── DEPLOYMENT_TESTING_GUIDE.md # Deployment & testing procedures
-├── IMPLEMENTATION_SUMMARY.md # Complete technical overview
-├── start-app.ps1             # One-command dev startup (Windows)
-└── docker-compose.yml        # Production deployment
++-- backend/
+|   +-- app/
+|   |   +-- api/                       # Route handlers
+|   |   |   +-- auth_new.py            # JWT + OAuth authentication
+|   |   |   +-- chat_new.py            # AI chat endpoints
+|   |   |   +-- voice.py               # Voice upload and SOAP generation
+|   |   |   +-- voice_consul.py        # WebSocket ambient transcription
+|   |   |   +-- predictions.py         # Readmission risk and alerts
+|   |   |   +-- wearable_auth.py       # Wearable OAuth
+|   |   |   +-- knowledge_graph_viz.py # D3 graph export
+|   |   |   +-- futuristic_features.py # XAI, trials, genomics, etc.
+|   |   |   +-- health.py              # Health checks and metrics
+|   |   |   +-- ...
+|   |   +-- services/                  # Business logic
+|   |   |   +-- voice_transcriber.py   # Whisper integration
+|   |   |   +-- voice_to_soap.py       # SOAP note generation
+|   |   |   +-- readmission_predictor.py # ML prediction
+|   |   |   +-- ml_trainer.py          # Model training
+|   |   |   +-- alert_generator.py     # Clinical alerts
+|   |   |   +-- wearable_sync.py       # Device data sync
+|   |   |   +-- vector_knowledge_base.py # FAISS vector search
+|   |   |   +-- drug_interactions.py   # Drug interaction checker
+|   |   |   +-- ...
+|   |   +-- models.py                  # SQLAlchemy ORM models
+|   |   +-- database.py                # DB session management
+|   |   +-- main.py                    # FastAPI app entrypoint
+|   |   +-- telemetry.py               # OpenTelemetry bootstrap
+|   |   +-- monitoring.py              # Prometheus metrics
+|   +-- tests/
+|   |   +-- test_api.py
+|   |   +-- test_readmission_predictor.py
+|   |   +-- test_voice_transcriber.py
+|   |   +-- test_hybrid_search.py
+|   |   +-- test_wearable_sync.py
+|   |   +-- test_vector_kb.py
+|   |   +-- integration/               # Integration tests
+|   +-- .env.template
+|   +-- requirements.txt
++-- frontend/
+|   +-- src/
+|   |   +-- pages/
+|   |   |   +-- VoiceDocumentation.tsx
+|   |   |   +-- WearableIntegration.tsx
+|   |   |   +-- KnowledgeGraphVisualizer.tsx
+|   |   |   +-- Diagnosis.tsx
+|   |   |   +-- DrugChecker.tsx
+|   |   |   +-- ...
+|   |   +-- components/
+|   |   |   +-- AlertsWidget.tsx
+|   |   |   +-- ErrorBoundary.tsx
+|   |   |   +-- ...
+|   |   +-- services/                  # API clients
+|   |   +-- context/                   # Auth context
+|   |   +-- test/                      # Test setup
+|   +-- e2e/                           # Playwright e2e tests
+|   +-- vitest.config.ts
+|   +-- vite.config.ts
++-- docs/
+|   +-- architecture.md
+|   +-- deployment.md
+|   +-- PRODUCTION_CHECKLIST.md
++-- docker-compose.yml
++-- start-app.ps1                      # One-command dev startup (Windows)
++-- CHANGELOG.md
++-- IMPLEMENTATION_SUMMARY.md
 ```
 
 ---
@@ -313,43 +402,64 @@ Natpudan-/
 
 | Model | Description |
 |-------|-------------|
+| `User` | Authentication, roles (staff/doctor/admin) |
+| `Patient` | Demographics, medical history |
+| `Conversation` / `Message` | AI chat sessions |
+| `TreatmentPlan` / `Medication` / `FollowUp` | Treatment management |
 | `VoiceRecording` | Audio files, transcriptions, SOAP linkage |
 | `WearableDeviceAuth` | OAuth tokens for wearable devices |
 | `WearableDeviceData` | Time-series vital measurements |
 | `WearableSyncLog` | Sync audit trail |
-| `Alert` | Clinical alerts with severity & recommendations |
+| `Alert` | Clinical alerts with severity and recommendations |
+
+---
+
+## Observability
+
+| Endpoint | Description |
+|----------|-------------|
+| `/health` | Basic liveness probe |
+| `/health/detailed` | System metrics — CPU, memory, disk |
+| `/metrics` | Prometheus exposition format |
+
+Optional integrations (configured via environment variables):
+- **Prometheus** — per-request latency and status code metrics
+- **OpenTelemetry** — distributed tracing via OTLP exporter
+- **Sentry** — error tracking and performance monitoring
 
 ---
 
 ## Troubleshooting
 
-**Port conflict on 8000**
-Backend auto-tries 8001. Update `VITE_API_BASE_URL` in `frontend/.env` if needed.
-
-**Missing Python packages**
-```powershell
-pip install -r backend/requirements.txt
-```
-
-**Android build fails**
-Requires Android Studio with SDK. Set the `ANDROID_HOME` environment variable.
-
-**AI features not working**
-Set `OPENAI_API_KEY` in `backend/.env`. Use `AI_PROVIDER=auto` to fall back to local models (Ollama/TinyLLama).
-
-**Voice transcription fails**
-Ensure `OPENAI_API_KEY` is valid. Check audio file size < 25MB.
-
-**Wearable sync not working**
-Verify OAuth credentials. Check `backend/logs/` for WEARABLE errors.
+| Problem | Solution |
+|---------|----------|
+| Port conflict on 8000 | Backend auto-tries 8001. Update `VITE_API_BASE_URL` in `frontend/.env`. |
+| Missing Python packages | `pip install -r backend/requirements.txt` |
+| Android build fails | Requires Android Studio + SDK. Set `ANDROID_HOME` env var. |
+| AI features not working | Set `OPENAI_API_KEY` in `backend/.env`. Use `AI_PROVIDER=auto` for local fallback. |
+| Voice transcription fails | Ensure valid `OPENAI_API_KEY`. Audio file size must be < 25 MB. |
+| Wearable sync not working | Verify OAuth credentials. Check `backend/logs/` for errors. |
 
 ---
 
 ## Documentation
 
-- **INTEGRATION_GUIDE.md** - Feature-by-feature setup instructions
-- **DEPLOYMENT_TESTING_GUIDE.md** - Development setup, testing, production deployment
-- **IMPLEMENTATION_SUMMARY.md** - Complete technical overview of all 15 features
+| Document | Description |
+|----------|-------------|
+| [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) | Complete technical overview of all 15 features |
+| [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | Feature-by-feature setup instructions |
+| [DEPLOYMENT_TESTING_GUIDE.md](DEPLOYMENT_TESTING_GUIDE.md) | Development setup, testing, production deployment |
+| [CHANGELOG.md](CHANGELOG.md) | Release history and unreleased changes |
+| [docs/architecture.md](docs/architecture.md) | Service and runtime architecture map |
+| [docs/deployment.md](docs/deployment.md) | Deployment checklist and operational validation |
+
+---
+
+## Known Issues
+
+- Some advanced AI and knowledge services degrade gracefully when optional dependencies are missing (e.g., FAISS, rank-bm25, OpenTelemetry exporters).
+- Local test execution may require extra dev dependencies not present in minimal runtime environments.
+- `backend/app/main.py` remains a large composition root; incremental modularization is ongoing.
 
 ---
 

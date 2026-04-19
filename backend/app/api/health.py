@@ -1,7 +1,7 @@
 """
 Health check and monitoring endpoints
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from typing import Dict, Any
 import time
 import psutil
@@ -19,8 +19,11 @@ START_TIME = time.time()
 
 def get_medical_assistant():
     """Dependency to get medical assistant instance"""
-    from app.main import medical_assistant
-    return medical_assistant
+    try:
+        from app.main import medical_assistant
+        return medical_assistant
+    except (ImportError, AttributeError):
+        return None
 
 
 @router.get("/health")
@@ -90,7 +93,7 @@ async def detailed_health_check() -> Dict[str, Any]:
         # Get system metrics
         cpu_percent = psutil.cpu_percent(interval=1)
         memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
+        disk = psutil.disk_usage(os.path.abspath(os.sep))
         
         # Get process info
         process = psutil.Process(os.getpid())
@@ -171,8 +174,11 @@ async def check_dependencies() -> Dict[str, Any]:
     
     # Check database
     try:
-        from app.database import get_db
+        from app.database import SessionLocal
         # Simple database connectivity check
+        db = SessionLocal()
+        db.execute("SELECT 1")
+        db.close()
         dependencies["services"]["database"] = {
             "status": "healthy",
             "type": "sqlite"
@@ -244,7 +250,7 @@ async def get_metrics() -> Dict[str, Any]:
             "system": {
                 "cpu_percent": psutil.cpu_percent(interval=0.1),
                 "memory_percent": psutil.virtual_memory().percent,
-                "disk_percent": psutil.disk_usage('/').percent
+                "disk_percent": psutil.disk_usage(os.path.abspath(os.sep)).percent
             }
         }
         
@@ -283,10 +289,11 @@ def _format_uptime(seconds: float) -> str:
 
 @router.get('/health/ai-provider')
 async def ai_provider_status() -> Dict[str, Any]:
-    '''
-    Check AI provider status and configuration
-    Returns status of OpenAI, Ollama, and embedded models
-    '''
+    """
+    Check AI provider status and configuration.
+
+    Returns status of OpenAI, Ollama, and embedded models.
+    """
     try:
         from app.utils.hybrid_ai_service import get_hybrid_ai
         

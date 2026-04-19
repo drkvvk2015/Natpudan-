@@ -191,6 +191,15 @@ const PatientIntake: React.FC = () => {
   const [currentFamily, setCurrentFamily] = useState<Partial<FamilyHistory>>({})
   const [saving, setSaving] = useState(false)
   const [generatingReport, setGeneratingReport] = useState(false)
+  const [complaintInput, setComplaintInput] = useState('')
+  const [complaintDurationInput, setComplaintDurationInput] = useState('')
+  const [presentHistoryDraft, setPresentHistoryDraft] = useState({
+    title: '',
+    duration: '',
+    associationFactors: [] as string[],
+    relievingFactors: [] as string[],
+    aggravatingFactors: [] as string[],
+  })
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -223,6 +232,7 @@ const PatientIntake: React.FC = () => {
     setLoading(true)
     try {
       const data = await getPatientIntake(id)
+      const dataFallback = data as unknown as Record<string, any>
       setPatientDetails({
         name: data.name,
         age: data.age,
@@ -230,6 +240,26 @@ const PatientIntake: React.FC = () => {
         bloodType: data.bloodType,
         travelHistory: data.travelHistory,
         familyHistory: data.familyHistory as FamilyHistory[],
+        heightCm: data.heightCm ?? dataFallback.height_cm,
+        weightKg: data.weightKg ?? dataFallback.weight_kg,
+        bmi: data.bmi,
+        waistCm: data.waistCm ?? dataFallback.waist_cm,
+        hipCm: data.hipCm ?? dataFallback.hip_cm,
+        whr: data.whr,
+        muacCm: data.muacCm ?? dataFallback.muac_cm,
+        headCircumferenceCm: data.headCircumferenceCm ?? dataFallback.head_circumference_cm,
+        chestExpansionCm: data.chestExpansionCm ?? dataFallback.chest_expansion_cm,
+        sittingHeightCm: data.sittingHeightCm ?? dataFallback.sitting_height_cm,
+        standingHeightCm: data.standingHeightCm ?? dataFallback.standing_height_cm,
+        armSpanCm: data.armSpanCm ?? dataFallback.arm_span_cm,
+        bodyFatPercent: data.bodyFatPercent ?? dataFallback.body_fat_percent,
+        bpSystolic: data.bpSystolic ?? dataFallback.bp_systolic,
+        bpDiastolic: data.bpDiastolic ?? dataFallback.bp_diastolic,
+        pulsePerMin: data.pulsePerMin ?? dataFallback.pulse_per_min,
+        respRatePerMin: data.respRatePerMin ?? dataFallback.resp_rate_per_min,
+        temperatureC: data.temperatureC ?? dataFallback.temperature_c,
+        chiefComplaints: data.chiefComplaints ?? dataFallback.chief_complaints ?? [],
+        presentHistory: data.presentHistory ?? dataFallback.present_history ?? [],
       })
     } catch (error) {
       console.error('Failed to load patient data:', error)
@@ -881,24 +911,33 @@ const PatientIntake: React.FC = () => {
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
             <TextField fullWidth label="Complaint" disabled={isViewMode}
-              value={''}
-              onChange={() => {}}
+              value={complaintInput}
+              onChange={(e) => setComplaintInput(e.target.value)}
               placeholder="e.g., Fever"
             />
           </Grid>
           <Grid item xs={12} md={4}>
-            <TextField fullWidth label="Duration" disabled={isViewMode} placeholder="e.g., 3 days" />
+            <TextField
+              fullWidth
+              label="Duration"
+              disabled={isViewMode}
+              placeholder="e.g., 3 days"
+              value={complaintDurationInput}
+              onChange={(e) => setComplaintDurationInput(e.target.value)}
+            />
           </Grid>
           {!isViewMode && (
             <Grid item xs={12} md={2}>
               <Button variant="contained" onClick={() => {
-                const complaintInput = (document.querySelector('input[placeholder="e.g., Fever"]') as HTMLInputElement)?.value || ''
-                const durationInput = (document.querySelector('input[placeholder="e.g., 3 days"]') as HTMLInputElement)?.value || ''
-                if (!complaintInput || !durationInput) return
+                const complaint = complaintInput.trim()
+                const duration = complaintDurationInput.trim()
+                if (!complaint || !duration) return
                 setPatientDetails({
                   ...patientDetails,
-                  chiefComplaints: [...(patientDetails.chiefComplaints||[]), { complaint: complaintInput, duration: durationInput }]
+                  chiefComplaints: [...(patientDetails.chiefComplaints||[]), { complaint, duration }]
                 })
+                setComplaintInput('')
+                setComplaintDurationInput('')
               }}>Add</Button>
             </Grid>
           )}
@@ -942,47 +981,68 @@ const PatientIntake: React.FC = () => {
         </Typography>
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <TextField fullWidth label="Complaint Title" disabled={isViewMode} placeholder="e.g., Cough" id="ph-title" />
+            <TextField
+              fullWidth
+              label="Complaint Title"
+              disabled={isViewMode}
+              placeholder="e.g., Cough"
+              value={presentHistoryDraft.title}
+              onChange={(e) => setPresentHistoryDraft({ ...presentHistoryDraft, title: e.target.value })}
+            />
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField fullWidth label="Duration" disabled={isViewMode} placeholder="e.g., 2 weeks" id="ph-duration" />
+            <TextField
+              fullWidth
+              label="Duration"
+              disabled={isViewMode}
+              placeholder="e.g., 2 weeks"
+              value={presentHistoryDraft.duration}
+              onChange={(e) => setPresentHistoryDraft({ ...presentHistoryDraft, duration: e.target.value })}
+            />
           </Grid>
           <Grid item xs={12}>
             <Autocomplete multiple freeSolo disabled={isViewMode}
               options={['Fever','Chest pain','Shortness of breath','Palpitations','Nausea']}
-              onChange={(_, v) => (document.getElementById('ph-assoc') as HTMLInputElement).value = JSON.stringify(v)}
+              value={presentHistoryDraft.associationFactors}
+              onChange={(_, v) => setPresentHistoryDraft({ ...presentHistoryDraft, associationFactors: v as string[] })}
               renderInput={(params) => <TextField {...params} label="Association Factors" placeholder="Select or type" />}
             />
-            <input id="ph-assoc" type="hidden" />
           </Grid>
           <Grid item xs={12}>
             <Autocomplete multiple freeSolo disabled={isViewMode}
               options={['Rest','Hydration','Analgesics','Antipyretics']}
-              onChange={(_, v) => (document.getElementById('ph-relieve') as HTMLInputElement).value = JSON.stringify(v)}
+              value={presentHistoryDraft.relievingFactors}
+              onChange={(_, v) => setPresentHistoryDraft({ ...presentHistoryDraft, relievingFactors: v as string[] })}
               renderInput={(params) => <TextField {...params} label="Relieving Factors" placeholder="Select or type" />}
             />
-            <input id="ph-relieve" type="hidden" />
           </Grid>
           <Grid item xs={12}>
             <Autocomplete multiple freeSolo disabled={isViewMode}
               options={['Exercise','Cold air','Dust','Spicy food']}
-              onChange={(_, v) => (document.getElementById('ph-aggravate') as HTMLInputElement).value = JSON.stringify(v)}
+              value={presentHistoryDraft.aggravatingFactors}
+              onChange={(_, v) => setPresentHistoryDraft({ ...presentHistoryDraft, aggravatingFactors: v as string[] })}
               renderInput={(params) => <TextField {...params} label="Aggravating Factors" placeholder="Select or type" />}
             />
-            <input id="ph-aggravate" type="hidden" />
           </Grid>
           {!isViewMode && (
             <Grid item xs={12}>
               <Button variant="contained" onClick={() => {
-                const title = (document.getElementById('ph-title') as HTMLInputElement)?.value || ''
-                const duration = (document.getElementById('ph-duration') as HTMLInputElement)?.value || ''
-                const assoc = JSON.parse((document.getElementById('ph-assoc') as HTMLInputElement)?.value || '[]')
-                const relieve = JSON.parse((document.getElementById('ph-relieve') as HTMLInputElement)?.value || '[]')
-                const aggravate = JSON.parse((document.getElementById('ph-aggravate') as HTMLInputElement)?.value || '[]')
+                const title = presentHistoryDraft.title.trim()
+                const duration = presentHistoryDraft.duration.trim()
+                const assoc = presentHistoryDraft.associationFactors
+                const relieve = presentHistoryDraft.relievingFactors
+                const aggravate = presentHistoryDraft.aggravatingFactors
                 if (!title) return
                 const newItem = { id: Date.now().toString(), title, duration, associationFactors: assoc, relievingFactors: relieve, aggravatingFactors: aggravate }
                 const next = [...(patientDetails.presentHistory||[]), newItem]
                 setPatientDetails({ ...patientDetails, presentHistory: next })
+                setPresentHistoryDraft({
+                  title: '',
+                  duration: '',
+                  associationFactors: [],
+                  relievingFactors: [],
+                  aggravatingFactors: [],
+                })
               }}>Add Complaint</Button>
             </Grid>
           )}

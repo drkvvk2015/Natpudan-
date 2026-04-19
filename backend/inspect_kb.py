@@ -3,13 +3,12 @@
 
 import sys
 from pathlib import Path
-import pickle
 
 # Add backend to path
-backend_dir = Path(__file__).parent / "backend"
+backend_dir = Path(__file__).parent / \"backend\"
 sys.path.insert(0, str(backend_dir))
 
-from app.services.local_vector_kb import LocalVectorKnowledgeBase
+from app.services.local_vector_kb import LocalVectorKnowledgeBase  # noqa: E402
 
 def main():
     print("[SEARCH] INSPECTING KNOWLEDGE BASE METADATA")

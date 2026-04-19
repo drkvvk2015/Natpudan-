@@ -18,6 +18,12 @@
     "types": ["vite/client"]
   },
   "include": ["src"],
-  "exclude": ["src/pages/OAuthCallback_old.tsx"],
+  "exclude": [
+    "src/pages/OAuthCallback_old.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "e2e/**"
+  ],
   "references": []
 }

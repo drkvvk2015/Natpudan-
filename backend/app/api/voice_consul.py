@@ -1,7 +1,7 @@
 """WebSocket API for ambient transcription in consultations"""
 from fastapi import APIRouter, WebSocket, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from app.database import get_db, SessionLocal
 from app.services.ambient_transcriber import get_ambient_transcriber
 from app.models import Conversation, Message
 import json
@@ -12,6 +12,7 @@ router = APIRouter(prefix="/voice/consultation", tags=["voice-consultation"])
 
 @router.websocket("/ws/{conversation_id}")
 async def websocket_consultation_transcription(websocket: WebSocket, conversation_id: int):
+    db = None
     try:
         await websocket.accept()
         db = SessionLocal()
@@ -56,10 +57,11 @@ async def websocket_consultation_transcription(websocket: WebSocket, conversatio
     except Exception as e:
         logger.error(f"[VOICE_CONSUL] WebSocket error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 @router.get("/summary/{conversation_id}")
-def get_consultation_summary(conversation_id: int, db: Session = Depends(SessionLocal)):
+def get_consultation_summary(conversation_id: int, db: Session = Depends(get_db)):
     try:
         messages = db.query(Message).filter(
             Message.conversation_id == conversation_id,

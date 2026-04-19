@@ -10,6 +10,7 @@ import jwt
 import httpx
 import os
 import logging
+import secrets
 from dotenv import load_dotenv
 
 from app.database import get_db
@@ -20,21 +21,46 @@ from app.crud import (
     get_user_by_id,
 )
 from app.models import User
+from app.core.config import settings
+from app.services.email_service import get_email_service
+
+logger = logging.getLogger(__name__)
 
 # Load environment once at startup - not at import time
 try:
     load_dotenv()
 except Exception as e:
     logger.warning(f"Failed to load .env file: {e}")
-    pass  # Continue with environment variables
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-logger = logging.getLogger(__name__)
 
 # JWT Configuration from environment
-SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key-change-in-production")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
+# OAuth state anti-CSRF store (single-use, short-lived)
+OAUTH_STATE_TTL_SECONDS = 600
+_oauth_state_store: Dict[str, datetime] = {}
+
+
+def _store_oauth_state(state: str) -> None:
+    """Store generated OAuth state for later one-time validation."""
+    now = datetime.utcnow()
+    _oauth_state_store[state] = now + timedelta(seconds=OAUTH_STATE_TTL_SECONDS)
+
+    # Opportunistic cleanup of expired states
+    expired = [key for key, expiry in _oauth_state_store.items() if expiry <= now]
+    for key in expired:
+        _oauth_state_store.pop(key, None)
+
+
+def _consume_oauth_state(state: str) -> bool:
+    """Validate and consume OAuth state exactly once."""
+    expiry = _oauth_state_store.pop(state, None)
+    if not expiry:
+        return False
+    return expiry > datetime.utcnow()
 
 # OAuth2 Configuration from environment
 OAUTH_CONFIG = {
@@ -81,6 +107,7 @@ class SocialLoginRequest(BaseModel):
     provider: str  # google, github, microsoft
     code: str
     redirect_uri: str
+    state: str
     role: str = "staff"  # Default to staff, but allow selection
 
 
@@ -131,13 +158,13 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired"
-        )
+        ) from None
     except jwt.PyJWTError as e:
         logger.error(f"JWT decode error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid authentication credentials: {str(e)}"
-        )
+        ) from e
     
     user = get_user_by_id(db, user_id)
     if user is None:
@@ -190,7 +217,7 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Registration failed: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -223,7 +250,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Login failed due to server error"
-        )
+        ) from e
 
 
 @router.get("/me")
@@ -264,8 +291,8 @@ async def get_oauth_url(provider: str, redirect_uri: str):
         )
     
     # Generate state parameter for security
-    import secrets
     state = secrets.token_urlsafe(32)
+    _store_oauth_state(state)
     
     # Build parameters based on provider
     if provider == "google":
@@ -317,6 +344,13 @@ async def oauth_callback(request: SocialLoginRequest, db: Session = Depends(get_
     try:
         provider = request.provider
         logger.info(f"OAuth callback received for provider: {provider}")
+
+        if not _consume_oauth_state(request.state):
+            logger.warning("OAuth callback rejected due to invalid or expired state")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired OAuth state"
+            )
         
         if provider not in OAUTH_CONFIG:
             raise HTTPException(
@@ -445,7 +479,7 @@ async def oauth_callback(request: SocialLoginRequest, db: Session = Depends(get_
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"OAuth authentication failed: {str(e)}"
-        )
+        ) from e
 
 
 # Password Reset Models
@@ -464,7 +498,7 @@ async def request_password_reset(
     request: ForgotPasswordRequest,
     db: Session = Depends(get_db)
 ):
-    """Request a password reset token. In production, this would send an email."""
+    """Request a password reset token and deliver it via email."""
     try:
         logger.info(f"Password reset requested for: {request.email}")
         
@@ -483,24 +517,29 @@ async def request_password_reset(
         }
         reset_token = jwt.encode(reset_token_data, SECRET_KEY, algorithm=ALGORITHM)
         
-        # In production, send this token via email
-        # For now, return it directly (development only)
-        reset_link = f"http://127.0.0.1:5173/reset-password?token={reset_token}"
+        frontend_base_url = os.getenv("FRONTEND_URL", "http://127.0.0.1:5173")
+        reset_link = f"{frontend_base_url.rstrip('/')}/reset-password?token={reset_token}"
         
         logger.info(f"Password reset token generated for {user.email}")
-        print(f"Password Reset Link for {user.email}: {reset_link}")
-        
-        return {
-            "message": "Password reset instructions sent to email.",
-            "reset_token": reset_token,  # Remove this in production
-            "reset_link": reset_link  # Remove this in production
-        }
+
+        email_service = get_email_service()
+        sent = email_service.send_password_reset_email(
+            to_email=user.email,
+            full_name=user.full_name,
+            reset_link=reset_link,
+        )
+
+        if not sent and settings.is_development():
+            logger.warning("Password reset email not sent (email provider not configured).")
+            logger.info(f"[DEV ONLY] Password reset link for {user.email}: {reset_link}")
+
+        return {"message": "If the email exists, a password reset link will be sent."}
     except Exception as e:
         logger.error(f"Password reset error for {request.email}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process password reset request"
-        )
+        ) from e
 
 
 @router.post("/reset-password")
@@ -544,9 +583,9 @@ async def reset_password(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Reset token has expired. Please request a new one."
-        )
+        ) from None
     except jwt.JWTError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid reset token"
-        )
+        ) from None

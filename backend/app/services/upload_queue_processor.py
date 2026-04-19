@@ -7,7 +7,7 @@ import logging
 import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Any, Dict, Optional, Callable
 import time
 
 from sqlalchemy.orm import Session
@@ -43,7 +43,7 @@ class UploadQueueProcessor:
         self.is_running = False
         logger.info("[QUEUE] Stopping PDF upload queue processor")
     
-    def process_queue_sync(self, db: Optional[Session] = None) -> dict:
+    def process_queue_sync(self, db: Optional[Session] = None) -> Dict[str, Any]:
         """
         Process queued documents synchronously
         Called periodically by the application
@@ -293,7 +293,7 @@ def get_queue_processor() -> UploadQueueProcessor:
     return _processor
 
 
-def process_upload_queue() -> dict:
+def process_upload_queue() -> Dict[str, Any]:
     """
     Process the upload queue (called periodically)
     Entry point for background task runners

@@ -145,13 +145,6 @@ class TreatmentPlanResponse(BaseModel):
 from app.database import get_db
 from app.models import TreatmentPlan, Medication, FollowUp, PatientIntake, MonitoringRecord, TreatmentStatus, MedicationFrequency, MedicationRoute, FollowUpStatus
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
 
 @router.post("/treatment-plans", response_model=TreatmentPlanResponse)
 async def create_treatment_plan(plan: TreatmentPlanCreate, db: Session = Depends(get_db)):

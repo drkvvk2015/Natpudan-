@@ -52,7 +52,12 @@ class LocalVectorKnowledgeBase:
             model_name: Sentence transformer model (all-MiniLM-L6-v2, all-mpnet-base-v2, etc.)
             embedding_dimension: Dimension of embeddings (384 for MiniLM, 768 for mpnet)
         """
-        self.storage_dir = Path(storage_dir)
+        # Resolve storage_dir relative to backend/ directory
+        if not Path(storage_dir).is_absolute():
+            backend_dir = Path(__file__).resolve().parent.parent.parent
+            self.storage_dir = backend_dir / storage_dir
+        else:
+            self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         
         self.model_name = model_name
@@ -122,14 +127,23 @@ class LocalVectorKnowledgeBase:
         """Save FAISS index and metadata to disk"""
         try:
             if FAISS_AVAILABLE and self.index is not None:
-                faiss.write_index(self.index, str(self.index_path))
-            
-            with open(self.metadata_path, 'wb') as f:
+                tmp_index = str(self.index_path) + ".tmp"
+                faiss.write_index(self.index, tmp_index)
+                # Atomic rename (works on Windows if target doesn't exist)
+                if self.index_path.exists():
+                    self.index_path.unlink()
+                Path(tmp_index).rename(self.index_path)
+
+            tmp_meta = str(self.metadata_path) + ".tmp"
+            with open(tmp_meta, 'wb') as f:
                 pickle.dump({
                     'documents': self.documents,
                     'document_count': self.document_count
                 }, f)
-            
+            if self.metadata_path.exists():
+                self.metadata_path.unlink()
+            Path(tmp_meta).rename(self.metadata_path)
+
             logger.info(f"Saved local index with {len(self.documents)} chunks")
         except Exception as e:
             logger.error(f"Error saving local index: {e}")
@@ -165,7 +179,7 @@ class LocalVectorKnowledgeBase:
                 logger.info(f"Loading local embedding model: {self.model_name_to_load}...")
                 self.embedding_model = SentenceTransformer(self.model_name_to_load)
                 self._model_loaded = True
-                logger.info(f"[OK] Local embedding model loaded")
+                logger.info("[OK] Local embedding model loaded")
             except Exception as e:
                 logger.error(f"Failed to load embedding model: {e}")
     

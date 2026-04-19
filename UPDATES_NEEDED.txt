@@ -1,0 +1,367 @@
+================================================================================
+                    NATPUDAN AI MEDICAL ASSISTANT
+                        UPDATES NEEDED CHECKLIST
+================================================================================
+Generated: 2026-04-18
+Based on: Comprehensive Code Review v2.0
+
+================================================================================
+                         PRIORITY LEGEND
+================================================================================
+
+🔴 CRITICAL  - Security vulnerabilities, must fix immediately
+🟠 HIGH      - Code quality issues, fix within 2 weeks
+🟡 MEDIUM    - Architecture improvements, fix within 1 month
+🟢 LOW       - Testing/Documentation, fix within quarter
+
+================================================================================
+                    SECTION 1: CRITICAL SECURITY UPDATES
+================================================================================
+Priority: 🔴 CRITICAL | Timeline: IMMEDIATE (This Week)
+
+┌────┬─────────────────────────────────────────────────────────────────────────┐
+│ #  │ UPDATE                                                                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 1  │ Remove password reset token from API response                           │
+│    │ File: backend/app/api/auth_new.py (lines 495-496)                       │
+│    │ Issue: Tokens returned in API instead of email only                     │
+│    │ Risk: Token exposure allows password reset bypass                       │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 2  │ Validate OAuth state parameter on callback                              │
+│    │ File: backend/app/api/auth_new.py (lines 267-268, 314-448)              │
+│    │ Issue: State generated but never validated                              │
+│    │ Risk: CSRF attack vulnerability                                         │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 3  │ Fix default SECRET_KEY generation issue                                 │
+│    │ File: backend/app/core/config.py (line 30)                              │
+│    │ Issue: New key generated on each restart                                │
+│    │ Risk: All sessions invalidated, potential session hijacking             │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 4  │ Remove hardcoded user ID (created_by_id=1)                              │
+│    │ File: backend/app/api/voice.py (line 242)                               │
+│    │ Issue: Hardcoded user instead of getting from auth context              │
+│    │ Risk: Data attribution errors, audit trail corruption                   │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 5  │ Add rate limiting middleware                                            │
+│    │ File: backend/app/middleware/rate_limiter.py (NEW FILE)                 │
+│    │ Issue: No rate limiting on API endpoints                                │
+│    │ Risk: DoS attacks, brute force attacks                                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 6  │ Implement proper email service for password reset                       │
+│    │ File: backend/app/services/email_service.py (NEW FILE)                  │
+│    │ Issue: Password reset tokens returned in API response                   │
+│    │ Risk: Security vulnerability, production blocker                        │
+└────┴─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                    SECTION 2: CODE QUALITY UPDATES
+================================================================================
+Priority: 🟠 HIGH | Timeline: 2 Weeks
+
+┌────┬─────────────────────────────────────────────────────────────────────────┐
+│ #  │ UPDATE                                                                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 1  │ Remove/fix all 20 TODO comments                                         │
+│    │ Files: main.py, voice.py, readmission_predictor.py, config.py, etc.     │
+│    │ Action: Either implement or create GitHub issues                        │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 2  │ Fix silent exception handling                                           │
+│    │ File: backend/app/api/auth_new.py (lines 28-29)                         │
+│    │ Issue: pass after failed .env load                                      │
+│    │ Action: Fail fast or use explicit defaults                              │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 3  │ Document ML model coefficients as named constants                       │
+│    │ File: backend/app/services/readmission_predictor.py (lines 207-227)     │
+│    │ Issue: Magic numbers (0.1, 0.25, 0.03, etc.)                            │
+│    │ Action: Extract to constants with medical literature citations          │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 4  │ Fix database connection reuse in background loops                       │
+│    │ File: backend/app/main.py (lines 122-189)                               │
+│    │ Issue: New DB connection created every 5-minute iteration               │
+│    │ Action: Reuse connection or use connection pool properly                │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 5  │ Add request validation (Pydantic models for all endpoints)              │
+│    │ Files: All API routers in backend/app/api/                              │
+│    │ Issue: Inconsistent input validation                                    │
+│    │ Action: Create Pydantic request/response models                         │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 6  │ Standardize error handling patterns                                     │
+│    │ Files: All service files in backend/app/services/                       │
+│    │ Issue: Inconsistent try/except patterns                                 │
+│    │ Action: Create error handling utility module                            │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 7  │ Remove magic numbers, add named constants                               │
+│    │ Files: Multiple files across backend                                    │
+│    │ Issue: Undocumented numeric literals                                    │
+│    │ Action: Extract to module-level constants                               │
+└────┴─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                    SECTION 3: ARCHITECTURE UPDATES
+================================================================================
+Priority: 🟡 MEDIUM | Timeline: 1 Month
+
+┌────┬─────────────────────────────────────────────────────────────────────────┐
+│ #  │ UPDATE                                                                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 1  │ Split main.py (1096 lines) into logical modules                         │
+│    │ File: backend/app/main.py                                               │
+│    │ Action: Create separate modules for:                                    │
+│    │   - lifespan.py (startup/shutdown logic)                                │
+│    │   - workers.py (background task loops)                                  │
+│    │   - health.py (health check endpoints)                                  │
+│    │   - Keep only router registration in main.py                            │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 2  │ Create lifespan.py                                                      │
+│    │ File: backend/app/lifespan.py (NEW FILE)                                │
+│    │ Action: Move lifespan context manager from main.py                      │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 3  │ Create workers.py                                                       │
+│    │ File: backend/app/workers.py (NEW FILE)                                 │
+│    │ Action: Move background task loops (_queue_worker_loop,                 │
+│    │       _wearable_sync_loop, _kb_growth_loop)                             │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 4  │ Refactor Diagnosis.tsx (73,000 lines) into subcomponents                │
+│    │ File: frontend/src/pages/Diagnosis.tsx                                  │
+│    │ Action: Extract subcomponents:                                          │
+│    │   - SymptomInput.tsx                                                    │
+│    │   - DiagnosisResults.tsx                                                │
+│    │   - ICDCodeSelector.tsx                                                 │
+│    │   - TreatmentPlanner.tsx                                                │
+│    │   - PatientHistory.tsx                                                  │
+│    │ Target: Each component <500 lines                                       │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 5  │ Add lazy imports to prevent circular dependencies                       │
+│    │ File: backend/app/main.py (lines 40-55)                                 │
+│    │ Action: Use importlib for lazy router imports                           │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 6  │ Implement dependency injection container                                │
+│    │ File: backend/app/container.py (NEW FILE)                               │
+│    │ Action: Use dependency-injector or FastAPI Depends system               │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 7  │ Add API versioning (/api/v1/)                                           │
+│    │ File: backend/app/main.py (line 27)                                     │
+│    │ Action: Add version prefix for future compatibility                     │
+└────┴─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                    SECTION 4: TESTING UPDATES
+================================================================================
+Priority: 🟢 MEDIUM | Timeline: 1-2 Months
+
+┌────┬─────────────────────────────────────────────────────────────────────────┐
+│ #  │ UPDATE                                                                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 1  │ Add unit tests for ReadmissionPredictor                                 │
+│    │ File: backend/tests/test_readmission_predictor.py (NEW FILE)            │
+│    │ Tests: extract_features(), predict_risk(), _rule_based_prediction()     │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 2  │ Add unit tests for VoiceTranscriber                                     │
+│    │ File: backend/tests/test_voice_transcriber.py (NEW FILE)                │
+│    │ Tests: transcribe_audio(), extract_medical_entities(), analyze_sentiment│
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 3  │ Add unit tests for HybridSearch                                         │
+│    │ File: backend/tests/test_hybrid_search.py (NEW FILE)                    │
+│    │ Tests: hybrid_search(), reciprocal_rank_fusion()                        │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 4  │ Add unit tests for WearableSync                                         │
+│    │ File: backend/tests/test_wearable_sync.py (NEW FILE)                    │
+│    │ Tests: fetch_fitbit_data(), import_wearable_data()                      │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 5  │ Add unit tests for VectorKnowledgeBase                                  │
+│    │ File: backend/tests/test_vector_kb.py (NEW FILE)                        │
+│    │ Tests: add_document(), search(), delete_document()                      │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 6  │ Add integration tests for full pipelines                                │
+│    │ File: backend/tests/integration/ (NEW DIRECTORY)                        │
+│    │ Tests:                                                                │
+│    │   - Voice → SOAP → Discharge Summary pipeline                           │
+│    │   - Wearable OAuth → Data sync → Alert generation                       │
+│    │   - PDF upload → OCR → Vector indexing                                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 7  │ Add frontend component tests                                            │
+│    │ File: frontend/src/__tests__/ (NEW DIRECTORY)                           │
+│    │ Tests: React component rendering and interaction                        │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 8  │ Add E2E tests (Playwright or Cypress)                                   │
+│    │ File: frontend/e2e/ (NEW DIRECTORY)                                     │
+│    │ Tests: Full user workflows                                              │
+└────┴─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                    SECTION 5: FRONTEND UPDATES
+================================================================================
+Priority: 🟢 LOW-MEDIUM | Timeline: 1 Month
+
+┌────┬─────────────────────────────────────────────────────────────────────────┐
+│ #  │ UPDATE                                                                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 1  │ Add React Error Boundaries                                              │
+│    │ File: frontend/src/components/ErrorBoundary.tsx (NEW FILE)              │
+│    │ Action: Wrap all routes with error boundary                             │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 2  │ Audit and fix hardcoded API URLs                                        │
+│    │ Files: All components in frontend/src/                                  │
+│    │ Action: Ensure all use VITE_API_BASE_URL and VITE_WS_URL                │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 3  │ Add loading states for async operations                                 │
+│    │ Files: All pages making API calls                                       │
+│    │ Action: Add skeleton loaders and progress indicators                    │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 4  │ Add form validation                                                     │
+│    │ Files: All form components                                              │
+│    │ Action: Add client-side validation with error messages                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 5  │ Add accessibility (a11y) improvements                                   │
+│    │ Files: All components                                                   │
+│    │ Action: ARIA labels, keyboard navigation, screen reader support         │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 6  │ Add responsive design fixes                                             │
+│    │ Files: All pages                                                        │
+│    │ Action: Mobile-first responsive design                                  │
+└────┴─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                    SECTION 6: INFRASTRUCTURE UPDATES
+================================================================================
+Priority: 🟢 MEDIUM | Timeline: 1-2 Months
+
+┌────┬─────────────────────────────────────────────────────────────────────────┐
+│ #  │ UPDATE                                                                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 1  │ Set up Alembic migrations                                               │
+│    │ Files: backend/alembic/ (NEW DIRECTORY)                                 │
+│    │ Action: Replace create_all() with proper migrations                     │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 2  │ Add OpenTelemetry tracing                                               │
+│    │ Files: backend/app/telemetry.py (NEW FILE)                              │
+│    │ Action: Add distributed tracing across services                         │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 3  │ Add Redis for caching                                                   │
+│    │ File: docker-compose.yml                                                │
+│    │ Action: Add Redis service, update cache implementations                 │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 4  │ Add health check monitoring                                             │
+│    │ File: backend/app/monitoring.py (enhance existing)                      │
+│    │ Action: Add Prometheus metrics endpoint                                 │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 5  │ Add structured logging (JSON format)                                    │
+│    │ File: backend/app/logging_config.py                                     │
+│    │ Action: Ensure all logs are JSON formatted for log aggregation          │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 6  │ Add CI/CD pipeline                                                      │
+│    │ File: .github/workflows/ci.yml (NEW FILE)                               │
+│    │ Action: Automated testing, linting, and deployment                      │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 7  │ Add Docker multi-stage builds                                           │
+│    │ File: Dockerfile (NEW FILE)                                             │
+│    │ Action: Optimize image size and build time                              │
+└────┴─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                    SECTION 7: DOCUMENTATION UPDATES
+================================================================================
+Priority: 🟢 LOW | Timeline: Ongoing
+
+┌────┬─────────────────────────────────────────────────────────────────────────┐
+│ #  │ UPDATE                                                                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 1  │ Add API documentation (Swagger/OpenAPI enhancements)                    │
+│    │ File: backend/app/main.py                                               │
+│    │ Action: Add comprehensive docstrings and schema examples                │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 2  │ Add inline code comments                                                │
+│    │ Files: All complex logic in services/                                   │
+│    │ Action: Explain WHY, not WHAT (avoid obvious comments)                  │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 3  │ Update README with known issues                                         │
+│    │ File: README.md                                                         │
+│    │ Action: Add KNOWN_ISSUES section                                        │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 4  │ Add architecture diagrams                                               │
+│    │ File: docs/architecture.md (NEW FILE)                                   │
+│    │ Action: System architecture, data flow, deployment diagrams             │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 5  │ Add deployment runbook                                                  │
+│    │ File: docs/deployment.md (NEW FILE)                                     │
+│    │ Action: Step-by-step deployment instructions                            │
+├────┼─────────────────────────────────────────────────────────────────────────┤
+│ 6  │ Add changelog                                                           │
+│    │ File: CHANGELOG.md (NEW FILE)                                           │
+│    │ Action: Track all version changes                                       │
+└────┴─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                         IMPLEMENTATION TIMELINE
+================================================================================
+
+WEEK 1 (Immediate):
+├─ Fix password reset token exposure
+├─ Validate OAuth state parameter
+├─ Fix SECRET_KEY generation
+├─ Remove hardcoded user IDs
+└─ Add rate limiting
+
+WEEK 2-3 (High Priority):
+├─ Remove all TODOs
+├─ Fix silent exception handling
+├─ Document ML coefficients
+├─ Fix DB connection reuse
+└─ Add request validation
+
+MONTH 1 (Architecture):
+├─ Split main.py into modules
+├─ Refactor Diagnosis.tsx
+├─ Add lazy imports
+├─ Implement DI container
+└─ Add API versioning
+
+MONTH 2 (Testing):
+├─ Unit tests for all services
+├─ Integration tests for pipelines
+├─ Frontend component tests
+└─ E2E tests
+
+MONTH 3 (Infrastructure):
+├─ Alembic migrations
+├─ OpenTelemetry tracing
+├─ Redis caching
+├─ CI/CD pipeline
+└─ Docker optimization
+
+================================================================================
+                         TRACKING TEMPLATE
+================================================================================
+
+Use this template to track progress:
+
+[ ] #<ID> - <Update Name>
+    ├── Status: PENDING / IN_PROGRESS / COMPLETED
+    ├── Assigned: <Developer>
+    ├── Due Date: <YYYY-MM-DD>
+    └── Notes: <Any additional context>
+
+Example:
+[ ] #1 - Remove password reset token from API response
+    ├── Status: COMPLETED
+    ├── Assigned: John Doe
+    ├── Due Date: 2026-04-25
+    └── Notes: Also need to integrate SendGrid for email delivery
+
+================================================================================
+                         TOTAL COUNT
+================================================================================
+
+Critical Security:     6 items
+Code Quality:          7 items
+Architecture:          7 items
+Testing:               8 items
+Frontend:              6 items
+Infrastructure:        7 items
+Documentation:         6 items
+                       ───────────
+TOTAL:                47 items
+
+================================================================================
+                         END OF UPDATES LIST
+================================================================================

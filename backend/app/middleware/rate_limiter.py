@@ -5,7 +5,8 @@ import time
 from collections import defaultdict
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Dict, Tuple
+from fastapi.responses import JSONResponse
+from typing import Dict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -43,9 +44,17 @@ class RateLimiter(BaseHTTPMiddleware):
         # Check rate limit
         if len(self.clients[client_ip]) >= self.calls:
             logger.warning(f"Rate limit exceeded for {client_ip} on {request.url.path}")
-            raise HTTPException(
+            return JSONResponse(
                 status_code=429,
-                detail=f"Rate limit exceeded. Maximum {self.calls} requests per {self.period} seconds."
+                content={
+                    "detail": f"Rate limit exceeded. Maximum {self.calls} requests per {self.period} seconds."
+                },
+                headers={
+                    "Retry-After": str(self.period),
+                    "X-RateLimit-Limit": str(self.calls),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(int(now + self.period)),
+                },
             )
         
         # Add current request timestamp

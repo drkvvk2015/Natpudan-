@@ -69,7 +69,7 @@ export default function Layout({ children }: LayoutProps) {
 
   // Define role visibility matrix
   const baseItems: MenuItem[] = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   ];
   const staffExtra: MenuItem[] = [
     { text: 'Patient Intake', icon: <PersonAdd />, path: '/patient-intake' },
