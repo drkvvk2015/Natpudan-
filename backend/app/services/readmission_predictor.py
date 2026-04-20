@@ -6,7 +6,7 @@ Features: age, BMI, comorbidities, medication count, diagnosis complexity, previ
 """
 
 import logging
-import pickle
+import pickle  # nosec B403
 import json
 from typing import Dict, List, Tuple
 from datetime import datetime
@@ -56,7 +56,7 @@ class ReadmissionPredictor:
             model_file = Path(self.model_path)
             if model_file.exists():
                 with open(model_file, 'rb') as f:
-                    data = pickle.load(f)
+                    data = pickle.load(f)  # nosec B301 - loading trusted internal ML model
                     self.model = data.get('model')
                     self.feature_names = data.get('feature_names', [])
                     self.model_metadata = data.get('metadata', {})

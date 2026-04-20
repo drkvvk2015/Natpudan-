@@ -16,22 +16,22 @@ class MedicalKnowledgeGraph:
     Knowledge graph for medical concepts.
     Tracks relationships between diseases, symptoms, medications, procedures.
     """
-    
+
     def __init__(self):
         """Initialize knowledge graph"""
         # Node storage: node_id -> {type, label, properties}
         self.nodes = {}
-        
+
         # Edge storage: (source, relation, target)
         self.edges = []
-        
+
         # Indexes for fast lookup
         self.node_by_label = defaultdict(list)
         self.edges_by_source = defaultdict(list)
         self.edges_by_target = defaultdict(list)
-        
+
         logger.info("Medical knowledge graph initialized")
-    
+
     def add_node(
         self,
         node_id: str,
@@ -41,13 +41,13 @@ class MedicalKnowledgeGraph:
     ) -> str:
         """
         Add node to knowledge graph.
-        
+
         Args:
             node_id: Unique identifier
             node_type: Type (disease, symptom, medication, procedure)
             label: Human-readable label
             properties: Additional properties
-            
+
         Returns:
             Node ID
         """
@@ -67,9 +67,9 @@ class MedicalKnowledgeGraph:
                 "properties": properties or {}
             }
             self.node_by_label[label.lower()].append(node_id)
-        
+
         return node_id
-    
+
     def add_edge(
         self,
         source_id: str,
@@ -79,7 +79,7 @@ class MedicalKnowledgeGraph:
     ):
         """
         Add relationship between nodes.
-        
+
         Args:
             source_id: Source node ID
             relation: Relationship type (causes, treats, symptom_of, etc.)
@@ -90,25 +90,25 @@ class MedicalKnowledgeGraph:
         if source_id not in self.nodes or target_id not in self.nodes:
             logger.warning("Cannot add edge: node not found")
             return
-        
+
         edge = {
             "source": source_id,
             "relation": relation,
             "target": target_id,
             "properties": properties or {}
         }
-        
+
         self.edges.append(edge)
         self.edges_by_source[source_id].append(edge)
         self.edges_by_target[target_id].append(edge)
-    
+
     def find_node(self, label: str) -> Optional[Dict[str, Any]]:
         """Find node by label"""
         node_ids = self.node_by_label.get(label.lower(), [])
         if node_ids:
             return self.nodes[node_ids[0]]
         return None
-    
+
     def get_neighbors(
         self,
         node_id: str,
@@ -117,17 +117,17 @@ class MedicalKnowledgeGraph:
     ) -> List[Dict[str, Any]]:
         """
         Get neighboring nodes.
-        
+
         Args:
             node_id: Node to get neighbors for
             relation: Filter by relationship type
             direction: "out" (outgoing), "in" (incoming), or "both"
-            
+
         Returns:
             List of neighbor nodes
         """
         neighbors = []
-        
+
         # Outgoing edges
         if direction in ("out", "both"):
             for edge in self.edges_by_source.get(node_id, []):
@@ -138,7 +138,7 @@ class MedicalKnowledgeGraph:
                         "relation": edge["relation"],
                         "edge_properties": edge.get("properties", {})
                     })
-        
+
         # Incoming edges
         if direction in ("in", "both"):
             for edge in self.edges_by_target.get(node_id, []):
@@ -149,9 +149,9 @@ class MedicalKnowledgeGraph:
                         "relation": edge["relation"],
                         "edge_properties": edge.get("properties", {})
                     })
-        
+
         return neighbors
-    
+
     def find_path(
         self,
         start_id: str,
@@ -160,41 +160,41 @@ class MedicalKnowledgeGraph:
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Find path between two nodes using BFS.
-        
+
         Args:
             start_id: Starting node
             end_id: Target node
             max_depth: Maximum path length
-            
+
         Returns:
             Path as list of nodes, or None if no path
         """
         if start_id not in self.nodes or end_id not in self.nodes:
             return None
-        
+
         # BFS
         queue = [(start_id, [start_id])]
         visited = {start_id}
-        
+
         while queue:
             current_id, path = queue.pop(0)
-            
+
             if len(path) > max_depth:
                 continue
-            
+
             if current_id == end_id:
                 # Found path
                 return [self.nodes[nid] for nid in path]
-            
+
             # Explore neighbors
             for edge in self.edges_by_source.get(current_id, []):
                 neighbor_id = edge["target"]
                 if neighbor_id not in visited:
                     visited.add(neighbor_id)
                     queue.append((neighbor_id, path + [neighbor_id]))
-        
+
         return None
-    
+
     def get_related_concepts(
         self,
         node_id: str,
@@ -202,33 +202,33 @@ class MedicalKnowledgeGraph:
     ) -> List[Dict[str, Any]]:
         """
         Get all concepts related to a node within distance.
-        
+
         Args:
             node_id: Source node
             max_distance: Maximum relationship distance
-            
+
         Returns:
             List of related nodes with distances
         """
         if node_id not in self.nodes:
             return []
-        
+
         # BFS to find all nodes within distance
         related = []
         queue = [(node_id, 0)]
         visited = {node_id}
-        
+
         while queue:
             current_id, distance = queue.pop(0)
-            
+
             if distance > max_distance:
                 continue
-            
+
             if distance > 0:
                 node = self.nodes[current_id].copy()
                 node["distance"] = distance
                 related.append(node)
-            
+
             # Explore neighbors
             neighbors = self.get_neighbors(current_id, direction="both")
             for neighbor in neighbors:
@@ -236,16 +236,16 @@ class MedicalKnowledgeGraph:
                 if neighbor_id not in visited:
                     visited.add(neighbor_id)
                     queue.append((neighbor_id, distance + 1))
-        
+
         return related
-    
+
     def build_from_entities(
         self,
         extracted_entities: Dict[str, List[Dict[str, Any]]]
     ):
         """
         Build knowledge graph from extracted medical entities.
-        
+
         Args:
             extracted_entities: Entities from medical_entity_extractor
         """
@@ -253,7 +253,7 @@ class MedicalKnowledgeGraph:
         disease_nodes = []
         medication_nodes = []
         symptom_nodes = []
-        
+
         # Diseases
         for disease in extracted_entities.get("diseases", []):
             node_id = f"disease_{disease['entity']}"
@@ -264,7 +264,7 @@ class MedicalKnowledgeGraph:
                 properties={"frequency": disease['count']}
             )
             disease_nodes.append(node_id)
-        
+
         # Medications
         for med in extracted_entities.get("medications", []):
             node_id = f"medication_{med['entity']}"
@@ -275,7 +275,7 @@ class MedicalKnowledgeGraph:
                 properties={"frequency": med['count']}
             )
             medication_nodes.append(node_id)
-        
+
         # Symptoms
         for symptom in extracted_entities.get("symptoms", []):
             node_id = f"symptom_{symptom['entity']}"
@@ -286,7 +286,7 @@ class MedicalKnowledgeGraph:
                 properties={"frequency": symptom['count']}
             )
             symptom_nodes.append(node_id)
-        
+
         # Create relationships (co-occurrence based)
         # Symptoms -> Diseases
         for symptom_id in symptom_nodes:
@@ -297,7 +297,7 @@ class MedicalKnowledgeGraph:
                     target_id=disease_id,
                     properties={"confidence": 0.5}
                 )
-        
+
         # Medications -> Diseases (treatment)
         for med_id in medication_nodes:
             for disease_id in disease_nodes:
@@ -307,24 +307,24 @@ class MedicalKnowledgeGraph:
                     target_id=disease_id,
                     properties={"confidence": 0.6}
                 )
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """Get graph statistics"""
         node_types = defaultdict(int)
         for node in self.nodes.values():
             node_types[node["type"]] += 1
-        
+
         relation_types = defaultdict(int)
         for edge in self.edges:
             relation_types[edge["relation"]] += 1
-        
+
         return {
             "total_nodes": len(self.nodes),
             "total_edges": len(self.edges),
             "node_types": dict(node_types),
             "relation_types": dict(relation_types)
         }
-    
+
     def export_graph(self) -> Dict[str, Any]:
         """Export graph as JSON"""
         return {
@@ -332,7 +332,7 @@ class MedicalKnowledgeGraph:
             "edges": self.edges,
             "statistics": self.get_statistics()
         }
-    
+
     def visualize_subgraph(
         self,
         center_node_id: str,

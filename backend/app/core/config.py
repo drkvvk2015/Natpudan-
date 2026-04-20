@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Optional
 from functools import lru_cache
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def get_project_root() -> Path:
@@ -16,11 +16,19 @@ def get_project_root() -> Path:
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
     # Application
     APP_NAME: str = "Natpudan Medical AI"
     APP_VERSION: str = "2.0.0"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    LOG_JSON: bool = os.getenv("LOG_JSON", "false").lower() == "true"
 
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")
@@ -38,6 +46,8 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./natpudan.db")
+    DATABASE_POOL_SIZE: int = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+    DATABASE_MAX_OVERFLOW: int = int(os.getenv("DATABASE_MAX_OVERFLOW", "10"))
 
     # OpenAI
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
@@ -45,6 +55,8 @@ class Settings(BaseSettings):
     OPENAI_EMBEDDING_MODEL: str = os.getenv(
         "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
     )
+    SENTRY_DSN: Optional[str] = os.getenv("SENTRY_DSN")
+    SENTRY_TRACES_SAMPLE_RATE: float = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0"))
 
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
@@ -62,10 +74,6 @@ class Settings(BaseSettings):
     KB_DIR: Path = DATA_DIR / "knowledge_base"
     LOGS_DIR: Path = BASE_DIR / "logs"
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Validate SECRET_KEY
@@ -79,6 +87,10 @@ class Settings(BaseSettings):
     def get_final_secret_key(self) -> str:
         """Get the JWT secret key, falling back to SECRET_KEY."""
         return self.JWT_SECRET_KEY or self.SECRET_KEY
+
+    def get_database_url(self) -> str:
+        """Return the configured database URL."""
+        return self.DATABASE_URL
 
     @property
     def is_production(self) -> bool:

@@ -25,6 +25,13 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend/ /app/backend/
 COPY --from=frontend-build /app/frontend/dist /app/frontend_dist
 
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
 EXPOSE 8000
 WORKDIR /app/backend
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+USER appuser
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

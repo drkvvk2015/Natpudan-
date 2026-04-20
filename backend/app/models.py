@@ -69,16 +69,16 @@ class User(Base):
     full_name = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), default=UserRole.STAFF, nullable=False)
     license_number = Column(String(100), nullable=True)
-    
+
     # OAuth fields
     oauth_provider = Column(String(50), nullable=True)  # google, github, microsoft
     oauth_id = Column(String(255), nullable=True)
-    
+
     # Metadata
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
     discharge_summaries = relationship("DischargeSummary", back_populates="created_by", cascade="all, delete-orphan")
@@ -91,11 +91,11 @@ class Conversation(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String(255), nullable=True)
-    
+
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     user = relationship("User", back_populates="conversations")
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
@@ -109,10 +109,10 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
     role = Column(String(20), nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
-    
+
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
 
@@ -123,7 +123,7 @@ class DischargeSummary(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    
+
     # Patient Information
     patient_name = Column(String(255), nullable=False)
     patient_age = Column(String(10), nullable=True)
@@ -131,7 +131,7 @@ class DischargeSummary(Base):
     mrn = Column(String(100), nullable=True)
     admission_date = Column(String(50), nullable=True)
     discharge_date = Column(String(50), nullable=True)
-    
+
     # Clinical Information
     chief_complaint = Column(Text, nullable=True)
     history_present_illness = Column(Text, nullable=True)
@@ -141,20 +141,20 @@ class DischargeSummary(Base):
     hospital_course = Column(Text, nullable=True)
     procedures_performed = Column(Text, nullable=True)
     medications = Column(Text, nullable=True)
-    
+
     # Discharge Information
     discharge_medications = Column(Text, nullable=True)
     follow_up_instructions = Column(Text, nullable=True)
     diet_restrictions = Column(Text, nullable=True)
     activity_restrictions = Column(Text, nullable=True)
-    
+
     # AI Generated Content
     ai_summary = Column(Text, nullable=True)
-    
+
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     created_by = relationship("User", back_populates="discharge_summaries")
 
@@ -164,14 +164,14 @@ class DischargeSummary(Base):
 class PatientIntake(Base):
     """Patient intake information model"""
     __tablename__ = "patient_intakes"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     intake_id = Column(String(50), unique=True, index=True, nullable=False)
     name = Column(String(200), nullable=False)
     age = Column(String(10))
     gender = Column(String(20))
     blood_type = Column(String(10))
-    
+
     # Extended Anthropometry
     height_cm = Column(Integer, nullable=True)
     weight_kg = Column(Integer, nullable=True)
@@ -191,19 +191,19 @@ class PatientIntake(Base):
     pulse_per_min = Column(Integer, nullable=True)
     resp_rate_per_min = Column(Integer, nullable=True)
     temperature_c = Column(Integer, nullable=True)
-    
+
     # Chief Complaints and Present History (stored as JSON text)
     chief_complaints = Column(Text, nullable=True)  # JSON: [{complaint, duration}]
     present_history = Column(Text, nullable=True)  # JSON: [{id, title, duration, associationFactors, relievingFactors, aggravatingFactors}]
-    
+
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     travel_history = relationship("TravelHistory", back_populates="patient", cascade="all, delete-orphan")
     family_history = relationship("FamilyHistory", back_populates="patient", cascade="all, delete-orphan")
     treatment_plans = relationship("TreatmentPlan", back_populates="patient", cascade="all, delete-orphan")
-    
+
     def __repr__(self):
         return f"<PatientIntake(id={self.intake_id}, name={self.name})>"
 
@@ -211,7 +211,7 @@ class PatientIntake(Base):
 class TravelHistory(Base):
     """Travel history model"""
     __tablename__ = "travel_history"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     patient_intake_id = Column(Integer, ForeignKey("patient_intakes.id", ondelete="CASCADE"))
     destination = Column(String(200), nullable=False)
@@ -221,10 +221,10 @@ class TravelHistory(Base):
     purpose = Column(String(100))
     activities = Column(Text)  # List of activities
     created_at = Column(DateTime, default=func.now())
-    
+
     # Relationships
     patient = relationship("PatientIntake", back_populates="travel_history")
-    
+
     def __repr__(self):
         return f"<TravelHistory(id={self.id}, destination={self.destination})>"
 
@@ -232,7 +232,7 @@ class TravelHistory(Base):
 class FamilyHistory(Base):
     """Family medical history model"""
     __tablename__ = "family_history"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     patient_intake_id = Column(Integer, ForeignKey("patient_intakes.id", ondelete="CASCADE"))
     family_relationship = Column(String(100), nullable=False)
@@ -242,10 +242,10 @@ class FamilyHistory(Base):
     status = Column(String(20))  # ongoing, resolved, deceased
     notes = Column(Text)
     created_at = Column(DateTime, default=func.now())
-    
+
     # Relationships
     patient = relationship("PatientIntake", back_populates="family_history")
-    
+
     def __repr__(self):
         return f"<FamilyHistory(id={self.id}, family_relationship={self.family_relationship}, condition={self.condition})>"
 
@@ -259,25 +259,25 @@ class TreatmentPlan(Base):
     plan_id = Column(String, unique=True, index=True, nullable=False)
     patient_intake_id = Column(String, ForeignKey("patient_intakes.intake_id"), nullable=False)
     diagnosis_id = Column(String, nullable=True)  # Optional link to diagnosis session
-    
+
     # Treatment metadata
     primary_diagnosis = Column(String, nullable=False)
     icd_code = Column(String, nullable=True)
     treatment_goals = Column(Text, nullable=True)
     clinical_notes = Column(Text, nullable=True)
-    
+
     # Status tracking
     status = Column(String, default=TreatmentStatus.ACTIVE, nullable=False)
     start_date = Column(DateTime, default=func.now(), nullable=False)
     end_date = Column(DateTime, nullable=True)
     last_review_date = Column(DateTime, nullable=True)
     next_review_date = Column(DateTime, nullable=True)
-    
+
     # Metadata
     created_by = Column(String, nullable=True)  # Doctor/user ID
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     patient = relationship("PatientIntake", back_populates="treatment_plans")
     medications = relationship("Medication", back_populates="treatment_plan", cascade="all, delete-orphan")
@@ -290,7 +290,7 @@ class Medication(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     treatment_plan_id = Column(Integer, ForeignKey("treatment_plans.id"), nullable=False)
-    
+
     # Medication details
     medication_name = Column(String, nullable=False)
     generic_name = Column(String, nullable=True)
@@ -298,27 +298,27 @@ class Medication(Base):
     route = Column(String, default=MedicationRoute.ORAL, nullable=False)
     frequency = Column(String, default=MedicationFrequency.ONCE_DAILY, nullable=False)
     duration_days = Column(Integer, nullable=True)
-    
+
     # Instructions
     instructions = Column(Text, nullable=True)
     precautions = Column(Text, nullable=True)
     side_effects = Column(Text, nullable=True)
-    
+
     # Prescription tracking
     prescribed_date = Column(DateTime, default=func.now(), nullable=False)
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
     refills_remaining = Column(Integer, default=0)
-    
+
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
     discontinuation_reason = Column(String, nullable=True)
     discontinuation_date = Column(DateTime, nullable=True)
-    
+
     # Metadata
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     treatment_plan = relationship("TreatmentPlan", back_populates="medications")
 
@@ -328,30 +328,30 @@ class FollowUp(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     treatment_plan_id = Column(Integer, ForeignKey("treatment_plans.id"), nullable=False)
-    
+
     # Appointment details
     scheduled_date = Column(DateTime, nullable=False)
     appointment_type = Column(String, nullable=True)  # e.g., "Routine Check-up", "Lab Review"
     location = Column(String, nullable=True)
     provider = Column(String, nullable=True)
-    
+
     # Status
     status = Column(String, default=FollowUpStatus.SCHEDULED, nullable=False)
     completed_date = Column(DateTime, nullable=True)
-    
+
     # Notes
     pre_appointment_instructions = Column(Text, nullable=True)
     post_appointment_notes = Column(Text, nullable=True)
     outcome = Column(Text, nullable=True)
-    
+
     # Reminders
     reminder_sent = Column(Boolean, default=False)
     reminder_date = Column(DateTime, nullable=True)
-    
+
     # Metadata
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     treatment_plan = relationship("TreatmentPlan", back_populates="follow_ups")
 
@@ -361,24 +361,24 @@ class MonitoringRecord(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     treatment_plan_id = Column(Integer, ForeignKey("treatment_plans.id"), nullable=False)
-    
+
     # Monitoring details
     record_date = Column(DateTime, default=func.now(), nullable=False)
     monitoring_type = Column(String, nullable=False)  # e.g., "Vital Signs", "Lab Results", "Symptoms"
-    
+
     # Measurements
     measurements = Column(Text, nullable=True)  # JSON string of measurements
-    
+
     # Assessment
     assessment = Column(Text, nullable=True)
     concerns = Column(Text, nullable=True)
     action_taken = Column(Text, nullable=True)
-    
+
     # Metadata
     recorded_by = Column(String, nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     treatment_plan = relationship("TreatmentPlan", back_populates="monitoring_records")
 
@@ -461,34 +461,34 @@ class KnowledgeChunk(Base):
 class DocumentProcessingStatus(Base):
     """Track processing status of uploaded documents during background embedding"""
     __tablename__ = "document_processing_status"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(String(36), ForeignKey("knowledge_documents.document_id"), unique=True, index=True)
-    
+
     # Status tracking
     status = Column(String(20), default="queued", index=True)  # queued|processing|completed|failed
     progress_percent = Column(Integer, default=0)  # 0-100
     current_chunk = Column(Integer, default=0)
     total_chunks = Column(Integer, default=0)
-    
+
     # Timing
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    
+
     # Error handling
     error_message = Column(Text, nullable=True)
     retry_count = Column(Integer, default=0)
-    
+
     # Metadata
     processing_type = Column(String(50), default="embedding")  # embedding|indexing|verification
     estimated_time_seconds = Column(Integer, nullable=True)
-    
+
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     document = relationship("KnowledgeDocument", foreign_keys=[document_id])
-    
+
     def __repr__(self):
         return f"<DocumentProcessingStatus(doc_id={self.document_id}, status={self.status})>"
 

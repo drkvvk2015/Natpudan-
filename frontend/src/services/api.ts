@@ -164,8 +164,14 @@ export const getLiveDiagnosis = async (symptoms: string): Promise<ReadableStream
  * Drug Checker API
  */
 export const checkDrugInteractions = async (request: DrugCheckRequest): Promise<DrugCheckResponse> => {
-  const response = await apiClient.post<DrugCheckResponse>('/api/prescription/drugs/check', request)
-  return response.data
+  const response = await apiClient.post<{
+    interactions: DrugInteraction[]
+    high_risk_warning: boolean
+  }>('/api/prescription/check-interactions', { medications: request.drugs })
+  return {
+    interactions: response.data.interactions || [],
+    warnings: response.data.high_risk_warning ? ['High-risk interaction detected'] : [],
+  }
 }
 
 export const searchDrug = async (query: string): Promise<string[]> => {
@@ -182,7 +188,7 @@ export const uploadDocument = async (file: File, onProgress?: (progress: number)
   const formData = new FormData()
   formData.append('file', file)
 
-  await apiClient.post('/api/upload/pdf', formData, {
+  await apiClient.post('/api/upload/document', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -196,8 +202,8 @@ export const uploadDocument = async (file: File, onProgress?: (progress: number)
 }
 
 export const getDocuments = async (): Promise<KnowledgeDocument[]> => {
-  const response = await apiClient.get<KnowledgeDocument[]>('/api/upload/documents')
-  return response.data
+  const response = await apiClient.get<{ documents: KnowledgeDocument[] }>('/api/upload/documents')
+  return response.data.documents || []
 }
 
 export const deleteDocument = async (documentId: string): Promise<void> => {
@@ -205,9 +211,7 @@ export const deleteDocument = async (documentId: string): Promise<void> => {
 }
 
 export const searchKnowledge = async (query: string): Promise<any> => {
-  const response = await apiClient.get('/api/medical/knowledge/search', {
-    params: { q: query },
-  })
+  const response = await apiClient.post('/api/medical/knowledge/search', { query })
   return response.data
 }
 
@@ -367,7 +371,7 @@ export const listPatientIntakes = async (params?: {
   if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString())
   if (params?.sort_by) queryParams.append('sort_by', params.sort_by)
   if (params?.order) queryParams.append('order', params.order)
-  
+
   const response = await apiClient.get(
     `/api/medical/patient-intake?${queryParams.toString()}`
   )
@@ -395,21 +399,21 @@ export interface DiagnosisReportData {
 }
 
 export const generatePatientIntakeReport = async (intakeId: string): Promise<Blob> => {
-  const response = await apiClient.get(`/api/medical/reports/patient-intake/${intakeId}`, {
+  const response = await apiClient.get(`/api/reports/patient-intake/${intakeId}`, {
     responseType: 'blob'
   })
   return response.data
 }
 
 export const generateDiagnosisReport = async (data: DiagnosisReportData): Promise<Blob> => {
-  const response = await apiClient.post('/api/medical/reports/diagnosis', data, {
+  const response = await apiClient.post('/api/reports/diagnosis', data, {
     responseType: 'blob'
   })
   return response.data
 }
 
 export const generateCombinedReport = async (intakeId: string, diagnosisData: DiagnosisReportData): Promise<Blob> => {
-  const response = await apiClient.post(`/api/medical/reports/combined/${intakeId}`, diagnosisData, {
+  const response = await apiClient.post(`/api/reports/combined/${intakeId}`, diagnosisData, {
     responseType: 'blob'
   })
   return response.data
@@ -537,7 +541,7 @@ export const listAllTreatmentPlans = async (params?: { skip?: number; limit?: nu
   if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString())
   if (params?.limit !== undefined) queryParams.append('limit', params.limit.toString())
   if (params?.status) queryParams.append('status', params.status)
-  
+
   const response = await apiClient.get(`/api/treatment/treatment-plans?${queryParams.toString()}`)
   return response.data
 }
@@ -582,7 +586,7 @@ export const getPatientTimeline = async (
   }
   if (filters?.startDate) queryParams.append('start_date', filters.startDate)
   if (filters?.endDate) queryParams.append('end_date', filters.endDate)
-  
+
   const response = await apiClient.get(
     `/api/timeline/patient/${patientIntakeId}?${queryParams.toString()}`
   )

@@ -264,7 +264,7 @@ async def upload_pdfs(
 ):
     """
     Upload multiple PDF files to knowledge base.
-    
+
     - **files**: List of PDF files (up to 200MB each, 1GB total)
     - **use_full_content**: If False (default), intelligent chunking; if True, full PDF as single document
     - **chunk_size**: Size of text chunks when use_full_content=False
@@ -284,11 +284,11 @@ async def upload_pdfs(
         raise HTTPException(status_code=400, detail="Invalid quality_mode. Use: fast|balanced|high")
     if duplicate_mode not in {"skip", "replace", "allow"}:
         raise HTTPException(status_code=400, detail="Invalid duplicate_mode. Use: skip|replace|allow")
-    
+
     # Validate file count
     if len(files) > 20:
         raise HTTPException(status_code=400, detail="Maximum 20 files allowed per upload")
-    
+
     # Validate file types and sizes
     total_size = 0
     for file in files:
@@ -299,7 +299,7 @@ async def upload_pdfs(
                 status_code=400,
                 detail=f"File {file.filename} has unsupported type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
             )
-        
+
         # Read file to check size
         content = await file.read()
         file_size = len(content)
@@ -310,47 +310,47 @@ async def upload_pdfs(
                 status_code=400,
                 detail=f"File {file.filename} is not a valid PDF signature"
             )
-        
+
         if file_size > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=400,
                 detail=f"File {file.filename} exceeds maximum size of {MAX_FILE_SIZE / 1024 / 1024:.0f}MB"
             )
-        
+
         total_size += file_size
-        
+
         # Reset file pointer
         await file.seek(0)
-    
+
     if total_size > MAX_TOTAL_SIZE:
         raise HTTPException(
             status_code=400,
             detail=f"Total upload size ({total_size / 1024 / 1024:.2f}MB) exceeds maximum of {MAX_TOTAL_SIZE / 1024 / 1024 / 1024:.1f}GB"
         )
-    
+
     # Process files
     results = []
     knowledge_base = get_knowledge_base()
     _update_upload_metrics(total_bytes_received=total_size)
-    
+
     for file in files:
         try:
             logger.info(f"Processing file: {file.filename}")
-            
+
             # Save file temporarily
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             safe_filename = f"{timestamp}_{file.filename}"
             file_path = UPLOAD_DIR / safe_filename
-            
+
             content = await file.read()
             with open(file_path, "wb") as f:
                 f.write(content)
-            
+
             # Calculate file hash for deduplication
             file_hash = hashlib.sha256(content).hexdigest()
 
             file_size = len(content)
-            
+
             # Duplicate handling (exact hash + near duplicate by name/size)
             if duplicate_mode != "allow":
                 exact_duplicate = db.query(KnowledgeDocument).filter(
@@ -399,7 +399,7 @@ async def upload_pdfs(
                                 old_file.unlink()
                         except Exception as cleanup_err:
                             logger.warning(f"Failed to delete old duplicate file {old_path}: {cleanup_err}")
-            
+
             # Generate unique document ID (must be before OCR call)
             doc_uuid = str(uuid.uuid4())
 
@@ -407,7 +407,7 @@ async def upload_pdfs(
             file_ext = Path(file.filename).suffix.lower()
             extracted_images = []
             extraction_method = "text"
-            
+
             if file_ext == ".pdf":
                 # Use enhanced OCR processor
                 ocr_processor = get_pdf_ocr_processor()
@@ -439,7 +439,7 @@ async def upload_pdfs(
                 extraction_method = pdf_result.get('method', 'text')
                 if pdf_result.get("ocr_applied"):
                     _update_upload_metrics(ocr_applied_count=1)
-                
+
                 logger.info(f"[EXTRACT] {file.filename}: {len(text_content)} chars, {len(extracted_images)} images, method={extraction_method}")
             elif file_ext == ".txt":
                 text_content = content.decode('utf-8', errors='ignore')
@@ -453,7 +453,7 @@ async def upload_pdfs(
                 text_content,
                 remove_repeated_lines=(quality_mode in {"balanced", "high"})
             )
-            
+
             if not text_content.strip():
                 results.append({
                     "filename": file.filename,
@@ -464,7 +464,7 @@ async def upload_pdfs(
                     "file_size_mb": len(content) / 1024 / 1024
                 })
                 continue
-            
+
             # Minimum character threshold (50 chars to filter out near-empty extractions)
             if len(text_content.strip()) < 50:
                 results.append({
@@ -476,9 +476,9 @@ async def upload_pdfs(
                     "file_size_mb": len(content) / 1024 / 1024
                 })
                 continue
-            
+
             # doc_uuid already generated above
-            
+
             # Process content
             if use_full_content:
                 # Add as single document
@@ -498,7 +498,7 @@ async def upload_pdfs(
                         "outdated": False
                     }
                 )
-                
+
                 # Save to database
                 db_doc = KnowledgeDocument(
                     document_id=doc_uuid,
@@ -532,7 +532,7 @@ async def upload_pdfs(
                     logger.info(f"[CANONICAL] Saved text: {canonical_path}")
 
                 _ensure_processing_status(db, doc_uuid, total_chunks=1)
-                
+
                 results.append({
                     "filename": file.filename,
                     "status": "success",
@@ -557,13 +557,13 @@ async def upload_pdfs(
                 # Use larger chunks for large documents to avoid timeout
                 effective_chunk_size = max(chunk_size, min(profile["max_chunk"], len(text_content) // 200 + 500))
                 chunks = smart_chunk_text(text_content, chunk_size=effective_chunk_size, overlap=profile["overlap"])
-                
+
                 # Cap chunks to prevent timeout on very large PDFs
                 MAX_CHUNKS = profile["max_chunks"]
                 if len(chunks) > MAX_CHUNKS:
                     logger.warning(f"[CHUNK] {file.filename}: {len(chunks)} chunks, capping at {MAX_CHUNKS}")
                     chunks = chunks[:MAX_CHUNKS]
-                
+
                 chunk_ids = []
                 for i, chunk in enumerate(chunks):
                     doc_id = await add_to_knowledge_base(
@@ -585,7 +585,7 @@ async def upload_pdfs(
                         }
                     )
                     chunk_ids.append(doc_id)
-                
+
                 db_doc = KnowledgeDocument(
                     document_id=doc_uuid,
                     filename=file.filename,
@@ -618,7 +618,7 @@ async def upload_pdfs(
                     logger.info(f"[CANONICAL] Saved text: {canonical_path}")
 
                 _ensure_processing_status(db, doc_uuid, total_chunks=len(chunks))
-                
+
                 results.append({
                     "filename": file.filename,
                     "status": "success",
@@ -636,18 +636,18 @@ async def upload_pdfs(
                     "embedding_status": "queued_for_background_processing",
                     "info": f"Extracted via {extraction_method}. {len(extracted_images)} images saved. {len(chunks)} chunks queued for embeddings."
                 })
-            
+
             logger.info(f"Successfully queued {file.filename}: {len(text_content)} characters")
-            
+
         except Exception as e:
             error_type = type(e).__name__
             error_msg = str(e).strip() if str(e).strip() else "Unknown error"
             full_error = f"{error_type}: {error_msg}" if error_msg != "Unknown error" else f"{error_type} during PDF extraction/processing"
-            
+
             logger.error(f"Error processing {file.filename}: {full_error}")
             import traceback
             logger.error(traceback.format_exc())
-            
+
             results.append({
                 "filename": file.filename,
                 "status": "error",
@@ -656,7 +656,7 @@ async def upload_pdfs(
                 "characters": 0,
                 "file_size_mb": len(content) / 1024 / 1024 if 'content' in locals() else 0
             })
-    
+
     # Summary
     successful = sum(1 for r in results if r["status"] == "success")
     skipped = sum(1 for r in results if r["status"] == "skipped")
@@ -673,7 +673,7 @@ async def upload_pdfs(
         total_skipped=skipped,
         avg_processing_seconds=new_avg,
     )
-    
+
     return {
         "message": f"Processed {len(files)} files: {successful} successful, {failed} failed",
         "summary": {
@@ -710,18 +710,18 @@ async def extract_pdf_text(file_path: Path, use_full_content: bool = True) -> st
     """
     try:
         import fitz  # PyMuPDF
-        
+
         logger.info(f"Opening PDF: {file_path}")
         doc = fitz.open(str(file_path))
         page_count = len(doc)
         logger.info(f"PDF opened successfully: {page_count} pages")
-        
+
         text_parts = []
-        
+
         for page_num, page in enumerate(doc, 1):
             # Extract text with layout preservation
             text = page.get_text("text")
-            
+
             if use_full_content:
                 # Include page headers and formatting
                 text_parts.append(f"\n--- Page {page_num} ---\n")
@@ -729,17 +729,17 @@ async def extract_pdf_text(file_path: Path, use_full_content: bool = True) -> st
             else:
                 # Clean text for chunking
                 text_parts.append(text)
-            
+
             # Log progress every 50 pages
             if page_num % 50 == 0:
                 logger.info(f"Processed {page_num}/{page_count} pages...")
-        
+
         doc.close()
         full_text = "\n".join(text_parts)
-        
+
         logger.info(f"[OK] Extracted {len(full_text)} characters from PDF with {page_count} pages")
         return full_text
-        
+
     except ImportError as e:
         logger.warning(f"PyMuPDF not available: {e}, using fallback")
         # Fallback to basic text extraction
@@ -752,18 +752,18 @@ async def extract_pdf_text(file_path: Path, use_full_content: bool = True) -> st
 
 
 async def extract_pdf_text_fallback(file_path: Path) -> str:
-    """Fallback PDF extraction using PyPDF2"""
+    """Fallback PDF extraction using pypdf"""
     try:
-        import PyPDF2
-        
+        import pypdf
+
         text_parts = []
         with open(file_path, 'rb') as f:
-            reader = PyPDF2.PdfReader(f)
+            reader = pypdf.PdfReader(f)
             for page in reader.pages:
                 text = page.extract_text()
                 if text:
                     text_parts.append(text)
-        
+
         return "\n".join(text_parts)
     except Exception as e:
         logger.error(f"Fallback PDF extraction error: {e}")
@@ -774,21 +774,21 @@ async def extract_word_text(file_path: Path) -> str:
     """Extract text from Word documents"""
     try:
         import docx
-        
+
         doc = docx.Document(str(file_path))
         text_parts = []
-        
+
         for para in doc.paragraphs:
             if para.text.strip():
                 text_parts.append(para.text)
-        
+
         # Extract tables
         for table in doc.tables:
             for row in table.rows:
                 row_text = " | ".join(cell.text.strip() for cell in row.cells)
                 if row_text.strip():
                     text_parts.append(row_text)
-        
+
         return "\n".join(text_parts)
     except ImportError:
         logger.warning("python-docx not available")
@@ -806,16 +806,16 @@ def smart_chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> L
     - Section headers
     """
     chunks = []
-    
+
     # Split by paragraphs first
     paragraphs = text.split('\n\n')
-    
+
     current_chunk = ""
     for para in paragraphs:
         para = para.strip()
         if not para:
             continue
-        
+
         # If adding this paragraph exceeds chunk_size
         if len(current_chunk) + len(para) > chunk_size:
             if current_chunk:
@@ -839,17 +839,17 @@ def smart_chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> L
                         current_chunk += (". " if current_chunk else "") + sentence
         else:
             current_chunk += ("\n\n" if current_chunk else "") + para
-    
+
     # Add remaining chunk
     if current_chunk:
         chunks.append(current_chunk)
-    
+
     return chunks
 
 
 async def add_to_knowledge_base(kb, text: str, source: str, metadata: Dict[str, Any]) -> str:
     """Add document to knowledge base with LOCAL EMBEDDING (NO API, NO COST, FAST)
-    
+
     Returns immediately with doc ID - actual embedding happens async in background.
     This prevents blocking the HTTP response during large PDF processing.
     """
@@ -857,9 +857,9 @@ async def add_to_knowledge_base(kb, text: str, source: str, metadata: Dict[str, 
         # DEFERRED EMBEDDING: Don't block response - just queue for processing
         from app.services.local_vector_kb import get_local_knowledge_base
         local_kb = get_local_knowledge_base()
-        
+
         logger.info(f"[QUEUED] Adding to LOCAL KB (deferred): {source} ({len(text)} chars)")
-        
+
         # Prepare metadata with document_id for linking
         full_metadata = {
             "source": source,
@@ -875,26 +875,26 @@ async def add_to_knowledge_base(kb, text: str, source: str, metadata: Dict[str, 
             full_metadata.setdefault("year", inferred_year)
         else:
             full_metadata.setdefault("year", metadata.get("year"))
-        
+
         # Ensure document_id is available for reference links
         if 'document_uuid' in metadata:
             full_metadata['document_id'] = metadata['document_uuid']
-        
+
         # ASYNC ADD: This queues the document without blocking
         # In production, this would use Celery/RQ/APScheduler
         # For now, we do a quick add without re-indexing
         import asyncio
         from pathlib import Path
-        
+
         # Store text temporarily to process later
         temp_dir = Path("data/knowledge_base/pending")
         temp_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Generate a pending task ID
         import hashlib
-        task_id = hashlib.md5(f"{source}{datetime.now().isoformat()}".encode(), usedforsecurity=False).hexdigest()[:16]
+        task_id = hashlib.sha256(f"{source}{datetime.now().isoformat()}".encode()).hexdigest()[:16]
         pending_file = temp_dir / f"{task_id}.json"
-        
+
         import json
         with open(pending_file, 'w') as f:
             json.dump({
@@ -906,19 +906,19 @@ async def add_to_knowledge_base(kb, text: str, source: str, metadata: Dict[str, 
                 "created_at": datetime.now().isoformat(),
                 "status": "pending"
             }, f)
-        
+
         # Schedule async processing (non-blocking)
         asyncio.create_task(
             _process_document_async(local_kb, text, source, full_metadata, task_id)
         )
-        
+
         logger.info(f"[QUEUED] {source} - scheduled for background processing (ID: {task_id})")
         return f"queued_{task_id}"
-        
+
     except Exception as e:
         logger.error(f"Failed to queue KB document: {e}")
         import hashlib
-        doc_id = hashlib.md5(f"{source}{text[:100]}".encode(), usedforsecurity=False).hexdigest()[:12]
+        doc_id = hashlib.sha256(f"{source}{text[:100]}".encode()).hexdigest()[:12]
         return doc_id
 
 
@@ -926,14 +926,14 @@ async def _process_document_async(kb, text: str, source: str, metadata: Dict[str
     """Background task to process document embeddings (does not block HTTP response)"""
     try:
         logger.info(f"[BACKGROUND] Processing embeddings for: {source} (task: {task_id})")
-        
+
         chunks_added = kb.add_document(
             content=text,
             metadata=metadata,
             chunk_size=2000,
             chunk_overlap=50
         )
-        
+
         # Update pending status
         from pathlib import Path
         pending_file = Path("data/knowledge_base/pending") / f"{task_id}.json"
@@ -945,7 +945,7 @@ async def _process_document_async(kb, text: str, source: str, metadata: Dict[str
             data['chunks_added'] = chunks_added
             with open(pending_file, 'w') as f:
                 json.dump(data, f)
-        
+
         logger.info(f"[OK] Background embedding complete: {source} - {chunks_added} chunks (task: {task_id})")
     except Exception as e:
         logger.error(f"[ERROR] Background processing failed for {source}: {e}")
@@ -981,21 +981,21 @@ async def get_statistics():
             db_docs = db.query(KnowledgeDocument).all()
             db_doc_count = len(db_docs)
             db_total_chunks = sum(doc.chunk_count or 0 for doc in db_docs)
-            
+
             # Get unique categories
             db_categories = set()
             for doc in db_docs:
                 if doc.category and doc.category.strip():
                     db_categories.add(doc.category.strip())
-            
+
             logger.info(f"Database query: {db_doc_count} documents, {db_total_chunks} chunks, {len(db_categories)} categories")
         finally:
             db.close()
-        
+
         # Enhanced KB (medical database, optional re-ranking) - keep for capabilities
         enhanced_kb = get_knowledge_base()
         enhanced_stats = enhanced_kb.get_statistics()
-        
+
         # Use database count as primary source
         _enhanced_doc_count = db_doc_count  # noqa: F841
 
@@ -1022,7 +1022,7 @@ async def get_statistics():
                     base = src.split(' (Part')[0].strip()
                     indexed_sources.add(base)
         except Exception:
-            pass
+            pass  # nosec B110
 
         def _file_entry(p: Path) -> Dict[str, Any]:
             name = p.name
@@ -1113,13 +1113,13 @@ async def get_statistics():
                 safe_tb.append(safe_line)
             except Exception:
                 safe_tb.append("Error in exception formatting")
-        
+
         error_msg = "Unknown error"
         try:
             error_msg = repr(e).encode('ascii', errors='replace').decode('ascii')
         except Exception:
             error_msg = "Error occurred"
-        
+
         logger.error(f"Error getting statistics: {error_msg}\nTraceback:\n{''.join(safe_tb)}")
         return {'status': 'error', 'error': error_msg, 'total_documents': 0, 'total_chunks': 0, 'knowledge_level': 'UNKNOWN'}
 
@@ -1132,7 +1132,7 @@ async def get_pending_status():
     pending_dir = Path("data/knowledge_base/pending")
     if not pending_dir.exists():
         return {"pending": [], "completed": 0}
-    
+
     pending = []
     for task_file in pending_dir.glob("*.json"):
         try:
@@ -1147,7 +1147,7 @@ async def get_pending_status():
             })
         except Exception as e:
             logger.warning(f"Error reading pending task {task_file}: {e}")
-    
+
     return {
         "total_pending": len(pending),
         "pending": pending
@@ -1174,7 +1174,7 @@ async def search_knowledge_base(request: SearchRequest):
                 if year and year < int(filters['min_year']):
                     return False
             except Exception:
-                pass
+                pass  # nosec B110
         if filters.get('allow_outdated') is False and metadata.get('outdated'):
             return False
         return True
@@ -1307,18 +1307,18 @@ async def get_upload_status(document_id: str, db: Session = Depends(get_db)):
     """Get processing status of a document upload"""
     try:
         from app.models import DocumentProcessingStatus
-        
+
         status = db.query(DocumentProcessingStatus).filter(
             DocumentProcessingStatus.document_id == document_id
         ).first()
-        
+
         if not status:
             return {
                 "document_id": document_id,
                 "status": "unknown",
                 "message": "Document not found in processing queue"
             }
-        
+
         response = {
             "document_id": document_id,
             "status": status.status,
@@ -1330,7 +1330,7 @@ async def get_upload_status(document_id: str, db: Session = Depends(get_db)):
             "started_at": status.started_at.isoformat() if status.started_at else None,
             "completed_at": status.completed_at.isoformat() if status.completed_at else None,
         }
-        
+
         if status.status == "processing":
             elapsed = (datetime.now() - status.started_at).total_seconds() if status.started_at else 0
             if status.estimated_time_seconds and status.progress_percent > 0:
@@ -1338,7 +1338,7 @@ async def get_upload_status(document_id: str, db: Session = Depends(get_db)):
                     (status.estimated_time_seconds * 100 / status.progress_percent) - elapsed
                 )
                 response["estimated_remaining_seconds"] = max(0, estimated_remaining)
-        
+
         return response
     except Exception as e:
         logger.error(f"Error getting upload status: {e}")
@@ -1354,17 +1354,17 @@ async def get_all_upload_statuses(db: Session = Depends(get_db)):
     """Get processing status of all documents in queue"""
     try:
         from app.models import DocumentProcessingStatus, KnowledgeDocument
-        
+
         statuses = db.query(DocumentProcessingStatus).order_by(
             DocumentProcessingStatus.updated_at.desc()
         ).all()
-        
+
         results = []
         for status in statuses:
             doc = db.query(KnowledgeDocument).filter(
                 KnowledgeDocument.document_id == status.document_id
             ).first()
-            
+
             results.append({
                 "document_id": status.document_id,
                 "filename": doc.filename if doc else "unknown",
@@ -1377,13 +1377,13 @@ async def get_all_upload_statuses(db: Session = Depends(get_db)):
                 "started_at": status.started_at.isoformat() if status.started_at else None,
                 "completed_at": status.completed_at.isoformat() if status.completed_at else None,
             })
-        
+
         # Summary
         queued = sum(1 for s in statuses if s.status == "queued")
         processing = sum(1 for s in statuses if s.status == "processing")
         completed = sum(1 for s in statuses if s.status == "completed")
         failed = sum(1 for s in statuses if s.status == "failed")
-        
+
         return {
             "total": len(statuses),
             "queued": queued,
@@ -1411,7 +1411,7 @@ async def list_documents():
     try:
         upload_files = list(UPLOAD_DIR.glob("*"))
         documents = []
-        
+
         for file_path in upload_files:
             if file_path.is_file():
                 stat = file_path.stat()
@@ -1421,10 +1421,10 @@ async def list_documents():
                     "uploaded_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
                     "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
                 })
-        
+
         # Sort by upload date (newest first)
         documents.sort(key=lambda x: x["uploaded_at"], reverse=True)
-        
+
         return {
             "documents": documents,
             "total_count": len(documents),
@@ -1443,15 +1443,15 @@ async def delete_document(
     """Delete an uploaded document"""
     try:
         file_path = UPLOAD_DIR / filename
-        
+
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         if not file_path.is_file():
             raise HTTPException(status_code=400, detail="Invalid file")
-        
+
         file_path.unlink()
-        
+
         return {
             "message": f"Document {filename} deleted successfully",
             "filename": filename
@@ -1479,12 +1479,12 @@ async def upload_large_pdf(
                 status_code=400,
                 detail=f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
             )
-        
+
         # Save file with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_filename = f"{timestamp}_{file.filename}"
         file_path = UPLOAD_DIR / safe_filename
-        
+
         # Save uploaded file
         logger.info(f"Saving large file: {file.filename}")
         with open(file_path, "wb") as f:
@@ -1492,10 +1492,10 @@ async def upload_large_pdf(
             chunk_size = 1024 * 1024  # 1MB chunks
             while chunk := await file.read(chunk_size):
                 f.write(chunk)
-        
+
         file_size_mb = file_path.stat().st_size / 1024 / 1024
         logger.info(f"Saved {file.filename}: {file_size_mb:.2f} MB")
-        
+
         # Validate file size
         if file_path.stat().st_size > MAX_FILE_SIZE:
             file_path.unlink()  # Delete oversized file
@@ -1503,22 +1503,22 @@ async def upload_large_pdf(
                 status_code=400,
                 detail=f"File exceeds maximum size of {MAX_FILE_SIZE / 1024 / 1024:.0f}MB"
             )
-        
+
         # Process with large PDF processor
         processor = get_large_pdf_processor()
         knowledge_base = get_knowledge_base()
-        
+
         # Progress tracking
         processing_status = {
             'current_page': 0,
             'total_pages': 0,
             'progress': 0
         }
-        
+
         async def progress_callback(progress: float, message: str):
             processing_status['progress'] = progress
             logger.info(f"Processing: {progress:.1f}% - {message}")
-        
+
         # Process PDF and add to KB
         result = await processor.process_large_pdf(
             file_path=file_path,
@@ -1527,7 +1527,7 @@ async def upload_large_pdf(
             ),
             progress_callback=progress_callback
         )
-        
+
         return {
             "message": f"Successfully processed {file.filename}",
             "filename": file.filename,
@@ -1537,7 +1537,7 @@ async def upload_large_pdf(
             "uploaded_by": current_user.email,
             "upload_time": datetime.now().isoformat()
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1551,7 +1551,7 @@ async def get_processor_statistics():
     try:
         processor = get_large_pdf_processor()
         stats = processor.get_statistics()
-        
+
         return {
             "processor_info": stats,
             "cache_dir": str(processor.cache_dir),
@@ -1571,7 +1571,7 @@ async def clear_processor_cache(
     try:
         processor = get_large_pdf_processor()
         result = await processor.clear_cache(older_than_days)
-        
+
         return {
             "message": "Cache cleared successfully",
             **result
@@ -1589,19 +1589,19 @@ async def clear_all_documents(
     """Clear all documents from knowledge base and database (admin only)"""
     if current_user.role != "admin" and current_user.role != "doctor":
         raise HTTPException(status_code=403, detail="Only admins and doctors can clear knowledge base")
-    
+
     try:
         # Delete all KB documents from database
         deleted_count = db.query(KnowledgeDocument).delete()
         db.commit()
-        
+
         # Clear vector store
         knowledge_base = get_knowledge_base()
         if hasattr(knowledge_base, 'clear_all'):
             knowledge_base.clear_all()
-        
+
         logger.info(f"Cleared {deleted_count} documents from knowledge base")
-        
+
         return {
             "message": "Knowledge base cleared successfully",
             "documents_deleted": deleted_count
@@ -1628,7 +1628,7 @@ async def list_documents_with_metadata(
 ):
     """List all uploaded documents with metadata"""
     documents = db.query(KnowledgeDocument).offset(skip).limit(limit).all()
-    
+
     return {
         "total": db.query(KnowledgeDocument).count(),
         "documents": [
@@ -1658,23 +1658,23 @@ async def get_document(
     doc = db.query(KnowledgeDocument).filter(
         KnowledgeDocument.document_id == document_id
     ).first()
-    
+
     # If not found, try by filename
     if not doc:
         doc = db.query(KnowledgeDocument).filter(
             KnowledgeDocument.filename == document_id
         ).first()
-    
+
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    
+
     canonical_path = CANONICAL_TEXT_DIR / f"{doc.document_id}.txt"
     canonical_text = ""
     if canonical_path.exists():
         canonical_text = canonical_path.read_text(encoding="utf-8", errors="ignore")
 
     preview_chunks = _build_preview_chunks(canonical_text)
-    
+
     return {
         "id": doc.document_id,
         "filename": doc.filename,
@@ -1714,22 +1714,22 @@ async def search_pubmed_online(
 ):
     """
     Search PubMed for recent medical research (FREE - No API key required)
-    
+
     - **query**: Search terms (e.g., "diabetes treatment", "COVID-19 symptoms")
     - **max_results**: Number of results (1-20)
     - **use_cache**: Use cached results if available (24h cache)
-    
+
     Returns recent research articles from PubMed database
     """
     if max_results < 1 or max_results > 20:
         raise HTTPException(status_code=400, detail="max_results must be between 1 and 20")
-    
+
     try:
         service = get_online_kb_service()
         await service.initialize()
-        
+
         results = await service.search_pubmed(query, max_results, use_cache)
-        
+
         return {
             "query": query,
             "total_results": len(results),
@@ -1749,18 +1749,18 @@ async def get_clinical_guidelines(
 ):
     """
     Get clinical practice guidelines from multiple authoritative sources
-    
+
     - **condition**: Medical condition (e.g., "hypertension", "diabetes", "asthma")
     - **use_cache**: Use cached results (7-day cache for guidelines)
-    
+
     Sources: PubMed, CDC, WHO, NICE (UK)
     """
     try:
         service = get_online_kb_service()
         await service.initialize()
-        
+
         guidelines = await service.get_clinical_guidelines(condition, use_cache)
-        
+
         # Group by source
         by_source = {}
         for guideline in guidelines:
@@ -1768,7 +1768,7 @@ async def get_clinical_guidelines(
             if source not in by_source:
                 by_source[source] = []
             by_source[source].append(guideline)
-        
+
         return {
             "condition": condition,
             "total_guidelines": len(guidelines),
@@ -1790,18 +1790,18 @@ async def get_drug_information(
 ):
     """
     Get comprehensive drug information from online sources
-    
+
     - **drug_name**: Drug name (generic or brand)
     - **use_cache**: Use cached results (24h cache)
-    
+
     Returns: Indications, dosage, side effects, interactions, etc.
     """
     try:
         service = get_online_kb_service()
         await service.initialize()
-        
+
         drug_info = await service.get_drug_information(drug_name, use_cache)
-        
+
         return {
             "drug_name": drug_name,
             "cached": use_cache,
@@ -1816,18 +1816,18 @@ async def get_drug_information(
 async def online_kb_status(current_user: User = Depends(get_current_user)):
     """
     Get status of online knowledge base service
-    
+
     Returns cache statistics and service availability
     """
     try:
         service = get_online_kb_service()
         await service.initialize()
-        
+
         # Get cache stats
         cache_dir = service.cache_dir
         cache_files = list(cache_dir.glob("*.json"))
         total_cache_size = sum(f.stat().st_size for f in cache_files)
-        
+
         return {
             "status": "operational",
             "initialized": service.initialized,
@@ -1854,24 +1854,24 @@ async def online_kb_status(current_user: User = Depends(get_current_user)):
 async def clear_online_cache(current_user: User = Depends(get_current_user)):
     """
     Clear online knowledge base cache
-    
+
     Forces fresh data fetching on next request
     """
     if current_user.role not in ["admin", "doctor"]:
         raise HTTPException(status_code=403, detail="Only admins and doctors can clear cache")
-    
+
     try:
         service = get_online_kb_service()
         await service.initialize()
-        
+
         cache_dir = service.cache_dir
         cache_files = list(cache_dir.glob("*.json"))
         deleted_count = 0
-        
+
         for cache_file in cache_files:
             cache_file.unlink()
             deleted_count += 1
-        
+
         return {
             "message": "Online KB cache cleared",
             "files_deleted": deleted_count
@@ -1890,21 +1890,21 @@ async def enhanced_search(
 ):
     """
     Enhanced KB search with images and online verification
-    
+
     - **query**: Search query
     - **top_k**: Number of results (default 5)
     - **include_images**: Include related medical images from PDFs
     - **verify_online**: Verify content against current medical guidelines
-    
+
     Returns: Text results + images + verification status
     """
     try:
         from app.services.enhanced_kb_processor import EnhancedKBProcessor
-        
+
         # Get KB services
         kb_service = get_local_knowledge_base()
         processor = EnhancedKBProcessor()
-        
+
         # Perform enhanced search
         results = processor.search_with_images(
             query=request.query,
@@ -1912,15 +1912,15 @@ async def enhanced_search(
             include_images=include_images,
             top_k=request.top_k
         )
-        
+
         # Add metadata
         results['query'] = request.query
         results['include_images'] = include_images
         results['verify_online'] = verify_online
         results['timestamp'] = datetime.now().isoformat()
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"Enhanced search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -1933,26 +1933,26 @@ async def get_document_images(
 ):
     """
     Get all images extracted from a specific document
-    
+
     Returns list of images with captions and descriptions
     """
     try:
         from app.services.enhanced_kb_processor import EnhancedKBProcessor
-        
+
         processor = EnhancedKBProcessor()
         images = processor._get_images_for_document(document_id)
-        
+
         # Generate AI descriptions for each image
         for img in images:
             if 'description' not in img:
                 img['description'] = processor.generate_image_description(img['path'])
-        
+
         return {
             "document_id": document_id,
             "total_images": len(images),
             "images": images
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting document images: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -1966,33 +1966,33 @@ async def extract_document_images(
 ):
     """
     Extract and save images from a specific PDF document
-    
+
     This is a background task that can take time for large PDFs
     """
     if current_user.role not in ["admin", "doctor"]:
         raise HTTPException(status_code=403, detail="Only admins and doctors can extract images")
-    
+
     try:
         from app.services.enhanced_kb_processor import EnhancedKBProcessor
-        
+
         # Find document in database
         doc = db.query(KnowledgeDocument).filter(
             KnowledgeDocument.document_id == document_id
         ).first()
-        
+
         if not doc:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         if not doc.file_path or not Path(doc.file_path).exists():
             raise HTTPException(status_code=404, detail="PDF file not found on disk")
-        
+
         # Extract images
         processor = EnhancedKBProcessor()
         extraction_result = processor.extract_text_and_images(doc.file_path)
-        
+
         if 'error' in extraction_result:
             raise HTTPException(status_code=500, detail=extraction_result['error'])
-        
+
         # Save images
         saved_images = []
         for img in extraction_result['images']:
@@ -2007,7 +2007,7 @@ async def extract_document_images(
                 'caption': img['caption'],
                 'size_kb': img['size'] / 1024
             })
-        
+
         return {
             "document_id": document_id,
             "filename": doc.filename,
@@ -2016,7 +2016,7 @@ async def extract_document_images(
             "images": saved_images,
             "metadata": extraction_result['metadata']
         }
-        
+
     except Exception as e:
         logger.error(f"Error extracting images: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -2037,21 +2037,21 @@ async def reset_knowledge_base(
             status_code=403,
             detail="Only administrators can reset the knowledge base"
         )
-    
+
     try:
         # Get count before deletion
         count_before = db.query(KnowledgeDocument).count()
         logger.warning(f"[ADMIN] {current_user.email} initiating KB reset - {count_before} documents")
-        
+
         # Delete all documents
         db.query(KnowledgeDocument).delete()
         db.commit()
-        
+
         # Verify deletion
         count_after = db.query(KnowledgeDocument).count()
-        
+
         logger.warning(f"[ADMIN] KB reset complete - deleted {count_before} documents, {count_after} remaining")
-        
+
         return {
             "status": "success",
             "message": f"Knowledge base reset complete",
@@ -2059,7 +2059,7 @@ async def reset_knowledge_base(
             "remaining_documents": count_after,
             "timestamp": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
         logger.error(f"[ERROR] KB reset failed: {e}")
         raise HTTPException(
@@ -2072,7 +2072,7 @@ async def reset_knowledge_base(
 async def get_ocr_status():
     """
     Check OCR setup status and get installation instructions
-    
+
     Returns information about:
     - Whether OCR dependencies are installed
     - Setup instructions for missing components
@@ -2081,7 +2081,7 @@ async def get_ocr_status():
     try:
         ocr_processor = get_pdf_ocr_processor()
         setup_info = ocr_processor.get_setup_instructions()
-        
+
         return {
             "status": "ready" if setup_info['ocr_ready'] else "needs_setup",
             "ocr_available": setup_info['ocr_ready'],
@@ -2115,7 +2115,7 @@ async def get_ocr_status():
 async def get_queue_status(db: Session = Depends(get_db)):
     """
     Get PDF upload queue processing status
-    
+
     Returns:
     - Queue statistics (queued, processing, completed, failed counts)
     - Processing worker status
@@ -2124,31 +2124,31 @@ async def get_queue_status(db: Session = Depends(get_db)):
     try:
         from app.services.upload_queue_processor import get_queue_processor
         from app.models import DocumentProcessingStatus
-        
+
         processor = get_queue_processor()
-        
+
         # Get queue statistics
         queued_count = db.query(DocumentProcessingStatus).filter(
             DocumentProcessingStatus.status == 'queued'
         ).count()
-        
+
         processing_count = db.query(DocumentProcessingStatus).filter(
             DocumentProcessingStatus.status == 'processing'
         ).count()
-        
+
         completed_count = db.query(DocumentProcessingStatus).filter(
             DocumentProcessingStatus.status == 'completed'
         ).count()
-        
+
         failed_count = db.query(DocumentProcessingStatus).filter(
             DocumentProcessingStatus.status == 'failed'
         ).count()
-        
+
         # Get current processing documents
         processing_docs = db.query(DocumentProcessingStatus).filter(
             DocumentProcessingStatus.status == 'processing'
         ).all()
-        
+
         processing_details = [
             {
                 "document_id": doc.document_id,
@@ -2160,7 +2160,7 @@ async def get_queue_status(db: Session = Depends(get_db)):
             }
             for doc in processing_docs
         ]
-        
+
         return {
             "worker_status": "running" if processor.is_running else "stopped",
             "queue": {

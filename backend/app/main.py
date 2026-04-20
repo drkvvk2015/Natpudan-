@@ -12,11 +12,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
-from contextlib import asynccontextmanager
 import time
 import os
 import psutil
 import logging
+import tempfile
 
 from app.core.config import settings
 from app.logging_config import setup_logging, get_logger
@@ -74,7 +74,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         f"[{error_id}] Unhandled exception at {request.method} {request.url.path}:",
         exc_info=True
     )
-    
+
     # Log to error corrector
     error_corrector.log_error(exc, {
         "operation": "api_request",
@@ -82,11 +82,11 @@ async def global_exception_handler(request: Request, exc: Exception):
         "path": str(request.url.path),
         "error_id": error_id
     })
-    
+
     # Determine user-friendly error message
     error_msg = "An unexpected error occurred. Please try again."
     status_code = 500
-    
+
     if "openai" in str(exc).lower():
         error_msg = "AI service temporarily unavailable. Please try again or use knowledge base search."
     elif "database" in str(exc).lower():
@@ -94,7 +94,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     elif "timeout" in str(exc).lower():
         error_msg = "Request timeout. Please try again with a simpler query."
         status_code = 504
-    
+
     return JSONResponse(
         status_code=status_code,
         content={
@@ -103,6 +103,21 @@ async def global_exception_handler(request: Request, exc: Exception):
             "detail": str(exc)[:200] if logger.level == logging.DEBUG else None
         }
     )
+
+
+@app.post("/api/error-correction/log")
+async def log_frontend_error(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Accept frontend error reports without failing the client."""
+    error_corrector.log_error(
+        Exception(payload.get("message", "Frontend error")),
+        {
+            "operation": "frontend_error",
+            "url": payload.get("url"),
+            "component_stack": payload.get("componentStack"),
+            "timestamp": payload.get("timestamp"),
+        },
+    )
+    return {"success": True}
 
 # CORS middleware - allow frontend origins
 app.add_middleware(
@@ -194,12 +209,12 @@ def detailed_health() -> Dict[str, Any]:
     try:
         # Calculate uptime in seconds
         uptime_seconds = int(time.time() - START_TIME)
-        
+
         # Get system metrics
         cpu_percent = psutil.cpu_percent(interval=0.5)
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage(os.path.abspath(os.sep))
-        
+
         return {
             "status": "healthy",
             "uptime": uptime_seconds,
@@ -266,7 +281,7 @@ def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Generate diagnosis suggestions from symptoms"""
     symptoms: List[str] = payload.get("symptoms", [])
     try:
-        
+
         if not symptoms:
             return {
                 "error": "No symptoms provided",
@@ -274,22 +289,22 @@ def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "differential_diagnoses": [],
                 "suggested_icd_codes": []
             }
-        
+
         # Get ICD-10 code suggestions
         icd_service = get_icd10_service()
         suggested_codes = icd_service.suggest_codes(symptoms)
-        
+
         # Use first suggested code as primary diagnosis
         primary_diagnosis = "Undetermined"
         if suggested_codes:
             primary_diagnosis = suggested_codes[0].get("description", "Undetermined")
-        
+
         # Differential diagnoses from remaining codes
         differential_diagnoses = [
             code.get("description", "")
             for code in suggested_codes[1:5]
         ]
-        
+
         return {
             "primary_diagnosis": primary_diagnosis,
             "differential_diagnoses": differential_diagnoses,
@@ -310,10 +325,10 @@ def analyze_symptoms(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze symptoms and suggest related conditions"""
     symptoms: List[Any] = payload.get("symptoms", [])
     try:
-        
+
         if not symptoms:
             return {"error": "No symptoms provided", "analysis": []}
-        
+
         # Get ICD-10 suggestions for each symptom
         icd_service = get_icd10_service()
         analysis: List[Dict[str, Any]] = []
@@ -324,7 +339,7 @@ def analyze_symptoms(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "symptom": symptom,
                 "related_conditions": codes
             })
-        
+
         return {
             "symptoms": symptoms,
             "analysis": analysis,
@@ -334,16 +349,178 @@ def analyze_symptoms(payload: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(f"Error analyzing symptoms: {e}")
         return {"error": str(e), "symptoms": symptoms, "analysis": []}
 
+
+@medical_router.post("/live-diagnosis")
+def live_diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate diagnosis suggestions from richer clinical context."""
+    try:
+        complaints = payload.get("complaints", [])
+        patient_history = payload.get("patient_history", "")
+        vital_signs = payload.get("vital_signs", {})
+        anthropometry = payload.get("anthropometry", {})
+        clinical_findings = payload.get("clinical_findings", [])
+
+        if not complaints:
+            return {
+                "differential_diagnoses": [],
+                "recommended_tests": [],
+                "clinical_summary": "No complaints provided",
+                "data_completeness": 0.0,
+            }
+
+        symptoms: List[str] = []
+        for complaint in complaints:
+            if isinstance(complaint, dict):
+                value = str(complaint.get("complaint", "")).strip()
+            else:
+                value = str(complaint).strip()
+            if value:
+                symptoms.append(value)
+
+        supporting_evidence: List[str] = []
+        for finding in clinical_findings:
+            if not isinstance(finding, dict):
+                supporting_evidence.append(str(finding))
+                continue
+            system = str(finding.get("system", "")).strip()
+            detail = str(finding.get("finding", "")).strip()
+            normalized = f"{system}: {detail}" if system and detail else detail or system
+            if normalized:
+                supporting_evidence.append(normalized)
+
+        data_completeness = 0.2
+        if patient_history:
+            data_completeness += 0.2
+        if vital_signs:
+            data_completeness += 0.2
+        if anthropometry:
+            data_completeness += 0.1
+        if clinical_findings:
+            data_completeness += 0.3
+
+        icd_service = get_icd10_service()
+        suggested_codes = icd_service.suggest_codes(symptoms)
+
+        differential_diagnoses: List[Dict[str, Any]] = []
+        for idx, code in enumerate(suggested_codes[:5]):
+            confidence = max(0.3, 0.9 - (idx * 0.15))
+            differential_diagnoses.append(
+                {
+                    "diagnosis": code.get("description", "Unknown"),
+                    "disease_name": code.get("description", "Unknown"),
+                    "confidence": confidence,
+                    "icd_code": code.get("code", ""),
+                    "supporting_evidence": supporting_evidence[:3] if supporting_evidence else symptoms[:2],
+                }
+            )
+
+        search_space = [item.lower() for item in [*symptoms, *supporting_evidence]]
+        recommended_tests: List[str] = []
+        if any("chest pain" in item or "heart" in item for item in search_space):
+            recommended_tests.extend(["ECG", "Troponins", "Chest X-ray"])
+        if any("fever" in item or "infection" in item for item in search_space):
+            recommended_tests.extend(["CBC", "Blood cultures", "CRP"])
+        if any("abdominal" in item or "stomach" in item for item in search_space):
+            recommended_tests.extend(["Abdominal ultrasound", "Lipase", "Liver function tests"])
+        if any("headache" in item or "neuro" in item for item in search_space):
+            recommended_tests.extend(["CT head", "MRI brain"])
+        recommended_tests = list(dict.fromkeys(recommended_tests))
+
+        primary_complaint = symptoms[0] if symptoms else "Unknown complaint"
+        duration_info = ""
+        if complaints and isinstance(complaints[0], dict) and complaints[0].get("duration"):
+            duration_info = f" for {complaints[0]['duration']}"
+
+        clinical_summary = f"Patient presents with {primary_complaint}{duration_info}. "
+        if len(symptoms) > 1:
+            clinical_summary += f"Associated symptoms include {', '.join(symptoms[1:3])}. "
+        if patient_history:
+            clinical_summary += "Comprehensive history available. "
+        if supporting_evidence:
+            clinical_summary += f"Positive findings on exam: {', '.join(supporting_evidence[:5])}. "
+        clinical_summary += f"Data completeness: {int(data_completeness * 100)}%."
+
+        return {
+            "differential_diagnoses": differential_diagnoses,
+            "recommended_tests": recommended_tests,
+            "clinical_summary": clinical_summary,
+            "data_completeness": data_completeness,
+        }
+    except Exception as e:
+        logger.error(f"Error in live diagnosis: {e}")
+        return {
+            "error": str(e),
+            "differential_diagnoses": [],
+            "recommended_tests": [],
+            "clinical_summary": "Error processing request",
+            "data_completeness": 0.0,
+        }
+
+
+@medical_router.post("/live-diagnosis/suggest-treatment")
+def suggest_treatment(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Compatibility endpoint for the diagnosis screen."""
+    from app.services.ai_treatment_recommender import get_treatment_recommender
+
+    diagnosis = payload.get("diagnosis", "")
+    patient_data = {
+        "age": payload.get("patient_age"),
+        "gender": payload.get("patient_gender"),
+        "comorbidities": payload.get("comorbidities", []),
+    }
+    recommender = get_treatment_recommender()
+    return recommender.recommend_treatment(diagnosis, patient_data)
+
+
+@medical_router.post("/parse-medical-report")
+async def parse_medical_report(file: UploadFile = File(...)) -> Dict[str, Any]:
+    """Extract structured data from uploaded PDF reports."""
+    from app.services.pdf_processor import pdf_processor
+
+    suffix = os.path.splitext(file.filename or "report.pdf")[1] or ".pdf"
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_file.write(await file.read())
+            temp_path = temp_file.name
+
+        report_data = pdf_processor.process_report(temp_path)
+        flattened_lab_results: List[Dict[str, Any]] = []
+        for category_results in report_data.get("lab_results", {}).values():
+            if not isinstance(category_results, dict):
+                continue
+            for test_name, value in category_results.items():
+                flattened_lab_results.append({"test": test_name, "value": str(value)})
+
+        diagnoses = [
+            {
+                "description": item.get("description", ""),
+                "icd10_code": item.get("code") if item.get("code") not in (None, "Unknown") else None,
+            }
+            for item in report_data.get("diagnoses", [])
+        ]
+
+        return {
+            "vitals": report_data.get("vitals", {}),
+            "medications": report_data.get("medications", []),
+            "lab_results": flattened_lab_results,
+            "diagnoses": diagnoses,
+            "allergies": report_data.get("allergies", []),
+        }
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+
 @medical_router.get("/icd/search")
 def icd_search(query: str, max_results: int = 20) -> List[Dict[str, str]]:
     """Search ICD-10 codes by code or description"""
     try:
         if not query:
             return []
-        
+
         icd_service = get_icd10_service()
         results = icd_service.search_codes(query, max_results=max_results)
-        
+
         return results
     except Exception as e:
         logger.error(f"Error searching ICD codes: {e}")
@@ -355,10 +532,10 @@ def icd_get_code(code: str) -> Dict[str, Any]:
     try:
         icd_service = get_icd10_service()
         result = icd_service.get_code(code)
-        
+
         if result is None:
             return {"error": "Code not found", "code": code}
-        
+
         return result
     except Exception as e:
         logger.error(f"Error getting ICD code: {e}")
@@ -386,11 +563,11 @@ def hybrid_search(payload: Dict[str, Any]) -> Dict[str, Any]:
     try:
         top_k = payload.get("top_k", 10)
         alpha = payload.get("alpha", 0.5)  # 0=BM25 only, 1=vector only
-        
+
         # Get vector search results
         kb = get_vector_knowledge_base()
         vector_results = kb.search(query, top_k=top_k * 2)
-        
+
         # Apply hybrid search
         hybrid_search_engine = get_hybrid_search()
         results = hybrid_search_engine.hybrid_search(
@@ -399,7 +576,7 @@ def hybrid_search(payload: Dict[str, Any]) -> Dict[str, Any]:
             top_k=top_k,
             alpha=alpha
         )
-        
+
         return {
             "query": query,
             "results": results,
@@ -493,7 +670,7 @@ def pubmed_latest_research(
             days_back=days_back,
             sort="date"
         )
-        
+
         return {
             "topic": topic,
             "papers": papers,
@@ -514,18 +691,18 @@ def pubmed_auto_update(payload: Dict[str, Any]) -> Dict[str, Any]:
         topics = payload.get("topics", ["diabetes", "hypertension", "cancer"])
         papers_per_topic = payload.get("papers_per_topic", 3)
         days_back = payload.get("days_back", 7)
-        
+
         # Auto-update knowledge base
         pubmed = get_pubmed_integration()
         kb = get_vector_knowledge_base()
-        
+
         result: Dict[str, Any] = pubmed.auto_update_knowledge_base(
             vector_kb=kb,
             topics=topics,
             papers_per_topic=papers_per_topic,
             days_back=days_back
         )
-        
+
         return result
     except Exception as e:
         logger.error(f"Error auto-updating from PubMed: {e}")
@@ -542,21 +719,21 @@ def visualize_knowledge_graph(
     """
     try:
         kg = get_knowledge_graph()
-        
+
         # Find node
         node = kg.find_node(concept)
         if not node:
             return {"error": f"Concept '{concept}' not found in knowledge graph"}
-        
+
         # Get visualization
         visualization = kg.visualize_subgraph(
             center_node_id=node["id"],
             max_distance=max_distance
         )
-        
+
         # Get statistics
         stats = kg.get_statistics()
-        
+
         return {
             "concept": concept,
             "visualization": visualization,
@@ -575,18 +752,18 @@ def build_graph_from_text(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         text = payload.get("text", "")
-        
+
         # Extract entities
         extractor = get_entity_extractor()
         entities = extractor.extract_entities(text)
-        
+
         # Build knowledge graph
         kg = get_knowledge_graph()
         kg.build_from_entities(entities)
-        
+
         # Get statistics
         stats = kg.get_statistics()
-        
+
         return {
             "message": "Knowledge graph built successfully",
             "statistics": stats,
@@ -633,7 +810,7 @@ async def upload_document(
     try:
         # Read file content
         content = await file.read()
-        
+
         # Save document
         doc_manager = get_document_manager()
         filename = file.filename or "unnamed_document"
@@ -646,11 +823,11 @@ async def upload_document(
                 "description": description
             }
         )
-        
+
         # Index document in vector knowledge base
         kb = get_vector_knowledge_base()
         text_content = doc_manager.get_document_text(doc_info["document_id"])
-        
+
         if text_content:
             chunk_count = kb.add_document(
                 content=text_content,
@@ -665,7 +842,7 @@ async def upload_document(
             doc_info["indexed_chunks"] = chunk_count
         else:
             doc_info["indexed_chunks"] = 0
-        
+
         return JSONResponse(
             status_code=200,
             content={
@@ -686,7 +863,7 @@ def list_documents() -> Dict[str, Any]:
     try:
         doc_manager = get_document_manager()
         documents = doc_manager.list_documents()
-        
+
         return {
             "success": True,
             "documents": documents,
@@ -702,10 +879,10 @@ def get_document(document_id: str) -> Dict[str, Any]:
     try:
         doc_manager = get_document_manager()
         doc_info = doc_manager.get_document(document_id)
-        
+
         if doc_info is None:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         return {
             "success": True,
             "document": doc_info
@@ -723,14 +900,14 @@ def delete_document(document_id: str) -> Dict[str, Any]:
         # Delete from document manager
         doc_manager = get_document_manager()
         deleted = doc_manager.delete_document(document_id)
-        
+
         if not deleted:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         # Delete from vector knowledge base
         kb = get_vector_knowledge_base()
         chunks_deleted = kb.delete_document(document_id)
-        
+
         return {
             "success": True,
             "message": "Document deleted successfully",
@@ -784,15 +961,30 @@ def generate_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
         "clinical_guidelines": treatment.get("clinical_guidelines", [])
     }
 
+
+@prescription_router.post("/generate")
+def generate_prescription(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Compatibility alias for legacy frontend callers."""
+    normalized_payload = {
+        "diagnosis": payload.get("diagnosis", ""),
+        "patient_data": {
+            "age": payload.get("patient_age"),
+            "weight": payload.get("patient_weight"),
+            "allergies": payload.get("allergies", []),
+        },
+        "medications": payload.get("medications", []),
+    }
+    return generate_plan(normalized_payload)
+
 @prescription_router.post("/check-interactions")
 def check_interactions(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Check for drug interactions among multiple medications"""
     try:
         from app.services.drug_interactions import get_drug_checker
-        
+
         medications: List[str] = payload.get("medications", [])
         include_severity: Optional[List[str]] = payload.get("include_severity")
-        
+
         if not medications or len(medications) < 2:
             return {
                 "total_interactions": 0,
@@ -800,10 +992,10 @@ def check_interactions(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "severity_breakdown": {"high": 0, "moderate": 0, "low": 0},
                 "interactions": []
             }
-        
+
         checker = get_drug_checker()
         results = checker.check_multiple_drugs(medications, include_severity)
-        
+
         # Format response
         return {
             "total_interactions": results.get("total_interactions", 0),
@@ -821,6 +1013,32 @@ def check_interactions(payload: Dict[str, Any]) -> Dict[str, Any]:
             "error": str(e)
         }
 
+
+@prescription_router.post("/drugs/check")
+def legacy_check_interactions(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Compatibility alias for older frontend service paths."""
+    return check_interactions(payload)
+
+
+@prescription_router.get("/drugs/search")
+def search_drugs(q: str) -> List[str]:
+    """Basic local drug search using the rule-based interaction database."""
+    from app.services.drug_interactions import get_drug_checker
+
+    query = q.strip().lower()
+    if not query:
+        return []
+
+    checker = get_drug_checker()
+    candidates = set()
+    for drug1, drug2 in checker.normalized_db.keys():
+        candidates.add(drug1)
+        candidates.add(drug2)
+    for drugs in checker.DRUG_CLASSES.values():
+        candidates.update(drugs)
+
+    return sorted([candidate for candidate in candidates if query in candidate])[:20]
+
 @prescription_router.post("/dosing")
 def dosing(payload: Dict[str, Any]) -> Dict[str, Any]:
     drug = payload.get("drug_name", "unknown")
@@ -831,11 +1049,8 @@ def dosing(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 api_router.include_router(prescription_router)
 register_api_routers(api_router)
-# Background task for processing upload queue
-_last_queue_process = 0
-_queue_process_interval = 10  # Process queue every 10 seconds
 
-@app.get("/api/queue/process")
+@app.post("/api/queue/process")
 def trigger_queue_processing() -> Dict[str, Any]:
     """
     Trigger PDF upload queue processing
@@ -857,31 +1072,9 @@ def trigger_queue_processing() -> Dict[str, Any]:
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-# Middleware to periodically check queue (on every request)
 @app.middleware("http")
 async def background_queue_processor(request: Request, call_next: RequestResponseEndpoint) -> StarletteResponse:
-    """
-    Periodically process upload queue on every API request
-    This is a simple approach - in production, use a real task scheduler
-    """
-    global _last_queue_process
-    
-    try:
-        # Check if it's time to process (every 10 seconds)
-        current_time = time.time()
-        if current_time - _last_queue_process >= _queue_process_interval:
-            _last_queue_process = current_time
-            
-            # Fallback mode only (primary mode is dedicated worker task)
-            from app.services.upload_queue_processor import process_upload_queue
-            try:
-                process_upload_queue()
-            except Exception as e:
-                logger.warning(f"[QUEUE] Background processing error: {e}")
-    except Exception as e:
-        logger.warning(f"[MIDDLEWARE] Error in background processor: {e}")
-    
-    # Continue with the request
+    """Pass-through middleware. Queue processing is explicit, not request-driven."""
     response: StarletteResponse = await call_next(request)
     return response
 @app.api_route("/api/v1/{full_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])

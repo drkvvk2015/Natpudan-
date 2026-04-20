@@ -152,7 +152,7 @@ app.add_middleware(
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handle HTTP exceptions and log to error correction system"""
     from app.api.error_correction import log_error, ErrorCategory, ErrorSeverity
-    
+
     # Determine severity based on status code
     if exc.status_code >= 500:
         severity = ErrorSeverity.CRITICAL
@@ -160,7 +160,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         severity = ErrorSeverity.MEDIUM
     else:
         severity = ErrorSeverity.LOW
-    
+
     # Determine category
     if exc.status_code == 401:
         category = ErrorCategory.AUTHENTICATION
@@ -170,7 +170,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         category = ErrorCategory.API
     else:
         category = ErrorCategory.API
-    
+
     # Log to error correction system
     await log_error(
         category=category,
@@ -185,7 +185,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
             "url": str(request.url)
         }
     )
-    
+
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail}
@@ -196,9 +196,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle validation errors and attempt auto-correction"""
     from app.api.error_correction import log_error, ErrorCategory, ErrorSeverity
-    
+
     error_msg = f"Validation error: {exc.errors()}"
-    
+
     # Log and attempt correction
     await log_error(
         category=ErrorCategory.VALIDATION,
@@ -209,7 +209,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         execute_correction=True,
         context={"validation_errors": exc.errors()}
     )
-    
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": exc.errors()}
@@ -220,9 +220,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def general_exception_handler(request: Request, exc: Exception):
     """Catch-all exception handler with error correction"""
     from app.api.error_correction import log_error, ErrorCategory, ErrorSeverity
-    
+
     error_msg = str(exc)
-    
+
     # Determine category based on error type/message
     if "database" in error_msg.lower() or "sql" in error_msg.lower():
         category = ErrorCategory.DATABASE
@@ -232,7 +232,7 @@ async def general_exception_handler(request: Request, exc: Exception):
         category = ErrorCategory.AUTHENTICATION
     else:
         category = ErrorCategory.SYSTEM
-    
+
     # Log and attempt correction
     correction_result = await log_error(
         category=category,
@@ -247,14 +247,14 @@ async def general_exception_handler(request: Request, exc: Exception):
             "exception_type": type(exc).__name__
         }
     )
-    
+
     logger.error(f"Unhandled exception at {request.url.path}: {error_msg}", exc_info=True)
-    
+
     # If correction was successful, include hint in response
     detail = error_msg
     if correction_result and correction_result.get("auto_corrected"):
         detail += f" (Auto-correction attempted: {correction_result.get('correction_applied')})"
-    
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": detail}
@@ -292,12 +292,12 @@ def detailed_health() -> Dict[str, Any]:
     try:
         # Calculate uptime in seconds
         uptime_seconds = int(time.time() - START_TIME)
-        
+
         # Get system metrics
         cpu_percent = psutil.cpu_percent(interval=0.5)
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
-        
+
         return {
             "status": "healthy",
             "uptime": uptime_seconds,
@@ -359,7 +359,7 @@ def knowledge_statistics() -> Dict[str, Any]:
     try:
         kb = get_vector_knowledge_base()
         doc_manager = get_document_manager()
-        
+
         kb_stats = kb.get_statistics()
         doc_stats = doc_manager.get_statistics()
 
@@ -373,7 +373,7 @@ def knowledge_statistics() -> Dict[str, Any]:
                 try:
                     size_mb = round(int(doc.get('file_size', 0)) / (1024 * 1024), 2)
                 except Exception:
-                    pass
+                    pass  # nosec B110
                 # Consider 'indexed' if any chunks exist for this document_id
                 status = 'indexed' if doc.get('document_id') in kb_docs and kb_docs[doc.get('document_id')].get('chunk_count', 0) > 0 else 'pending'
                 pdf_sources.append({
@@ -416,10 +416,10 @@ def knowledge_search(payload: Dict[str, Any]) -> Dict[str, Any]:
     try:
         query = payload.get("query", "")
         top_k = payload.get("top_k", 5)
-        
+
         if not query:
             return {"error": "Query is required", "query": "", "results": []}
-        
+
         kb = get_vector_knowledge_base()
         raw_results = kb.search(query, top_k=top_k)
 
@@ -436,7 +436,7 @@ def knowledge_search(payload: Dict[str, Any]) -> Dict[str, Any]:
                 'relevance': float(r.get('similarity_score', 0.0)),
                 'distance': float(r.get('distance', 0.0))
             })
-        
+
         return {
             "query": query,
             "results": results,
@@ -452,7 +452,7 @@ def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Generate diagnosis suggestions from symptoms"""
     try:
         symptoms: List[str] = payload.get("symptoms", [])
-        
+
         if not symptoms:
             return {
                 "error": "No symptoms provided",
@@ -460,22 +460,22 @@ def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "differential_diagnoses": [],
                 "suggested_icd_codes": []
             }
-        
+
         # Get ICD-10 code suggestions
         icd_service = get_icd10_service()
         suggested_codes = icd_service.suggest_codes(symptoms)
-        
+
         # Use first suggested code as primary diagnosis
         primary_diagnosis = "Undetermined"
         if suggested_codes:
             primary_diagnosis = suggested_codes[0].get("description", "Undetermined")
-        
+
         # Differential diagnoses from remaining codes
         differential_diagnoses = [
             code.get("description", "")
             for code in suggested_codes[1:5]
         ]
-        
+
         # Ensure suggested_icd_codes are well-formed
         formatted_icd = []
         for code in suggested_codes[:5]:
@@ -485,7 +485,7 @@ def diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
                     'description': code.get('description'),
                     'category': icd_service._get_category(code.get('code', '')) if code.get('code') else None
                 })
-        
+
         return {
             "primary_diagnosis": primary_diagnosis,
             "differential_diagnoses": differential_diagnoses,
@@ -506,21 +506,21 @@ def analyze_symptoms(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze symptoms and suggest related conditions"""
     try:
         symptoms = payload.get("symptoms", [])
-        
+
         if not symptoms:
             return {"error": "No symptoms provided", "analysis": []}
-        
+
         # Get ICD-10 suggestions for each symptom
         icd_service = get_icd10_service()
         analysis = []
-        
+
         for symptom in symptoms:
             codes = icd_service.search_codes(symptom, max_results=3)
             analysis.append({
                 "symptom": symptom,
                 "related_conditions": codes
             })
-        
+
         return {
             "symptoms": symptoms,
             "analysis": analysis,
@@ -536,10 +536,10 @@ def icd_search(query: str, max_results: int = 20) -> List[Dict[str, str]]:
     try:
         if not query:
             return []
-        
+
         icd_service = get_icd10_service()
         results = icd_service.search_codes(query, max_results=max_results)
-        
+
         return results
     except Exception as e:
         logger.error(f"Error searching ICD codes: {e}")
@@ -551,10 +551,10 @@ def icd_get_code(code: str) -> Dict[str, Any]:
     try:
         icd_service = get_icd10_service()
         result = icd_service.get_code(code)
-        
+
         if result is None:
             return {"error": "Code not found", "code": code}
-        
+
         return result
     except Exception as e:
         logger.error(f"Error getting ICD code: {e}")
@@ -569,7 +569,7 @@ def live_diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
         vital_signs = payload.get("vital_signs", {})
         anthropometry = payload.get("anthropometry", {})
         clinical_findings = payload.get("clinical_findings", [])
-        
+
         if not complaints:
             return {
                 "differential_diagnoses": [],
@@ -577,7 +577,7 @@ def live_diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "clinical_summary": "No complaints provided",
                 "data_completeness": 0.0
             }
-        
+
         # Extract symptoms for ICD analysis
         symptoms = []
         for complaint in complaints:
@@ -585,7 +585,7 @@ def live_diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
                 symptoms.append(complaint.get("complaint", ""))
             else:
                 symptoms.append(str(complaint))
-        
+
         # Normalize clinical findings into supporting evidence
         supporting_evidence = []
         positive_findings = []
@@ -598,19 +598,19 @@ def live_diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
                 supporting_evidence.append(entry)
                 positive_findings.append(entry)
             except Exception:
-                continue
-        
+                continue  # nosec B112
+
         # Calculate data completeness (0-1 scale)
         data_completeness = 0.2  # Base for having complaints
         if patient_history: data_completeness += 0.2
         if vital_signs: data_completeness += 0.2
         if anthropometry: data_completeness += 0.1
         if clinical_findings: data_completeness += 0.3
-        
+
         # Get ICD-10 suggestions
         icd_service = get_icd10_service()
         suggested_codes = icd_service.suggest_codes(symptoms)
-        
+
         # Build differential diagnoses with confidence scores
         differential_diagnoses = []
         for i, code in enumerate(suggested_codes[:5]):
@@ -622,7 +622,7 @@ def live_diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "icd_code": code.get("code", ""),
                 "supporting_evidence": supporting_evidence[:3] if supporting_evidence else symptoms[:2]
             })
-        
+
         # Generate recommended tests based on symptoms and positive findings
         recommended_tests = []
         if any("chest pain" in s.lower() or "heart" in s.lower() for s in symptoms + supporting_evidence):
@@ -633,16 +633,16 @@ def live_diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
             recommended_tests.extend(["Abdominal ultrasound", "Lipase", "Liver function tests"])
         if any("headache" in s.lower() or "neurologic" in s.lower() for s in symptoms + supporting_evidence):
             recommended_tests.extend(["CT head", "MRI brain"])
-        
+
         # Remove duplicates
         recommended_tests = list(dict.fromkeys(recommended_tests))
-        
+
         # Generate clinical summary including positive findings
         primary_complaint = symptoms[0] if symptoms else "Unknown complaint"
         duration_info = ""
         if complaints and isinstance(complaints[0], dict) and complaints[0].get("duration"):
             duration_info = f" for {complaints[0]['duration']}"
-        
+
         clinical_summary = f"Patient presents with {primary_complaint}{duration_info}. "
         if len(symptoms) > 1:
             clinical_summary += f"Associated symptoms include {', '.join(symptoms[1:3])}. "
@@ -651,14 +651,14 @@ def live_diagnosis(payload: Dict[str, Any]) -> Dict[str, Any]:
         if positive_findings:
             clinical_summary += f"Positive findings on exam: {', '.join(positive_findings[:5])}. "
         clinical_summary += f"Data completeness: {int(data_completeness * 100)}%."
-        
+
         return {
             "differential_diagnoses": differential_diagnoses,
             "recommended_tests": recommended_tests,
             "clinical_summary": clinical_summary,
             "data_completeness": data_completeness
         }
-        
+
     except Exception as e:
         logger.error(f"Error in live diagnosis: {e}")
         return {
@@ -691,11 +691,11 @@ def hybrid_search(payload: Dict[str, Any]) -> Dict[str, Any]:
         query = payload.get("query", "")
         top_k = payload.get("top_k", 10)
         alpha = payload.get("alpha", 0.5)  # 0=BM25 only, 1=vector only
-        
+
         # Get vector search results
         kb = get_vector_knowledge_base()
         vector_results = kb.search(query, top_k=top_k * 2)
-        
+
         # Apply hybrid search
         hybrid_search_engine = get_hybrid_search()
         results = hybrid_search_engine.hybrid_search(
@@ -704,7 +704,7 @@ def hybrid_search(payload: Dict[str, Any]) -> Dict[str, Any]:
             top_k=top_k,
             alpha=alpha
         )
-        
+
         return {
             "query": query,
             "results": results,
@@ -725,11 +725,11 @@ def rag_query(payload: Dict[str, Any]) -> Dict[str, Any]:
     try:
         query = payload.get("query", "")
         max_context = payload.get("max_context_chunks", 5)
-        
+
         # Retrieve relevant documents
         kb = get_vector_knowledge_base()
         retrieved_docs = kb.search(query, top_k=max_context)
-        
+
         # Generate response with RAG
         rag_service = get_rag_service()
         response = rag_service.generate_with_context(
@@ -737,7 +737,7 @@ def rag_query(payload: Dict[str, Any]) -> Dict[str, Any]:
             retrieved_docs=retrieved_docs,
             include_citations=True
         )
-        
+
         return response
     except Exception as e:
         logger.error(f"Error in RAG query: {e}")
@@ -752,28 +752,28 @@ def extract_medical_entities(payload: Dict[str, Any]) -> Dict[str, Any]:
     try:
         text = payload.get("text", "")
         include_summary = payload.get("include_summary", True)
-        
+
         # Extract entities
         extractor = get_entity_extractor()
         entities = extractor.extract_entities(text)
-        
+
         # Extract ICD codes
         icd_codes = extractor.extract_icd_codes(text)
-        
+
         # Extract dosages
         dosages = extractor.extract_dosages(text)
-        
+
         result = {
             "entities": entities,
             "icd_codes": icd_codes,
             "dosages": dosages
         }
-        
+
         # Add summary if requested
         if include_summary:
             summary = extractor.build_medical_summary(entities)
             result["summary"] = summary
-        
+
         return result
     except Exception as e:
         logger.error(f"Error extracting entities: {e}")
@@ -797,7 +797,7 @@ def pubmed_latest_research(
             days_back=days_back,
             sort="date"
         )
-        
+
         return {
             "topic": topic,
             "papers": papers,
@@ -819,10 +819,10 @@ async def fetch_online_medical_data(payload: Dict[str, Any]) -> Dict[str, Any]:
         sources = payload.get("sources", ["pubmed"])  # Default to PubMed
         max_results = payload.get("max_results", 10)
         auto_index = payload.get("auto_index", False)
-        
+
         if not query:
             raise HTTPException(status_code=400, detail="Query is required")
-        
+
         # Fetch from online sources
         online_sources = get_online_medical_sources()
         results = await online_sources.fetch_comprehensive_knowledge(
@@ -830,12 +830,12 @@ async def fetch_online_medical_data(payload: Dict[str, Any]) -> Dict[str, Any]:
             sources=sources,
             max_results=max_results
         )
-        
+
         # Optionally auto-index into knowledge base
         indexed_count = 0
         if auto_index:
             kb = get_vector_knowledge_base()
-            
+
             for source_name, documents in results.items():
                 for doc in documents:
                     try:
@@ -848,9 +848,9 @@ async def fetch_online_medical_data(payload: Dict[str, Any]) -> Dict[str, Any]:
                             indexed_count += 1
                     except Exception as e:
                         logger.error(f"Error indexing document from {source_name}: {e}")
-        
+
         total_found = sum(len(docs) for docs in results.values())
-        
+
         return {
             "query": query,
             "sources_queried": sources,
@@ -860,7 +860,7 @@ async def fetch_online_medical_data(payload: Dict[str, Any]) -> Dict[str, Any]:
             "indexed_count": indexed_count,
             "timestamp": datetime.utcnow().isoformat()
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -877,27 +877,27 @@ async def auto_update_knowledge_base(payload: Dict[str, Any]) -> Dict[str, Any]:
         topics = payload.get("topics", ["diabetes", "hypertension", "covid-19"])
         sources = payload.get("sources", ["pubmed"])
         results_per_topic = payload.get("results_per_topic", 5)
-        
+
         if not topics:
             raise HTTPException(status_code=400, detail="Topics list is required")
-        
+
         # Auto-update knowledge base
         online_sources = get_online_medical_sources()
         kb = get_vector_knowledge_base()
-        
+
         update_result = await online_sources.auto_update_knowledge_base(
             vector_kb=kb,
             topics=topics,
             sources=sources,
             results_per_topic=results_per_topic
         )
-        
+
         return {
             "success": True,
             "message": f"Knowledge base updated with {update_result['documents_indexed']} new documents",
             "update_summary": update_result
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -912,17 +912,17 @@ def get_kb_performance_metrics() -> Dict[str, Any]:
     try:
         doc_manager = get_enhanced_document_manager()
         stats = doc_manager.get_statistics()
-        
+
         kb = get_vector_knowledge_base()
         kb_stats = kb.get_statistics()
-        
+
         return {
             "success": True,
             "document_manager": stats,
             "vector_kb": kb_stats,
             "timestamp": datetime.utcnow().isoformat()
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting performance metrics: {e}")
         return {"error": str(e), "success": False}
@@ -935,13 +935,13 @@ def clear_document_cache() -> Dict[str, Any]:
     try:
         doc_manager = get_enhanced_document_manager()
         count = doc_manager.clear_cache()
-        
+
         return {
             "success": True,
             "message": f"Cleared {count} cached files",
             "files_cleared": count
         }
-        
+
     except Exception as e:
         logger.error(f"Error clearing cache: {e}")
         return {"error": str(e), "success": False}
@@ -956,18 +956,18 @@ def pubmed_auto_update(payload: Dict[str, Any]) -> Dict[str, Any]:
         topics = payload.get("topics", ["diabetes", "hypertension", "cancer"])
         papers_per_topic = payload.get("papers_per_topic", 3)
         days_back = payload.get("days_back", 7)
-        
+
         # Auto-update knowledge base
         pubmed = get_pubmed_integration()
         kb = get_vector_knowledge_base()
-        
+
         result = pubmed.auto_update_knowledge_base(
             vector_kb=kb,
             topics=topics,
             papers_per_topic=papers_per_topic,
             days_back=days_back
         )
-        
+
         return result
     except Exception as e:
         logger.error(f"Error auto-updating from PubMed: {e}")
@@ -984,21 +984,21 @@ def visualize_knowledge_graph(
     """
     try:
         kg = get_knowledge_graph()
-        
+
         # Find node
         node = kg.find_node(concept)
         if not node:
             return {"error": f"Concept '{concept}' not found in knowledge graph"}
-        
+
         # Get visualization
         visualization = kg.visualize_subgraph(
             center_node_id=node["id"],
             max_distance=max_distance
         )
-        
+
         # Get statistics
         stats = kg.get_statistics()
-        
+
         return {
             "concept": concept,
             "visualization": visualization,
@@ -1017,18 +1017,18 @@ def build_graph_from_text(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         text = payload.get("text", "")
-        
+
         # Extract entities
         extractor = get_entity_extractor()
         entities = extractor.extract_entities(text)
-        
+
         # Build knowledge graph
         kg = get_knowledge_graph()
         kg.build_from_entities(entities)
-        
+
         # Get statistics
         stats = kg.get_statistics()
-        
+
         return {
             "message": "Knowledge graph built successfully",
             "statistics": stats,
@@ -1071,23 +1071,23 @@ async def upload_document(
     """
     Upload a medical document (PDF, DOCX, TXT) to knowledge base.
     Enhanced with async processing, caching, and comprehensive error handling.
-    
+
     Supports files up to 500MB (configurable).
     """
     try:
         # Validate file
         if not file.filename:
             raise HTTPException(status_code=400, detail="Filename is required")
-        
+
         # Read file content
         content = await file.read()
-        
+
         if not content:
             raise HTTPException(status_code=400, detail="File is empty")
-        
+
         # Use enhanced document manager with 500MB limit
         doc_manager = get_enhanced_document_manager()
-        
+
         try:
             doc_info = await doc_manager.save_upload(
                 content,
@@ -1106,11 +1106,11 @@ async def upload_document(
             # Server error
             logger.error(f"Error saving document: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to process document")
-        
+
         # Index document in vector knowledge base
         kb = get_vector_knowledge_base()
         text_content = doc_manager.get_document_text(doc_info["document_id"])
-        
+
         if text_content:
             try:
                 chunk_count = kb.add_document(
@@ -1131,7 +1131,7 @@ async def upload_document(
         else:
             doc_info["indexed_chunks"] = 0
             doc_info["warning"] = "No text content extracted"
-        
+
         return JSONResponse(
             status_code=200,
             content={
@@ -1152,7 +1152,7 @@ def list_documents():
     try:
         doc_manager = get_document_manager()
         documents = doc_manager.list_documents()
-        
+
         return {
             "success": True,
             "documents": documents,
@@ -1168,10 +1168,10 @@ def get_document(document_id: str):
     try:
         doc_manager = get_document_manager()
         doc_info = doc_manager.get_document(document_id)
-        
+
         if doc_info is None:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         return {
             "success": True,
             "document": doc_info
@@ -1189,14 +1189,14 @@ def delete_document(document_id: str):
         # Delete from document manager
         doc_manager = get_document_manager()
         deleted = doc_manager.delete_document(document_id)
-        
+
         if not deleted:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         # Delete from vector knowledge base
         kb = get_vector_knowledge_base()
         chunks_deleted = kb.delete_document(document_id)
-        
+
         return {
             "success": True,
             "message": f"Document deleted successfully",

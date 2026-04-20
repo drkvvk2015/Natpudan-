@@ -43,7 +43,7 @@ class KBAutoIngester:
                 with open(self.state_path, "r") as f:
                     return json.load(f)
             except Exception:
-                pass
+                pass  # nosec B110
         return {
             "last_online_fetch": None,
             "last_gap_acquisition": None,

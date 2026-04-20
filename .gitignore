@@ -68,6 +68,8 @@ natpudan-ai
 # Certificates
 backend/certs/
 frontend/certs/
+*.keystore
+*.jks
 
 # Database files
 *.db

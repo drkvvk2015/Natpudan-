@@ -34,6 +34,7 @@ import {
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import apiClient from '../services/apiClient';
 
 interface QuantumStats {
   total_documents: number;
@@ -118,9 +119,8 @@ const FuturisticKBDashboard: React.FC = () => {
 
   const fetchMetrics = async () => {
     try {
-      const response = await fetch('/api/kb-growth/metrics');
-      const data = await response.json();
-      setMetrics(data);
+      const response = await apiClient.get('/api/kb-growth/metrics');
+      setMetrics(response.data);
     } catch (error) {
       console.error('Failed to fetch metrics:', error);
     }
@@ -128,9 +128,8 @@ const FuturisticKBDashboard: React.FC = () => {
 
   const fetchForecast = async () => {
     try {
-      const response = await fetch('/api/futuristic-kb/predictive-forecast');
-      const data = await response.json();
-      setForecast(data);
+      const response = await apiClient.get('/api/futuristic-kb/predictive-forecast');
+      setForecast(response.data);
     } catch (error) {
       console.error('Failed to fetch forecast:', error);
     }
@@ -139,13 +138,8 @@ const FuturisticKBDashboard: React.FC = () => {
   const handleQuantumSearch = async () => {
     if (!searchQuery) return;
     try {
-      const response = await fetch('/api/futuristic-kb/quantum-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery, top_k: 10 })
-      });
-      const data = await response.json();
-      setSearchResults(data.results || []);
+      const response = await apiClient.post('/api/futuristic-kb/quantum-search', { query: searchQuery, top_k: 10 });
+      setSearchResults(response.data.results || []);
     } catch (error) {
       console.error('Quantum search failed:', error);
     }
@@ -154,7 +148,7 @@ const FuturisticKBDashboard: React.FC = () => {
   const triggerAgent = async () => {
     setAgentTriggering(true);
     try {
-      await fetch('/api/futuristic-kb/agent/trigger-cycle', { method: 'POST' });
+      await apiClient.post('/api/futuristic-kb/agent/trigger-cycle');
       setTimeout(fetchMetrics, 2000);
     } catch (error) {
       console.error('Failed to trigger agent:', error);
@@ -209,7 +203,7 @@ const FuturisticKBDashboard: React.FC = () => {
                 <Typography color="text.secondary">Indexed Documents</Typography>
                 <LinearProgress
                   variant="determinate"
-                  value={(quantum?.coherence || 0) * 100}
+                  value={(quantum?.average_coherence || 0) * 100}
                   sx={{ mt: 1 }}
                 />
                 <Typography variant="caption">
@@ -265,7 +259,7 @@ const FuturisticKBDashboard: React.FC = () => {
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <SmartToyIcon color={agent?.is_active ? "success" : "default"} />
+                  <SmartToyIcon color={agent?.is_active ? "success" : "disabled"} />
                   <Typography variant="h6">Auto Agent</Typography>
                 </Box>
                 <Typography variant="h3" color={agent?.is_active ? "success.main" : "text.secondary"}>
@@ -354,7 +348,7 @@ const FuturisticKBDashboard: React.FC = () => {
                         <Chip
                           size="small"
                           label={topic.trend}
-                          color={topic.trend === 'increasing' ? 'success' : 'default'}
+                           color={topic.trend === 'increasing' ? 'success' : 'default'}
                         />
                       </Box>
                       <LinearProgress

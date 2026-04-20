@@ -10,8 +10,50 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 import fitz  # PyMuPDF
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import PatientIntake
+from app.services.pdf_generator import pdf_generator
 
 router = APIRouter()
+
+
+def _stream_pdf(pdf_bytes: bytes, filename: str) -> StreamingResponse:
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+def _build_simple_pdf(title: str, sections: List[tuple[str, str]]) -> bytes:
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    y = 50
+    page.insert_text((40, y), "Natpudan Medical AI", fontsize=18, fontname="helv-bold", color=(0.2, 0.3, 0.6))
+    y += 28
+    page.insert_text((40, y), title, fontsize=14, fontname="helv-bold")
+    y += 20
+    page.draw_line((40, y), (555, y), color=(0.6, 0.6, 0.6), width=0.8)
+    y += 20
+
+    for header, body in sections:
+        if y > 760:
+            page = doc.new_page(width=595, height=842)
+            y = 50
+        page.insert_text((40, y), header, fontsize=11, fontname="helv-bold", color=(0.2, 0.3, 0.6))
+        y += 16
+        text = str(body or "N/A").replace("\r", "")
+        for paragraph in text.split("\n"):
+            line = paragraph.strip() or " "
+            page.insert_textbox(fitz.Rect(50, y, 545, y + 60), line, fontsize=9, fontname="helv")
+            y += 24
+        y += 8
+
+    pdf_bytes = doc.tobytes()
+    doc.close()
+    return pdf_bytes
 
 class VitalSigns(BaseModel):
     blood_pressure_systolic: int
@@ -132,58 +174,58 @@ class EnhancedPDFGenerator:
         self.content_width = self.page_width - (2 * self.margin)
         self.current_y = 0
         self.line_height = 15
-        
+
     def create_opd_case_sheet(self, data: OPDCaseSheetRequest) -> bytes:
         """Generate comprehensive OPD case sheet PDF"""
         doc = fitz.open()
         page = doc.new_page(width=self.page_width, height=self.page_height)
         self.current_y = 50
-        
+
         # Header
         self._add_header(page, data.hospital_name, data.patient.name)
-        
+
         # Patient Information
         self._add_patient_info(page, data.patient, data.visit_date)
-        
+
         # Chief Complaints
         self._add_section(page, "CHIEF COMPLAINTS", data.diagnosis.chief_complaints)
-        
+
         # History of Present Illness
         self._add_text_section(page, "HISTORY OF PRESENT ILLNESS", data.diagnosis.history_of_present_illness)
-        
+
         # Medical History with timestamps
         self._add_medical_history(page, data.medical_history)
-        
+
         # Personal History with smoking index
         self._add_personal_history(page, data.personal_history)
-        
+
         # Clinical Examination
         self._add_clinical_examination(page, data.clinical_examination)
-        
+
         # Check if we need a new page
         if self.current_y > 700:
             page = doc.new_page(width=self.page_width, height=self.page_height)
             self.current_y = 50
-        
+
         # Diagnosis and Assessment
         self._add_diagnosis_section(page, data.diagnosis)
-        
+
         # Treatment Plan
         self._add_treatment_plan(page, data.treatment_plan)
-        
+
         # Doctor's Notes
         if data.doctor_notes:
             self._add_text_section(page, "DOCTOR'S NOTES", data.doctor_notes)
-        
+
         # Footer
         self._add_footer(page, data.doctor_name, data.visit_date)
-        
+
         # Convert to bytes
         pdf_bytes = doc.tobytes()
         doc.close()
-        
+
         return pdf_bytes
-    
+
     def _add_header(self, page, hospital_name: str, patient_name: str):
         """Add professional header with hospital info"""
         # Hospital name
@@ -194,9 +236,9 @@ class EnhancedPDFGenerator:
             fontname="helv-bold",
             color=(0.2, 0.3, 0.6)
         )
-        
+
         self.current_y += 25
-        
+
         # Document title
         page.insert_text(
             (self.margin, self.current_y),
@@ -205,7 +247,7 @@ class EnhancedPDFGenerator:
             fontname="helv-bold",
             color=(0.1, 0.1, 0.1)
         )
-        
+
         # Date and time on right
         date_str = datetime.now().strftime("%d/%m/%Y %H:%M")
         page.insert_text(
@@ -215,9 +257,9 @@ class EnhancedPDFGenerator:
             fontname="helv",
             color=(0.4, 0.4, 0.4)
         )
-        
+
         self.current_y += 30
-        
+
         # Horizontal line
         page.draw_line(
             (self.margin, self.current_y),
@@ -226,60 +268,60 @@ class EnhancedPDFGenerator:
             width=0.5
         )
         self.current_y += 15
-    
+
     def _add_patient_info(self, page, patient: PatientData, visit_date: datetime):
         """Add patient demographic information"""
         info_box_height = 80
-        
+
         # Background box
         rect = fitz.Rect(self.margin, self.current_y, self.page_width - self.margin, self.current_y + info_box_height)
         page.draw_rect(rect, color=(0.95, 0.95, 0.95), fill=True)
-        
+
         # Patient info in two columns
         col1_x = self.margin + 10
         col2_x = self.margin + 280
         info_y = self.current_y + 15
-        
+
         # Column 1
         page.insert_text((col1_x, info_y), "Patient Name:", fontsize=10, fontname="helv-bold")
         page.insert_text((col1_x + 80, info_y), patient.name, fontsize=10, fontname="helv")
-        
+
         info_y += 15
         page.insert_text((col1_x, info_y), "Age/Gender:", fontsize=10, fontname="helv-bold")
         page.insert_text((col1_x + 80, info_y), f"{patient.age} years / {patient.gender}", fontsize=10, fontname="helv")
-        
+
         info_y += 15
         page.insert_text((col1_x, info_y), "Contact:", fontsize=10, fontname="helv-bold")
         page.insert_text((col1_x + 80, info_y), patient.contact_number, fontsize=10, fontname="helv")
-        
+
         # Column 2
         info_y = self.current_y + 15
         page.insert_text((col2_x, info_y), "Patient ID:", fontsize=10, fontname="helv-bold")
         page.insert_text((col2_x + 80, info_y), patient.id, fontsize=10, fontname="helv")
-        
+
         info_y += 15
         page.insert_text((col2_x, info_y), "Visit Date:", fontsize=10, fontname="helv-bold")
         page.insert_text((col2_x + 80, info_y), visit_date.strftime("%d/%m/%Y"), fontsize=10, fontname="helv")
-        
+
         info_y += 15
         page.insert_text((col2_x, info_y), "Address:", fontsize=10, fontname="helv-bold")
         # Truncate address if too long
         address = patient.address[:30] + "..." if len(patient.address) > 30 else patient.address
         page.insert_text((col2_x + 80, info_y), address, fontsize=10, fontname="helv")
-        
+
         self.current_y += info_box_height + 20
-    
+
     def _add_medical_history(self, page, medical_history: List[MedicalHistoryItem]):
         """Add medical history with duration timestamps"""
         if not medical_history:
             return
-            
+
         self._add_section_header(page, "PAST MEDICAL HISTORY")
-        
+
         # Table headers
         headers = ["Condition", "Duration", "Onset", "Severity", "Status"]
         col_widths = [150, 80, 80, 70, 70]
-        
+
         # Header row
         x_pos = self.margin
         for i, (header, width) in enumerate(zip(headers, col_widths)):
@@ -290,9 +332,9 @@ class EnhancedPDFGenerator:
                 fontname="helv-bold"
             )
             x_pos += width
-        
+
         self.current_y += 15
-        
+
         # Draw header underline
         page.draw_line(
             (self.margin, self.current_y - 3),
@@ -300,34 +342,34 @@ class EnhancedPDFGenerator:
             color=(0.3, 0.3, 0.3),
             width=0.5
         )
-        
+
         # Data rows
         for condition in medical_history:
             x_pos = self.margin
-            
+
             # Condition name
             condition_text = condition.condition[:20] + "..." if len(condition.condition) > 20 else condition.condition
             page.insert_text((x_pos, self.current_y), condition_text, fontsize=9, fontname="helv")
             x_pos += col_widths[0]
-            
+
             # Duration
             page.insert_text((x_pos, self.current_y), condition.duration, fontsize=9, fontname="helv")
             x_pos += col_widths[1]
-            
+
             # Onset date
             onset_str = condition.onset.strftime("%m/%Y") if condition.onset else "Unknown"
             page.insert_text((x_pos, self.current_y), onset_str, fontsize=9, fontname="helv")
             x_pos += col_widths[2]
-            
+
             # Severity
             page.insert_text((x_pos, self.current_y), condition.severity, fontsize=9, fontname="helv")
             x_pos += col_widths[3]
-            
+
             # Status
             page.insert_text((x_pos, self.current_y), condition.status, fontsize=9, fontname="helv")
-            
+
             self.current_y += 12
-            
+
             # Add notes if present
             if condition.notes:
                 notes_text = f"Notes: {condition.notes[:60]}..." if len(condition.notes) > 60 else f"Notes: {condition.notes}"
@@ -339,19 +381,19 @@ class EnhancedPDFGenerator:
                     color=(0.4, 0.4, 0.4)
                 )
                 self.current_y += 10
-        
+
         self.current_y += 15
-    
+
     def _add_personal_history(self, page, personal_history: PersonalHistory):
         """Add personal history with smoking index calculation"""
         self._add_section_header(page, "PERSONAL HISTORY")
-        
+
         # Smoking history with pack-years index
         smoking = personal_history.smoking
         smoking_text = f"Smoking: {smoking.status}"
         if smoking.status != "Never":
             smoking_text += f" - {smoking.packs_per_day} packs/day × {smoking.years} years = {smoking.smoking_index} pack-years"
-            
+
             # Add risk assessment
             if smoking.smoking_index >= 20:
                 risk = "HIGH RISK"
@@ -362,17 +404,17 @@ class EnhancedPDFGenerator:
             else:
                 risk = "LOW RISK"
                 color = (0.2, 0.6, 0.2)
-                
+
             smoking_text += f" ({risk})"
-            
+
         page.insert_text((self.margin, self.current_y), smoking_text, fontsize=10, fontname="helv")
         if smoking.status != "Never":
             # Highlight risk level
             risk_x = self.margin + len(smoking_text.split("(")[0]) * 6
             page.insert_text((risk_x, self.current_y), f"({risk})", fontsize=10, fontname="helv-bold", color=color)
-        
+
         self.current_y += 15
-        
+
         # Alcohol history
         alcohol = personal_history.alcohol
         alcohol_text = f"Alcohol: {alcohol.status}"
@@ -380,7 +422,7 @@ class EnhancedPDFGenerator:
             alcohol_text += f" - {alcohol.units_per_week} units/week for {alcohol.years} years"
         page.insert_text((self.margin, self.current_y), alcohol_text, fontsize=10, fontname="helv")
         self.current_y += 15
-        
+
         # Exercise and occupation
         exercise = personal_history.exercise
         exercise_text = f"Exercise: {exercise.frequency}"
@@ -388,28 +430,28 @@ class EnhancedPDFGenerator:
             exercise_text += f" ({', '.join(exercise.type[:3])})"
         page.insert_text((self.margin, self.current_y), exercise_text, fontsize=10, fontname="helv")
         self.current_y += 15
-        
+
         if personal_history.occupation:
             page.insert_text((self.margin, self.current_y), f"Occupation: {personal_history.occupation}", fontsize=10, fontname="helv")
             self.current_y += 15
-        
+
         # Allergies
         if personal_history.allergies:
             allergies_text = f"Allergies: {', '.join(personal_history.allergies)}"
             page.insert_text((self.margin, self.current_y), allergies_text, fontsize=10, fontname="helv", color=(0.8, 0.2, 0.2))
             self.current_y += 15
-        
+
         self.current_y += 10
-    
+
     def _add_clinical_examination(self, page, examination: ClinicalExamination):
         """Add clinical examination findings"""
         self._add_section_header(page, "CLINICAL EXAMINATION")
-        
+
         # Vital signs in a structured format
         vitals = examination.vital_signs
         page.insert_text((self.margin, self.current_y), "Vital Signs:", fontsize=10, fontname="helv-bold")
         self.current_y += 12
-        
+
         vitals_text = [
             f"BP: {vitals.blood_pressure_systolic}/{vitals.blood_pressure_diastolic} mmHg",
             f"HR: {vitals.heart_rate} bpm",
@@ -420,21 +462,21 @@ class EnhancedPDFGenerator:
             f"Height: {vitals.height} cm",
             f"BMI: {vitals.bmi:.1f}"
         ]
-        
+
         # Display vitals in two columns
         for i, vital in enumerate(vitals_text):
             x_pos = self.margin + 10 if i % 2 == 0 else self.margin + 250
             if i % 2 == 0 and i > 0:
                 self.current_y += 12
             page.insert_text((x_pos, self.current_y), vital, fontsize=9, fontname="helv")
-        
+
         self.current_y += 20
-        
+
         # General examination
         general = examination.general_examination
         page.insert_text((self.margin, self.current_y), "General Examination:", fontsize=10, fontname="helv-bold")
         self.current_y += 12
-        
+
         findings = []
         if general.pallor: findings.append("Pallor")
         if general.jaundice: findings.append("Jaundice")
@@ -442,15 +484,15 @@ class EnhancedPDFGenerator:
         if general.clubbing: findings.append("Clubbing")
         if general.lymphadenopathy: findings.append("Lymphadenopathy")
         if general.edema: findings.append("Edema")
-        
+
         if findings:
             findings_text = f"Positive findings: {', '.join(findings)}"
         else:
             findings_text = "No significant abnormalities detected"
-            
+
         page.insert_text((self.margin + 10, self.current_y), findings_text, fontsize=9, fontname="helv")
         self.current_y += 15
-        
+
         # Systemic examination
         systemic = examination.systemic_examination
         systems = [
@@ -459,62 +501,62 @@ class EnhancedPDFGenerator:
             ("Abdominal", systemic.abdominal),
             ("Neurological", systemic.neurological),
         ]
-        
+
         for system, findings in systems:
             if findings:
                 page.insert_text((self.margin, self.current_y), f"{system}:", fontsize=9, fontname="helv-bold")
                 page.insert_text((self.margin + 100, self.current_y), findings, fontsize=9, fontname="helv")
                 self.current_y += 12
-        
+
         self.current_y += 10
-    
+
     def _add_diagnosis_section(self, page, diagnosis: DiagnosisData):
         """Add diagnosis and assessment"""
         self._add_section_header(page, "DIAGNOSIS & ASSESSMENT")
-        
+
         # Primary diagnosis
         page.insert_text((self.margin, self.current_y), "Primary Diagnosis:", fontsize=10, fontname="helv-bold")
         page.insert_text((self.margin + 120, self.current_y), diagnosis.primary_diagnosis, fontsize=10, fontname="helv")
         self.current_y += 15
-        
+
         # Secondary diagnoses
         if diagnosis.secondary_diagnosis:
             page.insert_text((self.margin, self.current_y), "Secondary Diagnosis:", fontsize=10, fontname="helv-bold")
             secondary_text = ", ".join(diagnosis.secondary_diagnosis)
             page.insert_text((self.margin + 120, self.current_y), secondary_text, fontsize=10, fontname="helv")
             self.current_y += 15
-        
+
         # ICD codes
         if diagnosis.icd_codes:
             page.insert_text((self.margin, self.current_y), "ICD Codes:", fontsize=10, fontname="helv-bold")
             icd_text = ", ".join(diagnosis.icd_codes)
             page.insert_text((self.margin + 120, self.current_y), icd_text, fontsize=10, fontname="helv")
             self.current_y += 15
-        
+
         # Confidence level
         page.insert_text((self.margin, self.current_y), "Confidence Level:", fontsize=10, fontname="helv-bold")
         page.insert_text((self.margin + 120, self.current_y), diagnosis.confidence, fontsize=10, fontname="helv")
         self.current_y += 20
-    
+
     def _add_treatment_plan(self, page, treatment: TreatmentPlan):
         """Add treatment plan and prescriptions"""
         # Check if we need a new page
         if self.current_y > 600:
             page = page.parent.new_page(width=self.page_width, height=self.page_height)
             self.current_y = 50
-        
+
         self._add_section_header(page, "TREATMENT PLAN")
-        
+
         # Medications
         if treatment.medications:
             page.insert_text((self.margin, self.current_y), "Medications:", fontsize=10, fontname="helv-bold")
             self.current_y += 15
-            
+
             for i, med in enumerate(treatment.medications):
                 med_text = f"{i+1}. {med.name} {med.dosage} - {med.frequency} for {med.duration} ({med.route})"
                 page.insert_text((self.margin + 10, self.current_y), med_text, fontsize=9, fontname="helv")
                 self.current_y += 12
-                
+
                 if med.instructions:
                     page.insert_text(
                         (self.margin + 20, self.current_y),
@@ -524,33 +566,33 @@ class EnhancedPDFGenerator:
                         color=(0.4, 0.4, 0.4)
                     )
                     self.current_y += 10
-        
+
         # Advice
         if treatment.advice:
             self.current_y += 10
             page.insert_text((self.margin, self.current_y), "Medical Advice:", fontsize=10, fontname="helv-bold")
             self.current_y += 15
-            
+
             for advice in treatment.advice:
                 page.insert_text((self.margin + 10, self.current_y), f"- {advice}", fontsize=9, fontname="helv")
                 self.current_y += 12
-        
+
         # Follow-up
         if treatment.follow_up:
             self.current_y += 10
             follow_up_date = treatment.follow_up.date.strftime("%d/%m/%Y")
             page.insert_text((self.margin, self.current_y), f"Follow-up: {follow_up_date}", fontsize=10, fontname="helv-bold")
             self.current_y += 12
-            
+
             if treatment.follow_up.instructions:
                 page.insert_text((self.margin + 10, self.current_y), treatment.follow_up.instructions, fontsize=9, fontname="helv")
                 self.current_y += 12
-    
+
     def _add_section_header(self, page, title: str):
         """Add a section header with underline"""
         page.insert_text((self.margin, self.current_y), title, fontsize=12, fontname="helv-bold", color=(0.2, 0.2, 0.6))
         self.current_y += 15
-        
+
         # Underline
         page.draw_line(
             (self.margin, self.current_y - 3),
@@ -559,21 +601,21 @@ class EnhancedPDFGenerator:
             width=1
         )
         self.current_y += 5
-    
+
     def _add_section(self, page, title: str, items: List[str]):
         """Add a section with bullet points"""
         self._add_section_header(page, title)
-        
+
         for item in items:
             page.insert_text((self.margin + 10, self.current_y), f"- {item}", fontsize=10, fontname="helv")
             self.current_y += 12
-        
+
         self.current_y += 10
-    
+
     def _add_text_section(self, page, title: str, content: str):
         """Add a text section with wrapping"""
         self._add_section_header(page, title)
-        
+
         # Simple text wrapping
         words = content.split()
         line = ""
@@ -585,25 +627,25 @@ class EnhancedPDFGenerator:
                     page.insert_text((self.margin + 10, self.current_y), line.strip(), fontsize=10, fontname="helv")
                     self.current_y += 12
                 line = word + " "
-        
+
         if line:
             page.insert_text((self.margin + 10, self.current_y), line.strip(), fontsize=10, fontname="helv")
             self.current_y += 12
-        
+
         self.current_y += 10
-    
+
     def _add_footer(self, page, doctor_name: str, visit_date: datetime):
         """Add footer with doctor signature and date"""
         footer_y = self.page_height - 80
-        
+
         # Doctor signature section
         page.insert_text((self.margin, footer_y), "Doctor's Signature:", fontsize=10, fontname="helv-bold")
         page.insert_text((self.margin, footer_y + 20), doctor_name, fontsize=10, fontname="helv")
         page.insert_text((self.margin, footer_y + 35), f"Date: {visit_date.strftime('%d/%m/%Y')}", fontsize=9, fontname="helv")
-        
+
         # Hospital stamp area
         page.insert_text((self.page_width - 200, footer_y), "Hospital Seal:", fontsize=10, fontname="helv-bold")
-        
+
         # Footer line
         page.draw_line(
             (self.margin, footer_y - 10),
@@ -618,15 +660,15 @@ async def generate_opd_case_sheet(request: OPDCaseSheetRequest):
     try:
         generator = EnhancedPDFGenerator()
         pdf_bytes = generator.create_opd_case_sheet(request)
-        
+
         filename = f"OPD_CaseSheet_{request.patient.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
-        
+
         return StreamingResponse(
             io.BytesIO(pdf_bytes),
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate OPD case sheet: {str(e)}")
 
@@ -634,11 +676,29 @@ async def generate_opd_case_sheet(request: OPDCaseSheetRequest):
 async def generate_prescription(request: dict):
     """Generate prescription PDF"""
     try:
-        # Implementation for prescription-only PDF
-        # Add prescription-specific generation logic here
-        
-        return {"message": "Prescription PDF generation endpoint - to be implemented"}
-        
+        patient = request.get("patient", {})
+        treatment_plan = request.get("treatmentPlan", {})
+        doctor_info = request.get("doctorInfo", {})
+        meds = treatment_plan.get("medications", []) or []
+        med_lines = []
+        for idx, med in enumerate(meds, 1):
+            med_lines.append(
+                f"{idx}. {med.get('name', 'Medication')} {med.get('dosage', '')} | "
+                f"{med.get('frequency', '')} | {med.get('duration', '')} | {med.get('route', '')}"
+            )
+            if med.get("instructions"):
+                med_lines.append(f"   Instructions: {med['instructions']}")
+
+        sections = [
+            ("Patient", f"Name: {patient.get('name', 'Unknown')}\nAge: {patient.get('age', 'N/A')}\nGender: {patient.get('gender', 'N/A')}"),
+            ("Prescribed Medications", "\n".join(med_lines) if med_lines else "No medications listed"),
+            ("Advice", "\n".join(treatment_plan.get("advice", []) or []) or "No additional advice"),
+            ("Follow Up", str((treatment_plan.get("followUp") or {}).get("instructions", "As clinically indicated"))),
+            ("Doctor", f"Name: {doctor_info.get('name', 'Natpudan Clinician')}\nRegistration: {doctor_info.get('registration', 'N/A')}\nHospital: {doctor_info.get('hospital', 'Natpudan Medical AI')}"),
+        ]
+        filename = f"Prescription_{str(patient.get('name', 'patient')).replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return _stream_pdf(_build_simple_pdf("Prescription", sections), filename)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate prescription: {str(e)}")
 
@@ -646,10 +706,110 @@ async def generate_prescription(request: dict):
 async def generate_medical_history(request: dict):
     """Generate medical history PDF"""
     try:
-        # Implementation for medical history PDF
-        # Add medical history-specific generation logic here
-        
-        return {"message": "Medical history PDF generation endpoint - to be implemented"}
-        
+        patient = request.get("patient", {})
+        medical_history = request.get("medicalHistory", []) or []
+        personal_history = request.get("personalHistory", {}) or {}
+
+        history_lines = []
+        for idx, item in enumerate(medical_history, 1):
+            history_lines.append(
+                f"{idx}. {item.get('condition', 'Condition')} | Severity: {item.get('severity', 'N/A')} | "
+                f"Status: {item.get('status', 'N/A')} | Duration: {item.get('duration', 'N/A')}"
+            )
+            if item.get("notes"):
+                history_lines.append(f"   Notes: {item['notes']}")
+
+        smoking = personal_history.get("smoking", {})
+        alcohol = personal_history.get("alcohol", {})
+        exercise = personal_history.get("exercise", {})
+        sections = [
+            ("Patient", f"Name: {patient.get('name', 'Unknown')}\nAge: {patient.get('age', 'N/A')}\nGender: {patient.get('gender', 'N/A')}"),
+            ("Medical History", "\n".join(history_lines) if history_lines else "No medical history recorded"),
+            (
+                "Personal History",
+                f"Smoking: {smoking.get('status', 'N/A')} | Pack-years: {smoking.get('smokingIndex', smoking.get('smoking_index', 0))}\n"
+                f"Alcohol: {alcohol.get('status', 'N/A')} | Units/week: {alcohol.get('unitsPerWeek', 'N/A')}\n"
+                f"Exercise: {exercise.get('frequency', 'N/A')} | Duration: {exercise.get('duration', 'N/A')}\n"
+                f"Occupation: {personal_history.get('occupation', 'N/A')}\n"
+                f"Allergies: {', '.join(personal_history.get('allergies', []) or []) or 'None listed'}"
+            ),
+        ]
+        filename = f"Medical_History_{str(patient.get('name', 'patient')).replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return _stream_pdf(_build_simple_pdf("Medical History Summary", sections), filename)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate medical history: {str(e)}")
+
+
+@router.post("/diagnosis")
+async def generate_diagnosis_report(request: Dict[str, Any]):
+    """Generate a diagnosis PDF for the clinical case sheet page."""
+    try:
+        pdf_bytes = pdf_generator.generate_diagnosis_report(request)
+        patient_name = request.get("patient_name", "patient").replace(" ", "_")
+        filename = f"Diagnosis_Report_{patient_name}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return _stream_pdf(pdf_bytes, filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate diagnosis report: {str(e)}")
+
+
+@router.get("/patient-intake/{intake_id}")
+async def generate_patient_intake_pdf(intake_id: str, db: Session = Depends(get_db)):
+    """Generate a patient intake summary PDF from the stored patient record."""
+    patient = db.query(PatientIntake).filter(PatientIntake.intake_id == intake_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient intake not found")
+
+    try:
+        patient_data = {
+            "intake_id": patient.intake_id,
+            "name": patient.name,
+            "age": patient.age,
+            "gender": patient.gender,
+            "blood_type": patient.blood_type,
+            "created_at": patient.created_at.isoformat() if patient.created_at else "",
+            "travel_history": [
+                {
+                    "destination": item.destination,
+                    "departure_date": item.departure_date.isoformat() if item.departure_date else "",
+                    "return_date": item.return_date.isoformat() if item.return_date else "",
+                    "purpose": item.purpose or "",
+                }
+                for item in patient.travel_history
+            ],
+            "family_history": [
+                {
+                    "relationship": item.family_relationship,
+                    "condition": item.condition,
+                    "age_of_onset": item.age_of_onset,
+                    "status": item.status,
+                }
+                for item in patient.family_history
+            ],
+        }
+        pdf_bytes = pdf_generator.generate_patient_intake_report(patient_data)
+        filename = f"Patient_Intake_{patient.intake_id}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return _stream_pdf(pdf_bytes, filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate patient intake report: {str(e)}")
+
+
+@router.post("/combined/{intake_id}")
+async def generate_combined_report(intake_id: str, request: Dict[str, Any], db: Session = Depends(get_db)):
+    """Generate a combined report using stored intake data plus live diagnosis data."""
+    patient = db.query(PatientIntake).filter(PatientIntake.intake_id == intake_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient intake not found")
+
+    patient_data = {
+        "intake_id": patient.intake_id,
+        "name": patient.name,
+        "age": patient.age,
+        "blood_type": patient.blood_type,
+    }
+    try:
+        pdf_bytes = pdf_generator.generate_combined_report(patient_data, request)
+        filename = f"Combined_Report_{patient.intake_id}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return _stream_pdf(pdf_bytes, filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate combined report: {str(e)}")

@@ -6,7 +6,7 @@ Added fallback: if FAISS or OpenAI client unavailable, perform simple keyword se
 
 import logging
 import os
-import pickle
+import pickle  # nosec B403
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import numpy as np
@@ -36,7 +36,7 @@ class VectorKnowledgeBase:
     Vector-based knowledge base using FAISS for similarity search.
     Stores document chunks with OpenAI embeddings for semantic search.
     """
-    
+
     def __init__(
         self,
         storage_dir: str = "data/knowledge_base",
@@ -45,7 +45,7 @@ class VectorKnowledgeBase:
     ):
         """
         Initialize vector knowledge base.
-        
+
         Args:
             storage_dir: Directory to store index and metadata
             embedding_model: OpenAI embedding model to use
@@ -53,49 +53,49 @@ class VectorKnowledgeBase:
         """
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.embedding_model = embedding_model
         self.embedding_dimension = embedding_dimension
-        
+
         self.index_path = self.storage_dir / "faiss_index.bin"
         self.metadata_path = self.storage_dir / "metadata.pkl"
-        
+
         # Initialize OpenAI client
         self.openai_client = None
         if OPENAI_AVAILABLE:
             api_key = os.getenv("OPENAI_API_KEY")
             if api_key:
                 self.openai_client = OpenAI(api_key=api_key)
-        
+
         # Initialize FAISS index
         self.index = None
         self.documents = []  # Store document chunks with metadata
         self.document_count = 0
-        
+
         # Load existing index if available
         self._load_index()
-        
+
         logger.info(f"Vector knowledge base initialized with {self.document_count} documents")
-    
+
     def _load_index(self):
         """Load FAISS index and metadata from disk"""
         if self.index_path.exists() and self.metadata_path.exists():
             try:
                 if FAISS_AVAILABLE:
                     self.index = faiss.read_index(str(self.index_path))
-                
+
                 with open(self.metadata_path, 'rb') as f:
-                    data = pickle.load(f)
+                    data = pickle.load(f)  # nosec B301 - loading trusted internal index metadata
                     self.documents = data.get('documents', [])
                     self.document_count = data.get('document_count', 0)
-                
+
                 logger.info(f"Loaded existing index with {len(self.documents)} chunks")
             except Exception as e:
                 logger.error(f"Error loading index: {e}")
                 self._initialize_new_index()
         else:
             self._initialize_new_index()
-    
+
     def _initialize_new_index(self):
         """Initialize a new FAISS index"""
         if FAISS_AVAILABLE:
@@ -104,37 +104,37 @@ class VectorKnowledgeBase:
             self.index = faiss.IndexFlatL2(self.embedding_dimension)
         self.documents = []
         self.document_count = 0
-    
+
     def _save_index(self):
         """Save FAISS index and metadata to disk"""
         try:
             if FAISS_AVAILABLE and self.index is not None:
                 faiss.write_index(self.index, str(self.index_path))
-            
+
             with open(self.metadata_path, 'wb') as f:
                 pickle.dump({
                     'documents': self.documents,
                     'document_count': self.document_count
                 }, f)
-            
+
             logger.info(f"Saved index with {len(self.documents)} chunks")
         except Exception as e:
             logger.error(f"Error saving index: {e}")
-    
+
     def _get_embedding(self, text: str) -> Optional[np.ndarray]:
         """
         Get embedding vector for text using OpenAI API.
-        
+
         Args:
             text: Text to embed
-            
+
         Returns:
             Embedding vector or None if failed
         """
         if not self.openai_client:
             logger.warning("OpenAI client not available")
             return None
-        
+
         try:
             response = self.openai_client.embeddings.create(
                 model=self.embedding_model,
@@ -145,22 +145,22 @@ class VectorKnowledgeBase:
         except Exception as e:
             logger.error(f"Error getting embedding: {e}")
             return None
-    
+
     def _get_embeddings_batch(self, texts: List[str], batch_size: int = 100) -> List[np.ndarray]:
         """
         Get embeddings for multiple texts in batches (10-20x faster than one-by-one).
-        
+
         Args:
             texts: List of texts to embed
             batch_size: Number of texts per API call (max 2048 for OpenAI)
-            
+
         Returns:
             List of embedding vectors
         """
         if not self.openai_client:
             logger.warning("OpenAI client not available")
             return []
-        
+
         embeddings = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
@@ -179,9 +179,9 @@ class VectorKnowledgeBase:
                     emb = self._get_embedding(text)
                     if emb is not None:
                         embeddings.append(emb)
-        
+
         return embeddings
-    
+
     def add_document(
         self,
         content: str,
@@ -191,33 +191,33 @@ class VectorKnowledgeBase:
     ) -> int:
         """
         Add a document to the knowledge base with chunking.
-        
+
         Args:
             content: Full document text
             metadata: Document metadata (filename, source, date, etc.)
             chunk_size: Size of text chunks
             chunk_overlap: Overlap between chunks
-            
+
         Returns:
             Number of chunks added
         """
         if not FAISS_AVAILABLE or not self.openai_client:
             logger.warning("FAISS or OpenAI not available, cannot add documents")
             return 0
-        
+
         # Split content into chunks
         chunks = self._chunk_text(content, chunk_size, chunk_overlap)
-        
+
         # PERFORMANCE: Generate embeddings in batch (10-20x faster)
         logger.info(f"Generating embeddings for {len(chunks)} chunks in batch...")
         embeddings_batch = self._get_embeddings_batch(chunks, batch_size=100)
-        
+
         if len(embeddings_batch) != len(chunks):
             logger.warning(f"Only got {len(embeddings_batch)}/{len(chunks)} embeddings")
-        
+
         chunks_added = 0
         documents_batch = []
-        
+
         for i, (chunk, _emb) in enumerate(zip(chunks, embeddings_batch, strict=False)):
             # Store chunk with metadata
             chunk_metadata = metadata.copy()
@@ -226,24 +226,24 @@ class VectorKnowledgeBase:
                 'chunk_text': chunk,
                 'added_at': datetime.utcnow().isoformat()
             })
-            
+
             documents_batch.append(chunk_metadata)
             chunks_added += 1
-        
+
         # Add to FAISS index
         if embeddings_batch:
             embeddings_array = np.array(embeddings_batch, dtype='float32')
             self.index.add(embeddings_array)
             self.documents.extend(documents_batch)
             self.document_count += 1
-            
+
             # Save index
             self._save_index()
-            
+
             logger.info(f"Added document '{metadata.get('filename', 'unknown')}' with {chunks_added} chunks")
-        
+
         return chunks_added
-    
+
     def _chunk_text(
         self,
         text: str,
@@ -252,24 +252,24 @@ class VectorKnowledgeBase:
     ) -> List[str]:
         """
         Split text into overlapping chunks.
-        
+
         Args:
             text: Text to chunk
             chunk_size: Maximum chunk size
             overlap: Overlap between chunks
-            
+
         Returns:
             List of text chunks
         """
         if len(text) <= chunk_size:
             return [text]
-        
+
         chunks = []
         start = 0
-        
+
         while start < len(text):
             end = start + chunk_size
-            
+
             # Try to break at sentence boundary
             if end < len(text):
                 # Look for sentence ending
@@ -278,12 +278,12 @@ class VectorKnowledgeBase:
                     if last_delimiter != -1:
                         end = last_delimiter + len(delimiter)
                         break
-            
+
             chunks.append(text[start:end].strip())
             start = end - overlap
-        
+
         return chunks
-    
+
     def search(
         self,
         query: str,
@@ -292,12 +292,12 @@ class VectorKnowledgeBase:
     ) -> List[Dict[str, Any]]:
         """
         Search knowledge base for relevant documents.
-        
+
         Args:
             query: Search query
             top_k: Number of results to return
             filter_metadata: Optional metadata filters
-        
+
         Returns:
             List of relevant document chunks with metadata and scores
         """
@@ -334,27 +334,27 @@ class VectorKnowledgeBase:
         if len(self.documents) == 0:
             logger.warning("No documents in knowledge base")
             return []
-        
+
         # Get query embedding
         query_embedding = self._get_embedding(query)
         if query_embedding is None:
             return []
-        
+
         # Search FAISS index
         query_vector = np.array([query_embedding], dtype='float32')
-        
+
         # Search for more results than needed for filtering
         search_k = min(top_k * 3, len(self.documents))
         distances, indices = self.index.search(query_vector, search_k)
-        
+
         # Collect results
         results = []
         for distance, idx in zip(distances[0], indices[0], strict=False):
             if idx >= len(self.documents):
                 continue
-            
+
             doc = self.documents[idx]
-            
+
             # Apply metadata filters
             if filter_metadata:
                 match = all(
@@ -363,29 +363,29 @@ class VectorKnowledgeBase:
                 )
                 if not match:
                     continue
-            
+
             # Convert L2 distance to similarity score (0-1)
             similarity = 1 / (1 + distance)
-            
+
             results.append({
                 'content': doc.get('chunk_text', ''),
                 'metadata': {k: v for k, v in doc.items() if k != 'chunk_text'},
                 'similarity_score': float(similarity),
                 'distance': float(distance)
             })
-            
+
             if len(results) >= top_k:
                 break
-        
+
         return results
-    
+
     def delete_document(self, document_id: str) -> int:
         """
         Delete all chunks of a document.
-        
+
         Args:
             document_id: Document identifier
-            
+
         Returns:
             Number of chunks deleted
         """
@@ -393,42 +393,42 @@ class VectorKnowledgeBase:
         indices_to_keep = []
         documents_to_keep = []
         deleted_count = 0
-        
+
         for i, doc in enumerate(self.documents):
             if doc.get('document_id') == document_id:
                 deleted_count += 1
             else:
                 indices_to_keep.append(i)
                 documents_to_keep.append(doc)
-        
+
         if deleted_count > 0:
             # Rebuild index (FAISS doesn't support deletion)
             self._initialize_new_index()
-            
+
             if FAISS_AVAILABLE and self.openai_client and indices_to_keep:
                 # Re-embed remaining documents
                 for doc in documents_to_keep:
                     embedding = self._get_embedding(doc['chunk_text'])
                     if embedding is not None:
                         self.index.add(np.array([embedding], dtype='float32'))
-                
+
             self.documents = documents_to_keep
             self.document_count -= 1
             self._save_index()
-            
+
             logger.info(f"Deleted {deleted_count} chunks for document {document_id}")
-        
+
         return deleted_count
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """
         Get knowledge base statistics.
-        
+
         Returns:
             Statistics dictionary
         """
         unique_documents = set(doc.get('document_id') for doc in self.documents)
-        
+
         return {
             'total_documents': self.document_count,
             'total_chunks': len(self.documents),
@@ -439,11 +439,11 @@ class VectorKnowledgeBase:
             'openai_available': OPENAI_AVAILABLE and self.openai_client is not None,
             'index_size_bytes': self.index_path.stat().st_size if self.index_path.exists() else 0
         }
-    
+
     def list_documents(self) -> List[Dict[str, Any]]:
         """
         List all unique documents in the knowledge base.
-        
+
         Returns:
             List of document metadata
         """
@@ -460,7 +460,7 @@ class VectorKnowledgeBase:
                     'chunk_count': 0
                 }
             docs_dict[doc_id]['chunk_count'] += 1
-        
+
         return list(docs_dict.values())
 
 

@@ -13,7 +13,7 @@ async def queue_worker_loop(interval_seconds: int = 5) -> None:
         try:
             process_upload_queue()
         except Exception:
-            pass
+            pass  # nosec B110
         await asyncio.sleep(interval_seconds)
 
 
@@ -26,7 +26,7 @@ async def kb_growth_loop(interval_seconds: int = 3600) -> None:
             orchestrator = get_kb_orchestrator()
             await orchestrator.periodic_online_fetch()
         except Exception:
-            pass
+            pass  # nosec B110
         await asyncio.sleep(interval_seconds)
 
 

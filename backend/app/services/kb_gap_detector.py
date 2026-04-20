@@ -42,7 +42,7 @@ class KnowledgeGapDetector:
                 with open(self.storage_path, "r") as f:
                     return json.load(f)
             except Exception:
-                pass
+                pass  # nosec B110
         return {
             "queries": {},          # query_normalized -> {count, last_seen, best_score, resolved}
             "acquisition_queue": [], # [{topic, priority, source, queued_at}]

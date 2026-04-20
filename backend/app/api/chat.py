@@ -158,7 +158,7 @@ async def delete_conversation(
 def generate_ai_response(user_message: str) -> str:
     """
     Generate AI response based on user message.
-    
+
     This is a stub implementation. In production, this should:
     1. Call an LLM API (OpenAI, Claude, etc.)
     2. Use medical knowledge base for context
@@ -167,7 +167,7 @@ def generate_ai_response(user_message: str) -> str:
     """
     # Simple rule-based responses for demonstration
     message_lower = user_message.lower()
-    
+
     if any(word in message_lower for word in ["symptom", "pain", "fever", "cough"]):
         return (
             "I understand you're experiencing symptoms. As an AI medical assistant, "

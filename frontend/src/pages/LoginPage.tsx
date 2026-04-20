@@ -36,7 +36,7 @@ const LoginPage: React.FC = () => {
     } catch (err: any) {
       console.error('Login error:', err);
       let errorMsg = 'Failed to login. Please check your credentials.';
-      
+
       if (err?.response?.data?.detail) {
         const detail = err.response.data.detail;
         // Handle validation errors array
@@ -50,7 +50,7 @@ const LoginPage: React.FC = () => {
       } else if (err?.message) {
         errorMsg = err.message;
       }
-      
+
       setError(errorMsg);
       setLoading(false);
     }
@@ -60,17 +60,17 @@ const LoginPage: React.FC = () => {
     try {
       setError(''); // Clear previous errors
       setLoading(true);
-      
+
       const frontendURL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
       const redirectUri = `${frontendURL}/auth/callback`;
       const baseURL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-      
+
       console.log(`Initiating ${provider} OAuth flow...`);
       console.log(`Using API Base URL: ${baseURL}`);
       console.log(`OAuth redirect URI: ${redirectUri}`);
-      
+
       const response = await fetch(`${baseURL}/api/auth/oauth/${provider}/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
-      
+
       // Check if response is ok
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
@@ -80,16 +80,16 @@ const LoginPage: React.FC = () => {
         setLoading(false);
         return;
       }
-      
+
       const data = await response.json();
-      
+
       if (data.auth_url) {
         // Store provider and state for callback verification
         localStorage.setItem('oauth_provider', provider);
         if (data.state) {
           localStorage.setItem('oauth_state', data.state);
         }
-        
+
         console.log(`Redirecting to ${provider} OAuth authorization page...`);
         // Redirect to OAuth provider
         window.location.href = data.auth_url;
@@ -146,7 +146,7 @@ const LoginPage: React.FC = () => {
           >
             Sign In
           </Button>
-          
+
           <Box sx={{ textAlign: 'center', mb: 2 }}>
             <Typography
               component={Link}
@@ -163,18 +163,18 @@ const LoginPage: React.FC = () => {
               Forgot password?
             </Typography>
           </Box>
-          
+
           <Divider sx={{ my: 2 }}>
             <Typography variant="body2" color="text.secondary">OR</Typography>
           </Divider>
-          
+
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
             <Button
               fullWidth
               variant="outlined"
               startIcon={<GoogleIcon />}
               onClick={() => handleSocialLogin('google')}
-              sx={{ 
+              sx={{
                 textTransform: 'none',
                 borderColor: '#4285F4',
                 color: '#4285F4',
@@ -188,7 +188,7 @@ const LoginPage: React.FC = () => {
               variant="outlined"
               startIcon={<GitHubIcon />}
               onClick={() => handleSocialLogin('github')}
-              sx={{ 
+              sx={{
                 textTransform: 'none',
                 borderColor: '#333',
                 color: '#333',
@@ -202,7 +202,7 @@ const LoginPage: React.FC = () => {
               variant="outlined"
               startIcon={<MicrosoftIcon />}
               onClick={() => handleSocialLogin('microsoft')}
-              sx={{ 
+              sx={{
                 textTransform: 'none',
                 borderColor: '#00A4EF',
                 color: '#00A4EF',
@@ -212,7 +212,7 @@ const LoginPage: React.FC = () => {
               Continue with Microsoft
             </Button>
           </Box>
-          
+
           <Typography variant="body2" align="center" sx={{ mt: 1 }}>
             New here? <a href="/register">Create an account</a>
           </Typography>

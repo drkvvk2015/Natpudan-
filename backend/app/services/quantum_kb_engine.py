@@ -111,7 +111,7 @@ class HolographicMemory:
 
     def _generate_reference_beam(self, key: str) -> np.ndarray:
         """Generate phase-reference beam from key"""
-        np.random.seed(int(hashlib.md5(key.encode()).hexdigest(), 16) % (2**32))
+        np.random.seed(int(hashlib.sha256(key.encode()).hexdigest(), 16) % (2**32))
         phases = np.random.uniform(0, 2*np.pi, self.dimension)
         return np.exp(1j * phases)
 

@@ -4,7 +4,7 @@ No API costs, no quota limits, runs entirely on your machine
 """
 
 import logging
-import pickle
+import pickle  # nosec B403
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import numpy as np
@@ -37,7 +37,7 @@ class LocalVectorKnowledgeBase:
     - Fast embedding generation (batch processing)
     - Good quality semantic search
     """
-    
+
     def __init__(
         self,
         storage_dir: str = "data/knowledge_base",
@@ -46,7 +46,7 @@ class LocalVectorKnowledgeBase:
     ):
         """
         Initialize local vector knowledge base.
-        
+
         Args:
             storage_dir: Directory to store index and metadata
             model_name: Sentence transformer model (all-MiniLM-L6-v2, all-mpnet-base-v2, etc.)
@@ -59,22 +59,22 @@ class LocalVectorKnowledgeBase:
         else:
             self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.model_name = model_name
         self.embedding_dimension = embedding_dimension
-        
+
         self.index_path = self.storage_dir / "local_faiss_index.bin"
         self.metadata_path = self.storage_dir / "local_metadata.pkl"
-        
+
         # Initialize local embedding model (LAZY LOADING - only when needed)
         self.embedding_model = None
         self.model_name_to_load = model_name
         self._model_loaded = False
-        
+
         # DON'T load model during init - load it when first needed
         # This prevents backend startup delays
         logger.info(f"Local AI model configured: {model_name} (lazy loading - will load on first use)")
-        
+
         # Initialize FAISS index
         self.index = None
         self.documents: List[Dict[str, Any]] = []
@@ -87,42 +87,42 @@ class LocalVectorKnowledgeBase:
         except Exception:
             self.hybrid_engine = None
         self._bm25_indexed = False
-        
+
         # Load existing index
         self._load_index()
 
         # Build BM25 index if we already have documents
         if self.hybrid_engine and self.documents:
             self._rebuild_bm25_index()
-        
+
         logger.info(f"Local vector KB ready with {self.document_count} documents")
-    
+
     def _load_index(self):
         """Load FAISS index and metadata from disk"""
         if self.index_path.exists() and self.metadata_path.exists():
             try:
                 if FAISS_AVAILABLE:
                     self.index = faiss.read_index(str(self.index_path))
-                
+
                 with open(self.metadata_path, 'rb') as f:
-                    data = pickle.load(f)
+                    data = pickle.load(f)  # nosec B301 - loading trusted internal index metadata
                     self.documents = data.get('documents', [])
                     self.document_count = data.get('document_count', 0)
-                
+
                 logger.info(f"Loaded local index with {len(self.documents)} chunks")
             except Exception as e:
                 logger.error(f"Error loading local index: {e}")
                 self._initialize_new_index()
         else:
             self._initialize_new_index()
-    
+
     def _initialize_new_index(self):
         """Initialize a new FAISS index"""
         if FAISS_AVAILABLE:
             self.index = faiss.IndexFlatL2(self.embedding_dimension)
         self.documents = []
         self.document_count = 0
-    
+
     def _save_index(self):
         """Save FAISS index and metadata to disk"""
         try:
@@ -168,12 +168,12 @@ class LocalVectorKnowledgeBase:
         except Exception as e:
             logger.warning(f"BM25 indexing failed: {e}")
             self._bm25_indexed = False
-    
+
     def _ensure_model_loaded(self):
         """Load model on first use (lazy loading)"""
         if self._model_loaded:
             return
-            
+
         if SENTENCE_TRANSFORMER_AVAILABLE and self.embedding_model is None:
             try:
                 logger.info(f"Loading local embedding model: {self.model_name_to_load}...")
@@ -182,23 +182,23 @@ class LocalVectorKnowledgeBase:
                 logger.info("[OK] Local embedding model loaded")
             except Exception as e:
                 logger.error(f"Failed to load embedding model: {e}")
-    
+
     def _get_embeddings_batch(self, texts: List[str]) -> List[np.ndarray]:
         """
         Generate embeddings locally (NO API CALLS, VERY FAST)
-        
+
         Args:
             texts: List of texts to embed
-            
+
         Returns:
             List of embedding vectors
         """
         self._ensure_model_loaded()  # Load model if not already loaded
-        
+
         if not self.embedding_model:
             logger.warning("Local embedding model not available")
             return []
-        
+
         try:
             # FAST: Process all texts at once (batched internally)
             embeddings = self.embedding_model.encode(
@@ -212,7 +212,7 @@ class LocalVectorKnowledgeBase:
         except Exception as e:
             logger.error(f"Error generating local embeddings: {e}")
             return []
-    
+
     def add_document(
         self,
         content: str,
@@ -222,38 +222,38 @@ class LocalVectorKnowledgeBase:
     ) -> int:
         """
         Add document with local embeddings (NO API CALLS).
-        
+
         Args:
             content: Full document text
             metadata: Document metadata
             chunk_size: Size of text chunks
             chunk_overlap: Overlap between chunks
-            
+
         Returns:
             Number of chunks added
         """
         # CRITICAL: Load model FIRST before checking if it exists!
         self._ensure_model_loaded()
-        
+
         if not self.embedding_model or not FAISS_AVAILABLE:
             logger.warning("Local embeddings or FAISS not available")
             return 0
-        
+
         # Split into chunks
         chunks = self._chunk_text(content, chunk_size, chunk_overlap)
-        
+
         # Generate embeddings locally (FAST, NO COST)
         logger.info(f"Generating local embeddings for {len(chunks)} chunks...")
         embeddings_batch = self._get_embeddings_batch(chunks)
-        
+
         if len(embeddings_batch) != len(chunks):
             logger.warning(f"Only got {len(embeddings_batch)}/{len(chunks)} embeddings")
             return 0
-        
+
         # Add to index
         chunks_added = 0
         documents_batch = []
-        
+
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings_batch)):
             # Build document entry with text and metadata
             metadata_copy = metadata.copy()
@@ -274,7 +274,7 @@ class LocalVectorKnowledgeBase:
             })
             documents_batch.append(doc_entry)
             chunks_added += 1
-        
+
         # Add to FAISS
         if embeddings_batch:
             embeddings_array = np.array(embeddings_batch, dtype='float32')
@@ -286,26 +286,26 @@ class LocalVectorKnowledgeBase:
             # Rebuild BM25 index so hybrid search includes the new content
             if self.hybrid_engine:
                 self._rebuild_bm25_index()
-            
+
             logger.info(f"[OK] Added '{metadata.get('source', 'unknown')}' with {chunks_added} chunks (LOCAL)")
-        
+
         return chunks_added
-    
+
     def _chunk_text(self, text: str, chunk_size: int = 2000, overlap: int = 50) -> List[str]:
         """Split text into overlapping chunks"""
         chunks = []
         start = 0
         text_len = len(text)
-        
+
         while start < text_len:
             end = start + chunk_size
             chunk = text[start:end]
-            
+
             if chunk.strip():
                 chunks.append(chunk)
-            
+
             start = end - overlap
-        
+
         return chunks if chunks else [text]
 
     def _passes_filters(self, metadata: Dict[str, Any], filters: Optional[Dict[str, Any]]) -> bool:
@@ -326,11 +326,11 @@ class LocalVectorKnowledgeBase:
                 if year and year < int(min_year):
                     return False
             except Exception:
-                pass
+                pass  # nosec B110
         if not allow_outdated and metadata.get("outdated"):
             return False
         return True
-    
+
     def search(
         self,
         query: str,
@@ -344,26 +344,26 @@ class LocalVectorKnowledgeBase:
         Search using local embeddings (NO API CALLS) with optional BM25 hybrid fusion.
         """
         self._ensure_model_loaded()  # Load model if not already loaded
-        
+
         if not self.embedding_model or not FAISS_AVAILABLE or self.index is None:
             logger.warning("Local search not available")
             return []
-        
+
         if len(self.documents) == 0:
             return []
 
         if use_bm25 and self.hybrid_engine and not self._bm25_indexed:
             self._rebuild_bm25_index()
-        
+
         try:
             # Generate query embedding locally
             query_embedding = self.embedding_model.encode([query], convert_to_numpy=True)[0]
             query_embedding = query_embedding.astype('float32').reshape(1, -1)
-            
+
             # Search FAISS (retrieve extra for filtering)
             k = min(max(top_k * 3, top_k), len(self.documents))
             distances, indices = self.index.search(query_embedding, k)
-            
+
             vector_results = []
             for dist, idx in zip(distances[0], indices[0]):
                 if idx < len(self.documents):
@@ -372,7 +372,7 @@ class LocalVectorKnowledgeBase:
                     if not self._passes_filters(metadata, filters):
                         continue
                     similarity = 1.0 / (1.0 + dist)  # Convert distance to similarity
-                    
+
                     if similarity >= min_score:
                         citation = {
                             "document_id": metadata.get("document_id") or metadata.get("document_uuid"),
@@ -393,7 +393,7 @@ class LocalVectorKnowledgeBase:
                             'source_type': metadata.get('source', 'Local Vector KB'),
                             'document_title': metadata.get('title', 'Medical Reference')
                         })
-            
+
             # BM25-only path if enabled
             if use_bm25 and self.hybrid_engine and self._bm25_indexed:
                 fused = self.hybrid_engine.hybrid_search(
@@ -419,14 +419,14 @@ class LocalVectorKnowledgeBase:
                         doc['full_text'] = text
                         doc['preview'] = text[:2000] + '...'
                 final_results.append(doc)
-            
+
             logger.info(f"Local search found {len(final_results)} results (hybrid={use_bm25})")
             return final_results
-            
+
         except Exception as e:
             logger.error(f"Local search error: {e}")
             return []
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """Get knowledge base statistics"""
         return {

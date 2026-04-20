@@ -110,7 +110,6 @@
         "nsis",
         "portable"
       ],
-      "icon": "build/icon.ico",
       "artifactName": "${productName}-${version}-Windows.${ext}"
     },
     "nsis": {
@@ -125,7 +124,6 @@
         "deb",
         "rpm"
       ],
-      "icon": "build/icon.png",
       "category": "Medical",
       "artifactName": "${productName}-${version}-Linux.${ext}"
     },
@@ -134,7 +132,6 @@
         "dmg",
         "zip"
       ],
-      "icon": "build/icon.icns",
       "category": "public.app-category.medical",
       "artifactName": "${productName}-${version}-macOS.${ext}"
     },

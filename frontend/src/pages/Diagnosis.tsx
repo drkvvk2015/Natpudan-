@@ -78,7 +78,7 @@ const COMPLAINT_TEMPLATES = {
 }
 
 const DURATION_OPTIONS = [
-  '1 hour', '2-6 hours', '12 hours', '1 day', '2-3 days', '1 week', 
+  '1 hour', '2-6 hours', '12 hours', '1 day', '2-3 days', '1 week',
   '2 weeks', '1 month', '2-3 months', '6 months', '1 year', 'chronic (>1 year)'
 ]
 
@@ -228,18 +228,18 @@ export default function ClinicalCaseSheet() {
   const [sex, setSex] = useState('')
   const [address, setAddress] = useState('')
   const [uhid, setUhid] = useState('')
-  
+
   // Patient selector state
   const [showPatientSelector, setShowPatientSelector] = useState(false)
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
   const [selectedPatientRisk, setSelectedPatientRisk] = useState<'low' | 'medium' | 'high' | 'critical' | null>(null)
   const [generatingReport, setGeneratingReport] = useState(false)
-  
+
   // Chief Complaints with enhanced structure
   const [complaints, setComplaints] = useState<Complaint[]>([
     { id: '1', complaint: '', duration: '', severity: '', details: '' }
   ])
-  
+
   // Present History with chronological ordering
   const [presentHistory, setPresentHistory] = useState<{
     onset: string
@@ -254,7 +254,7 @@ export default function ClinicalCaseSheet() {
     relievingFactors: [],
     aggravatingFactors: []
   })
-  
+
   // Past Medical History
   const [enhancedHistory, setEnhancedHistory] = useState<{
     medicalHistory: MedicalHistoryItem[];
@@ -263,10 +263,10 @@ export default function ClinicalCaseSheet() {
     medicalHistory: [],
     smokingHistory: { isSmoker: false }
   })
-  
+
   // Family History
   const [familyHistory, setFamilyHistory] = useState<string[]>([])
-  
+
   // Social History
   const [socialHistory, setSocialHistory] = useState<{
     occupation: string
@@ -279,7 +279,7 @@ export default function ClinicalCaseSheet() {
     drugs: '',
     travel: ''
   })
-  
+
   // Review of Systems
   const [reviewOfSystems, setReviewOfSystems] = useState<{[key: string]: string[]}>({
     constitutional: [],
@@ -291,7 +291,7 @@ export default function ClinicalCaseSheet() {
     musculoskeletal: [],
     dermatological: []
   })
-  
+
   // Vital Signs
   const [vitalSigns, setVitalSigns] = useState({
     temperature: '',
@@ -303,15 +303,15 @@ export default function ClinicalCaseSheet() {
     weight: '',
     bmi: ''
   })
-  
+
   // Clinical Examination
   const [clinicalFindings, setClinicalFindings] = useState<ClinicalFinding[]>([])
-  
+
   // Lab Investigations and Reports
   const [labTests, setLabTests] = useState<LabTest[]>([])
   const [uploadedReports, setUploadedReports] = useState<UploadedReport[]>([])
   const [investigationAdvice, setInvestigationAdvice] = useState<InvestigationAdvice[]>([])
-  
+
   // Assessment and Plan
   const [assessment, setAssessment] = useState('')
   const [plan, setPlan] = useState('')
@@ -329,10 +329,10 @@ export default function ClinicalCaseSheet() {
   }
 
   const updateComplaint = (id: string, field: keyof Complaint, value: string) => {
-    setComplaints((complaints || []).map(c => 
+    setComplaints((complaints || []).map(c =>
       c.id === id ? { ...c, [field]: value } : c
     ))
-    
+
     // Auto-populate present history when complaint and duration are both filled
     const updatedComplaint = (complaints || []).find(c => c.id === id)
     if (updatedComplaint && field === 'duration' && value && updatedComplaint.complaint) {
@@ -344,7 +344,7 @@ export default function ClinicalCaseSheet() {
         }))
       }
     }
-    
+
     // Also update when complaint is changed and duration exists
     if (field === 'complaint' && value) {
       const complaint = (complaints || []).find(c => c.id === id)
@@ -417,7 +417,7 @@ export default function ClinicalCaseSheet() {
   }
 
   const updateLabTest = (id: string, field: keyof LabTest, value: string) => {
-    setLabTests((labTests || []).map(test => 
+    setLabTests((labTests || []).map(test =>
       test.id === id ? { ...test, [field]: value } : test
     ))
   }
@@ -445,7 +445,7 @@ export default function ClinicalCaseSheet() {
       const newReport: UploadedReport = {
         id: Date.now().toString() + i,
         name: file.name,
-        type: file.name.toLowerCase().includes('lab') ? 'lab' : 
+        type: file.name.toLowerCase().includes('lab') ? 'lab' :
               file.name.toLowerCase().includes('rad') || file.name.toLowerCase().includes('xray') || file.name.toLowerCase().includes('ct') || file.name.toLowerCase().includes('mri') ? 'radiology' :
               file.name.toLowerCase().includes('path') || file.name.toLowerCase().includes('biopsy') ? 'pathology' : 'other',
         date: new Date().toISOString().split('T')[0],
@@ -466,7 +466,7 @@ export default function ClinicalCaseSheet() {
       const patientDataAny = patientData as any
       const [firstNameFromFull = '', ...lastNameParts] = (patientData.name || '').split(' ')
       const lastNameFromFull = lastNameParts.join(' ')
-      
+
       // Populate form with patient data
       setFirstName(patientDataAny.first_name || firstNameFromFull || '')
       setLastName(patientDataAny.last_name || lastNameFromFull || '')
@@ -474,10 +474,10 @@ export default function ClinicalCaseSheet() {
       setSex(patientData.gender || '')
       setAddress(patientDataAny.address || '')
       setUhid(patientDataAny.uhid || patientData.intake_id || '')
-      
+
       // Set risk level for badge display
       setSelectedPatientRisk(patientDataAny.risk_level || 'medium')
-      
+
       setSelectedPatientId(patient.intake_id)
       setShowPatientSelector(false)
     } catch (error) {
@@ -559,7 +559,7 @@ export default function ClinicalCaseSheet() {
         patient_gender: sex,
         comorbidities: (enhancedHistory.medicalHistory || []).map(h => h.condition)
       })
-      
+
       setTreatmentPlan(response.data)
     } catch (error) {
       console.error('Error suggesting treatment:', error)
@@ -581,7 +581,7 @@ export default function ClinicalCaseSheet() {
         patient_weight: parseFloat(vitalSigns.weight) || undefined,
         allergies: (enhancedHistory.medicalHistory || []).filter(h => h.condition?.toLowerCase().includes('allerg')).map(h => h.condition)
       })
-      
+
       setPrescriptionPlan(response.data)
     } catch (error) {
       console.error('Error generating prescription:', error)
@@ -603,8 +603,8 @@ export default function ClinicalCaseSheet() {
         age: parseInt(age) || undefined,
         sex: sex,
         uhid: uhid,
-        complaints: (complaints || []).filter(c => c.complaint?.trim()).map(c => ({ 
-          complaint: c.complaint, 
+        complaints: (complaints || []).filter(c => c.complaint?.trim()).map(c => ({
+          complaint: c.complaint,
           duration: c.duration,
           severity: c.severity
         })),
@@ -639,7 +639,7 @@ export default function ClinicalCaseSheet() {
   const handleExportOPDCaseSheet = async () => {
     try {
       setGeneratingReport(true)
-      
+
       const caseSheetData = {
         patientInfo: {
           name: `${firstName} ${lastName}`.trim() || 'Unknown Patient',
@@ -662,8 +662,8 @@ export default function ClinicalCaseSheet() {
           packsPerDay: enhancedHistory.smokingHistory.packsPerDay || 0,
           yearsSmoked: enhancedHistory.smokingHistory.yearsSmoked || 0,
           packYears: enhancedHistory.smokingHistory.packYears || 0,
-          riskLevel: enhancedHistory.smokingHistory.packYears 
-            ? enhancedHistory.smokingHistory.packYears > 20 ? 'High' 
+          riskLevel: enhancedHistory.smokingHistory.packYears
+            ? enhancedHistory.smokingHistory.packYears > 20 ? 'High'
               : enhancedHistory.smokingHistory.packYears > 10 ? 'Moderate' : 'Low'
             : 'None'
         },
@@ -672,9 +672,9 @@ export default function ClinicalCaseSheet() {
         assessment: assessment,
         plan: plan
       }
-      
+
       await OPDCaseSheetService.generateOPDCaseSheetPDF(caseSheetData as any)
-      
+
     } catch (error) {
       console.error('Error generating case sheet:', error)
       alert('Failed to generate case sheet. Please try again.')
@@ -708,18 +708,18 @@ export default function ClinicalCaseSheet() {
                 Load Patient
               </Button>
             </Box>
-            
+
             {/* Selected Patient Info */}
             {selectedPatientId && (
-              <Alert 
-                severity="info" 
+              <Alert
+                severity="info"
                 sx={{ mb: 2 }}
                 action={selectedPatientRisk && <RiskBadge level={selectedPatientRisk} size="small" />}
               >
                 <strong>Linked Patient:</strong> {selectedPatientId}
               </Alert>
             )}
-            
+
             {/* Patient Demographics */}
             <Accordion defaultExpanded sx={{ mb: 2 }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -854,9 +854,9 @@ export default function ClinicalCaseSheet() {
                     </Box>
                   ))}
                 </Box>
-                
+
                 <Divider sx={{ my: 2 }} />
-                
+
                 {/* Individual Complaints */}
                 {(complaints || []).map((complaint, index) => (
                   <Card key={complaint.id} variant="outlined" sx={{ mb: 2, p: 2 }}>
@@ -954,7 +954,7 @@ export default function ClinicalCaseSheet() {
                       size="small"
                     />
                   </Grid>
-                  
+
                   <Grid item xs={12}>
                     <Typography variant="body2" gutterBottom>
                       <AccessTimeIcon fontSize="small" sx={{ mr: 1, verticalAlign: 'middle' }} />
@@ -1209,7 +1209,7 @@ export default function ClinicalCaseSheet() {
                           )
                         })}
                       </Box>
-                      
+
                       {/* Custom findings input */}
                       <TextField
                         fullWidth
@@ -1226,7 +1226,7 @@ export default function ClinicalCaseSheet() {
                           }
                         }}
                       />
-                      
+
                       {/* Show selected abnormal findings */}
                       {(clinicalFindings || []).filter(f => f.system === system).length > 0 && (
                         <Box sx={{ mt: 2 }}>
@@ -1267,7 +1267,7 @@ export default function ClinicalCaseSheet() {
                     <LabIcon sx={{ mr: 1 }} />
                     Suggested Investigations
                   </Typography>
-                  
+
                   {/* Quick Investigation Categories */}
                   <Box sx={{ mb: 2 }}>
                     {Object.entries(INVESTIGATION_CATEGORIES).map(([category, tests]) => (
@@ -1309,8 +1309,8 @@ export default function ClinicalCaseSheet() {
                                 Reason: {advice.reason} | Urgency: {advice.urgency}
                               </Typography>
                             </Box>
-                            <IconButton 
-                              size="small" 
+                            <IconButton
+                              size="small"
                               onClick={() => setInvestigationAdvice(investigationAdvice.filter((_, i) => i !== index))}
                             >
                               <ClearIcon />
@@ -1330,7 +1330,7 @@ export default function ClinicalCaseSheet() {
                     <BiologyIcon sx={{ mr: 1 }} />
                     Lab Results
                   </Typography>
-                  
+
                   {/* Quick Lab Test Entry */}
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="caption" gutterBottom>Quick Add Common Tests:</Typography>
@@ -1415,8 +1415,8 @@ export default function ClinicalCaseSheet() {
                           </FormControl>
                         </Grid>
                         <Grid item xs={6} md={1}>
-                          <IconButton 
-                            color="error" 
+                          <IconButton
+                            color="error"
                             onClick={() => removeLabTest(test.id)}
                             size="small"
                           >
@@ -1426,7 +1426,7 @@ export default function ClinicalCaseSheet() {
                       </Grid>
                     </Card>
                   ))}
-                  
+
                   <Button
                     variant="outlined"
                     onClick={addLabTest}
@@ -1445,7 +1445,7 @@ export default function ClinicalCaseSheet() {
                     <UploadIcon sx={{ mr: 1 }} />
                     Previous Reports Upload
                   </Typography>
-                  
+
                   <Box sx={{ mb: 2 }}>
                     <Box
                       component="input"
@@ -1492,8 +1492,8 @@ export default function ClinicalCaseSheet() {
                               <IconButton size="small" color="primary">
                                 <DownloadIcon />
                               </IconButton>
-                              <IconButton 
-                                size="small" 
+                              <IconButton
+                                size="small"
                                 color="error"
                                 onClick={() => removeReport(report.id)}
                               >
@@ -1593,9 +1593,9 @@ export default function ClinicalCaseSheet() {
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     Data Completeness: {Math.round((liveDiagnosis.data_completeness || 0) * 100)}%
                   </Typography>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={(liveDiagnosis.data_completeness || 0) * 100} 
+                  <LinearProgress
+                    variant="determinate"
+                    value={(liveDiagnosis.data_completeness || 0) * 100}
                     sx={{ height: 8, borderRadius: 1 }}
                   />
                 </Box>
@@ -1622,9 +1622,9 @@ export default function ClinicalCaseSheet() {
                           <Typography variant="subtitle2" fontWeight={600}>
                             {diff.diagnosis || diff.disease_name}
                           </Typography>
-                          <Chip 
-                            label={`${Math.round(diff.confidence * 100)}%`} 
-                            size="small" 
+                          <Chip
+                            label={`${Math.round(diff.confidence * 100)}%`}
+                            size="small"
                             color={diff.confidence > 0.8 ? 'success' : diff.confidence > 0.6 ? 'warning' : 'default'}
                           />
                         </Box>
@@ -1693,7 +1693,7 @@ export default function ClinicalCaseSheet() {
             Generate Prescription
           </Button>
         </Box>
-        
+
         {treatmentPlan && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle1" fontWeight={600}>AI Treatment Plan</Typography>
@@ -1702,7 +1702,7 @@ export default function ClinicalCaseSheet() {
             </Box>
           </Box>
         )}
-        
+
         {prescriptionPlan && (
           <Box>
             <Typography variant="subtitle1" fontWeight={600}>AI Prescription</Typography>
@@ -1712,7 +1712,7 @@ export default function ClinicalCaseSheet() {
           </Box>
         )}
       </Paper>
-      
+
       {/* Patient Selector Modal */}
       <PatientSelector
         open={showPatientSelector}

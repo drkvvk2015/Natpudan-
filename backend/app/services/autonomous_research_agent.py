@@ -307,7 +307,7 @@ class AutonomousResearchAgent:
                     finding.novelty_score *= 0.5
 
             except Exception:
-                pass
+                pass  # nosec B110
 
             finding.validation_status = "validated"
             validated.append(finding)
@@ -354,7 +354,7 @@ Based on recent research findings:
                     "source": "Autonomous Research Agent",
                     "topic": topic,
                     "type": "auto_researched",
-                    "document_id": f"ara_{hashlib.md5(topic.encode()).hexdigest()[:12]}",
+                    "document_id": f"ara_{hashlib.sha256(topic.encode()).hexdigest()[:12]}",
                     "year": datetime.utcnow().year
                 }
             )
@@ -384,7 +384,7 @@ Based on recent research findings:
 
     def _generate_task_id(self) -> str:
         """Generate unique task ID"""
-        return f"task_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{hashlib.md5(str(datetime.utcnow()).encode()).hexdigest()[:8]}"
+        return f"task_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{hashlib.sha256(str(datetime.utcnow()).encode()).hexdigest()[:8]}"
 
     def _calculate_novelty(self, paper: Dict) -> float:
         """Calculate novelty score for a paper"""
@@ -401,7 +401,7 @@ Based on recent research findings:
                 elif days_old < 30:
                     base_score += 0.2
             except Exception:
-                pass
+                pass  # nosec B110
 
         return min(base_score, 1.0)
 

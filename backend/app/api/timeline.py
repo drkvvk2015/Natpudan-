@@ -23,7 +23,7 @@ class TimelineEvent(BaseModel):
     status: Optional[str] = None
     related_id: Optional[str] = None
     metadata: Optional[dict] = {}
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -49,7 +49,7 @@ def format_date(dt) -> datetime:
     return datetime.now()
 
 
-def create_event(event_id: str, event_type: str, date, title: str, 
+def create_event(event_id: str, event_type: str, date, title: str,
                  description: str, status: str = None, related_id: str = None,
                  metadata: dict = None) -> dict:
     """Create a timeline event dictionary"""
@@ -77,7 +77,7 @@ async def get_patient_timeline(
 ):
     """
     Get comprehensive medical history timeline for a patient.
-    
+
     Aggregates events from multiple sources:
     - Patient intake creation
     - Travel history entries
@@ -86,7 +86,7 @@ async def get_patient_timeline(
     - Medications prescribed
     - Follow-up appointments
     - Monitoring records
-    
+
     Query Parameters:
     - event_types: Filter by event types (comma-separated)
     - start_date: Filter events after this date (ISO format)
@@ -97,17 +97,17 @@ async def get_patient_timeline(
         patient = db.query(PatientIntake).filter(
             PatientIntake.intake_id == patient_intake_id
         ).first()
-        
+
         if not patient:
             raise HTTPException(status_code=404, detail="Patient not found")
-        
+
         events = []
-        
+
         # Parse filter parameters
         filter_types = set(event_types.split(',')) if event_types else None
         filter_start = datetime.fromisoformat(start_date) if start_date else None
         filter_end = datetime.fromisoformat(end_date) if end_date else None
-        
+
         # 1. PATIENT INTAKE EVENT
         if not filter_types or 'intake' in filter_types:
             intake_date = format_date(patient.created_at)
@@ -127,7 +127,7 @@ async def get_patient_timeline(
                         "intake_id": patient.intake_id,
                     }
                 ))
-        
+
         # 2. TRAVEL HISTORY EVENTS
         if not filter_types or 'travel' in filter_types:
             travel_records = db.query(TravelHistory).filter(
@@ -152,7 +152,7 @@ async def get_patient_timeline(
                             "duration": travel.duration
                         }
                     ))
-        
+
         # 3. FAMILY HISTORY EVENTS
         if not filter_types or 'family_history' in filter_types:
             family_records = db.query(FamilyHistory).filter(
@@ -177,13 +177,13 @@ async def get_patient_timeline(
                             "notes": family.notes
                         }
                     ))
-        
+
         # 4. TREATMENT PLAN EVENTS
         if not filter_types or 'treatment_plan' in filter_types:
             treatment_plans = db.query(TreatmentPlan).filter(
                 TreatmentPlan.patient_intake_id == patient_intake_id
             ).all()
-            
+
             for plan in treatment_plans:
                 plan_date = format_date(plan.start_date or plan.created_at)
                 if (not filter_start or plan_date >= filter_start) and \
@@ -204,13 +204,13 @@ async def get_patient_timeline(
                             "followup_count": len(plan.follow_ups)
                         }
                     ))
-        
+
         # 5. MEDICATION EVENTS
         if not filter_types or 'medication' in filter_types:
             treatment_plans = db.query(TreatmentPlan).filter(
                 TreatmentPlan.patient_intake_id == patient_intake_id
             ).all()
-            
+
             for plan in treatment_plans:
                 for med in plan.medications:
                     med_date = format_date(med.prescribed_date or med.start_date or plan.created_at)
@@ -236,7 +236,7 @@ async def get_patient_timeline(
                                 "treatment_plan_id": plan.plan_id
                             }
                         ))
-                    
+
                     # Add discontinuation event if applicable
                     if not med.is_active and med.discontinuation_date:
                         disc_date = format_date(med.discontinuation_date)
@@ -255,13 +255,13 @@ async def get_patient_timeline(
                                     "reason": med.discontinuation_reason
                                 }
                             ))
-        
+
         # 6. FOLLOW-UP APPOINTMENT EVENTS
         if not filter_types or 'follow_up' in filter_types:
             treatment_plans = db.query(TreatmentPlan).filter(
                 TreatmentPlan.patient_intake_id == patient_intake_id
             ).all()
-            
+
             for plan in treatment_plans:
                 for followup in plan.follow_ups:
                     followup_date = format_date(followup.scheduled_date)
@@ -284,13 +284,13 @@ async def get_patient_timeline(
                                 "treatment_plan_id": plan.plan_id
                             }
                         ))
-        
+
         # 7. MONITORING RECORD EVENTS
         if not filter_types or 'monitoring' in filter_types:
             treatment_plans = db.query(TreatmentPlan).filter(
                 TreatmentPlan.patient_intake_id == patient_intake_id
             ).all()
-            
+
             for plan in treatment_plans:
                 for record in plan.monitoring_records:
                     record_date = format_date(record.record_date)
@@ -313,17 +313,17 @@ async def get_patient_timeline(
                                 "treatment_plan_id": plan.plan_id
                             }
                         ))
-        
+
         # Sort events by date (most recent first)
         events.sort(key=lambda x: x["date"], reverse=True)
-        
+
         return {
             "patient_intake_id": patient_intake_id,
             "patient_name": patient.name,
             "total_events": len(events),
             "events": events
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

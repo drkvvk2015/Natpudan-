@@ -58,6 +58,7 @@ def register_api_routers(api_router: APIRouter) -> None:
         ("app.api.wearable_auth", "router", {}, {"tags": ["wearable"]}),
         ("app.api.kb_growth", "router", {}, {"tags": ["kb-growth"]}),
         ("app.api.futuristic_kb", "router", {}, {"tags": ["futuristic-kb"]}),
+        ("app.api.futuristic_features", "router", {}, {"tags": ["features"]}),
     ]
 
     for module_path, symbol, include_kwargs, extra_kwargs in router_configs:

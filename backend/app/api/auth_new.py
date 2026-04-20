@@ -68,21 +68,21 @@ OAUTH_CONFIG = {
         "client_id": os.getenv("GOOGLE_CLIENT_ID"),
         "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
         "auth_url": "https://accounts.google.com/o/oauth2/v2/auth",
-        "token_url": "https://oauth2.googleapis.com/token",
+        "token_url": "https://oauth2.googleapis.com/token",  # nosec B105
         "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
     },
     "github": {
         "client_id": os.getenv("GITHUB_CLIENT_ID"),
         "client_secret": os.getenv("GITHUB_CLIENT_SECRET"),
         "auth_url": "https://github.com/login/oauth/authorize",
-        "token_url": "https://github.com/login/oauth/access_token",
+        "token_url": "https://github.com/login/oauth/access_token",  # nosec B105
         "userinfo_url": "https://api.github.com/user",
     },
     "microsoft": {
         "client_id": os.getenv("MICROSOFT_CLIENT_ID"),
         "client_secret": os.getenv("MICROSOFT_CLIENT_SECRET"),
         "auth_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",  # nosec B105
         "userinfo_url": "https://graph.microsoft.com/v1.0/me",
     }
 }
@@ -165,7 +165,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid authentication credentials: {str(e)}"
         ) from e
-    
+
     user = get_user_by_id(db, user_id)
     if user is None:
         logger.error(f"User not found in database: user_id={user_id}")
@@ -181,7 +181,7 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new user with password hashing."""
     try:
         logger.info(f"Registration attempt for email: {request.email}")
-        
+
         # Check if user already exists
         existing_user = get_user_by_email(db, request.email)
         if existing_user:
@@ -190,7 +190,7 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
             )
-        
+
         # Create new user with hashed password
         user = create_user(
             db=db,
@@ -200,12 +200,12 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
             role=request.role,
             license_number=request.license_number,
         )
-        
+
         logger.info(f"User created successfully: {user.email} (ID: {user.id})")
-        
+
         # Create access token
         access_token = create_access_token(data={"sub": str(user.id)})
-        
+
         return TokenResponse(
             access_token=access_token,
             user=user_to_dict(user)
@@ -225,7 +225,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """Login user with email and password."""
     try:
         logger.info(f"Login attempt for email: {request.email}")
-        
+
         user = authenticate_user(db, request.email, request.password)
         if not user:
             logger.warning(f"Login failed for {request.email}: Invalid credentials")
@@ -233,12 +233,12 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"
             )
-        
+
         logger.info(f"Login successful for {user.email} (ID: {user.id})")
-        
+
         # Create access token
         access_token = create_access_token(data={"sub": str(user.id)})
-        
+
         return TokenResponse(
             access_token=access_token,
             user=user_to_dict(user)
@@ -273,15 +273,15 @@ async def logout(current_user: User = Depends(get_current_user)):
 async def get_oauth_url(provider: str, redirect_uri: str):
     """Get OAuth authorization URL for specified provider."""
     logger.info(f"OAuth URL requested for provider: {provider}")
-    
+
     if provider not in OAUTH_CONFIG:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported OAuth provider: {provider}"
         )
-    
+
     config = OAUTH_CONFIG[provider]
-    
+
     # Check if OAuth credentials are configured
     if not config["client_id"] or not config["client_secret"]:
         logger.warning(f"OAuth credentials not configured for {provider}")
@@ -289,11 +289,11 @@ async def get_oauth_url(provider: str, redirect_uri: str):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"{provider.capitalize()} login is not configured. Please contact administrator or use email/password login."
         )
-    
+
     # Generate state parameter for security
     state = secrets.token_urlsafe(32)
     _store_oauth_state(state)
-    
+
     # Build parameters based on provider
     if provider == "google":
         params = {
@@ -329,11 +329,11 @@ async def get_oauth_url(provider: str, redirect_uri: str):
             "scope": "email profile",
             "state": state
         }
-    
+
     # Build URL with proper encoding
     from urllib.parse import urlencode
     url = f"{config['auth_url']}?{urlencode(params)}"
-    
+
     logger.info(f"OAuth URL generated for {provider}")
     return {"auth_url": url, "state": state}
 
@@ -351,15 +351,15 @@ async def oauth_callback(request: SocialLoginRequest, db: Session = Depends(get_
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired OAuth state"
             )
-        
+
         if provider not in OAUTH_CONFIG:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Unsupported OAuth provider: {provider}"
             )
-        
+
         config = OAUTH_CONFIG[provider]
-        
+
         # Exchange code for access token
         async with httpx.AsyncClient(timeout=30.0) as client:
             # Prepare token exchange data
@@ -370,7 +370,7 @@ async def oauth_callback(request: SocialLoginRequest, db: Session = Depends(get_
                 "redirect_uri": request.redirect_uri,
                 "grant_type": "authorization_code",
             }
-            
+
             # Set proper headers based on provider
             if provider == "github":
                 headers = {"Accept": "application/json"}
@@ -379,14 +379,14 @@ async def oauth_callback(request: SocialLoginRequest, db: Session = Depends(get_
                     "Accept": "application/json",
                     "Content-Type": "application/x-www-form-urlencoded"
                 }
-            
+
             logger.info(f"Exchanging authorization code for access token with {provider}")
             token_response = await client.post(
                 config["token_url"],
                 data=token_data,
                 headers=headers,
             )
-            
+
             if token_response.status_code != 200:
                 error_detail = token_response.text
                 logger.error(f"OAuth token exchange failed for {provider}: {error_detail}")
@@ -394,28 +394,28 @@ async def oauth_callback(request: SocialLoginRequest, db: Session = Depends(get_
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Failed to exchange OAuth code for token: {error_detail[:200]}"
                 )
-            
+
             token_data = token_response.json()
             access_token_oauth = token_data.get("access_token")
-            
+
             # Get user info from provider
             headers = {"Authorization": f"Bearer {access_token_oauth}"}
             if provider == "github":
                 headers["Accept"] = "application/json"
-            
+
             userinfo_response = await client.get(
                 config["userinfo_url"],
                 headers=headers,
             )
-            
+
             if userinfo_response.status_code != 200:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Failed to get user info from OAuth provider"
                 )
-            
+
             userinfo = userinfo_response.json()
-            
+
             # Extract email and name based on provider
             if provider == "google":
                 email = userinfo.get("email")
@@ -442,16 +442,16 @@ async def oauth_callback(request: SocialLoginRequest, db: Session = Depends(get_
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Unsupported provider"
                 )
-            
+
             if not email:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Email not provided by OAuth provider"
                 )
-            
+
             # Check if user exists
             user = get_user_by_email(db, email)
-            
+
             if not user:
                 # Create new user for OAuth login with selected role
                 user = create_user(
@@ -463,10 +463,10 @@ async def oauth_callback(request: SocialLoginRequest, db: Session = Depends(get_
                     oauth_provider=provider,
                     oauth_id=oauth_id,
                 )
-            
+
             # Create JWT access token
             access_token = create_access_token(data={"sub": str(user.id)})
-            
+
             logger.info(f"OAuth login successful for {email} via {provider}")
             return TokenResponse(
                 access_token=access_token,
@@ -501,14 +501,14 @@ async def request_password_reset(
     """Request a password reset token and deliver it via email."""
     try:
         logger.info(f"Password reset requested for: {request.email}")
-        
+
         user = get_user_by_email(db, request.email)
-        
+
         if not user:
             # Don't reveal if user exists for security
             logger.info(f"Password reset: User not found for {request.email}")
             return {"message": "If the email exists, a password reset link will be sent."}
-        
+
         # Generate password reset token (valid for 1 hour)
         reset_token_data = {
             "sub": user.id,
@@ -516,10 +516,10 @@ async def request_password_reset(
             "exp": datetime.utcnow() + timedelta(hours=1)
         }
         reset_token = jwt.encode(reset_token_data, SECRET_KEY, algorithm=ALGORITHM)
-        
+
         frontend_base_url = os.getenv("FRONTEND_URL", "http://127.0.0.1:5173")
         reset_link = f"{frontend_base_url.rstrip('/')}/reset-password?token={reset_token}"
-        
+
         logger.info(f"Password reset token generated for {user.email}")
 
         email_service = get_email_service()
@@ -551,20 +551,20 @@ async def reset_password(
     try:
         # Verify and decode the reset token
         payload = jwt.decode(request.token, SECRET_KEY, algorithms=[ALGORITHM])
-        
+
         if payload.get("type") != "password_reset":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid reset token"
             )
-        
+
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid reset token"
             )
-        
+
         # Get user from database
         user = get_user_by_id(db, user_id)
         if not user:
@@ -572,13 +572,13 @@ async def reset_password(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
-        
+
         # Update password
         from app.crud import update_user_password
         update_user_password(db, user.id, request.new_password)
-        
+
         return {"message": "Password successfully reset. You can now login with your new password."}
-        
+
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

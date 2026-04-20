@@ -29,7 +29,7 @@ except ImportError:
 
 class MedicalKnowledgeSource:
     """Base class for medical knowledge sources"""
-    
+
     def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """Search this knowledge source"""
         raise NotImplementedError
@@ -40,11 +40,11 @@ class LocalMedicalDatabase(MedicalKnowledgeSource):
     Local medical database with common conditions, symptoms, treatments.
     This provides fallback when external APIs are unavailable.
     """
-    
+
     def __init__(self):
         self.knowledge_base = self._load_medical_knowledge()
         logger.info(f"Loaded {len(self.knowledge_base)} medical entries")
-    
+
     def _load_medical_knowledge(self) -> Dict[str, Dict[str, Any]]:
         """Load comprehensive medical knowledge"""
         return {
@@ -170,57 +170,57 @@ class LocalMedicalDatabase(MedicalKnowledgeSource):
                 "emergency_signs": ["all symptoms require immediate emergency care"]
             }
         }
-    
+
     def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """Search local medical database using keyword matching"""
         query_lower = query.lower()
         # Split query into keywords
         keywords = query_lower.split()
         results = []
-        
+
         for condition_id, data in self.knowledge_base.items():
             score = 0.0
             matched_fields = []
-            
+
             # Check each keyword
             for keyword in keywords:
                 if len(keyword) < 3:  # Skip very short words
                     continue
-                
+
                 # Check name match
                 if keyword in data["name"].lower():
                     score += 10.0
                     matched_fields.append(f"name:{keyword}")
-                
+
                 # Check symptoms
                 for symptom in data.get("symptoms", []):
                     if keyword in symptom.lower():
                         score += 3.0
                         matched_fields.append(f"symptom:{symptom}")
-                
+
                 # Check causes
                 for cause in data.get("causes", []):
                     if keyword in cause.lower():
                         score += 2.0
                         matched_fields.append(f"cause:{cause}")
-                
+
                 # Check treatments
                 for treatment in data.get("treatments", []):
                     if keyword in treatment.lower():
                         score += 2.0
                         matched_fields.append(f"treatment:{treatment}")
-                
+
                 # Check category
                 if keyword in data.get("category", "").lower():
                     score += 4.0
                     matched_fields.append(f"category:{keyword}")
-                
+
                 # Check emergency signs
                 for sign in data.get("emergency_signs", []):
                     if keyword in sign.lower():
                         score += 5.0  # Higher weight for emergency signs
                         matched_fields.append(f"[WARNING]emergency:{sign}")
-            
+
             if score > 0:
                 results.append({
                     "text": self._format_condition(data),
@@ -232,29 +232,29 @@ class LocalMedicalDatabase(MedicalKnowledgeSource):
                     "matched_fields": matched_fields,
                     "raw_data": data
                 })
-        
+
         # Sort by score and return top_k
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:top_k]
-    
+
     def _format_condition(self, data: Dict[str, Any]) -> str:
         """Format condition data for display"""
         text = f"**{data['name']}** (ICD-10: {data.get('icd10', 'N/A')})\n\n"
         text += f"**Category:** {data.get('category', 'N/A')}\n"
         text += f"**Severity:** {data.get('severity', 'N/A')}\n\n"
-        
+
         if data.get("symptoms"):
             text += f"**Symptoms:** {', '.join(data['symptoms'][:5])}\n\n"
-        
+
         if data.get("causes"):
             text += f"**Common Causes:** {', '.join(data['causes'][:3])}\n\n"
-        
+
         if data.get("treatments"):
             text += f"**Treatments:** {', '.join(data['treatments'][:5])}\n\n"
-        
+
         if data.get("emergency_signs"):
             text += f"**[WARNING] Emergency Signs:** {', '.join(data['emergency_signs'])}\n"
-        
+
         return text
 
 
@@ -263,14 +263,14 @@ class EnhancedKnowledgeBase:
     Enhanced knowledge base combining multiple sources with hybrid search.
     Falls back gracefully when external services are unavailable.
     """
-    
+
     def __init__(self, storage_dir: str = "data/knowledge_base"):
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize knowledge sources
         self.sources = []
-        
+
         # Always available: Local medical database
         try:
             self.local_db = LocalMedicalDatabase()
@@ -278,7 +278,7 @@ class EnhancedKnowledgeBase:
             logger.info("[OK] Local medical database loaded")
         except Exception as e:
             logger.error(f"Failed to load local database: {e}")
-        
+
         # Load sentence transformer for better semantic search (optional)
         self.embedder = None
         if SENTENCE_TRANSFORMERS_AVAILABLE:
@@ -287,14 +287,14 @@ class EnhancedKnowledgeBase:
                 logger.info("[OK] Sentence transformer loaded for semantic search")
             except Exception as e:
                 logger.warning(f"Could not load sentence transformer: {e}")
-    
+
     def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """
         Hybrid search across all knowledge sources.
         Combines results from multiple sources and re-ranks them.
         """
         all_results = []
-        
+
         # Search each source
         for source_name, source in self.sources:
             try:
@@ -304,22 +304,22 @@ class EnhancedKnowledgeBase:
                     all_results.append(result)
             except Exception as e:
                 logger.warning(f"Error searching {source_name}: {e}")
-        
+
         # If we have semantic embedder, re-rank results
         if self.embedder and all_results and NUMPY_AVAILABLE:
             try:
                 all_results = self._semantic_rerank(query, all_results)
             except Exception as e:
                 logger.warning(f"Semantic re-ranking failed: {e}")
-        
+
         # Sort by score and return top results
         all_results.sort(key=lambda x: x.get("score", 0), reverse=True)
         return all_results[:top_k]
-    
+
     def _semantic_rerank(self, query: str, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Re-rank results using semantic similarity"""
         query_embedding = self.embedder.encode([query])[0]
-        
+
         for result in results:
             text_embedding = self.embedder.encode([result["text"][:500]])[0]
             # Cosine similarity
@@ -329,9 +329,9 @@ class EnhancedKnowledgeBase:
             # Boost score with semantic similarity
             result["score"] = result.get("score", 0) + (similarity * 10)
             result["semantic_score"] = float(similarity)
-        
+
         return results
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """Get knowledge base statistics"""
         stats = {
@@ -342,26 +342,26 @@ class EnhancedKnowledgeBase:
                 "local_database": any(name == "Local Database" for name, _ in self.sources),
             }
         }
-        
+
         for source_name, source in self.sources:
             if hasattr(source, 'knowledge_base'):
                 stats["source_details"][source_name] = {
                     "entries": len(source.knowledge_base),
                     "categories": len(set(data.get("category") for data in source.knowledge_base.values()))
                 }
-        
+
         return stats
-    
+
     def add_document(self, text: str, source: str, metadata: Dict[str, Any]) -> str:
         """
         Add a document to the knowledge base.
         Stores in local database and creates searchable entry.
         """
         import hashlib
-        
+
         # Generate unique document ID
-        doc_id = hashlib.md5(f"{source}{text[:100]}{datetime.now().isoformat()}".encode()).hexdigest()[:12]
-        
+        doc_id = hashlib.sha256(f"{source}{text[:100]}{datetime.now().isoformat()}".encode()).hexdigest()[:12]
+
         # Store document (simple in-memory for now, could persist to SQLite)
         doc_entry = {
             "id": doc_id,
@@ -372,7 +372,7 @@ class EnhancedKnowledgeBase:
             "character_count": len(text),
             "word_count": len(text.split())
         }
-        
+
         # Add to local database if available
         if hasattr(self, 'local_db') and self.local_db:
             # Store as a searchable entry
@@ -385,10 +385,10 @@ class EnhancedKnowledgeBase:
                 "metadata": metadata,
                 "created_at": doc_entry["created_at"]
             }
-        
+
         logger.info(f"Added document to enhanced KB: {source} (ID: {doc_id}, {len(text)} chars)")
         return doc_id
-    
+
     def add_pdf_source(self, pdf_directory: str):
         """Add PDF documents as a knowledge source.
 
@@ -399,7 +399,7 @@ class EnhancedKnowledgeBase:
             "PDF source ingestion is not implemented in EnhancedKnowledgeBase yet. "
             "Use app.services.pdf_processor with vector_knowledge_base ingestion path."
         )
-    
+
     def add_pubmed_source(self, api_key: Optional[str] = None):
         """Add PubMed API as a knowledge source.
 

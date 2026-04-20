@@ -29,7 +29,7 @@ import {
   ExpandMore,
   ExpandLess,
 } from "@mui/icons-material";
-import axios from "axios";
+import apiClient from "../services/apiClient";
 
 export interface Alert {
   id: number;
@@ -76,15 +76,15 @@ const AlertsWidget: React.FC<AlertsWidgetProps> = ({ patientId, compact = false 
 
       if (patientId) {
         // Load alerts for specific patient
-        const response = await axios.get(`/api/predictions/patient/${patientId}/alerts`);
+        const response = await apiClient.get(`/api/predictions/alerts/patient/${patientId}`);
         setAlerts(response.data.alerts || []);
       } else {
         // Load high-risk patients (for admin/overview)
-        const response = await axios.get("/api/predictions/high-risk-patients");
-        setHighRiskPatients(response.data.patients || []);
+        const response = await apiClient.get("/api/predictions/alerts/high-risk-patients");
+        setHighRiskPatients(response.data.high_risk_patients || []);
 
         // Also load recent alerts
-        const alertsResponse = await axios.get("/api/predictions/recent-alerts");
+        const alertsResponse = await apiClient.get("/api/predictions/alerts/recent");
         setAlerts(alertsResponse.data.alerts || []);
       }
     } catch (err: any) {
@@ -96,7 +96,11 @@ const AlertsWidget: React.FC<AlertsWidgetProps> = ({ patientId, compact = false 
 
   const acknowledgeAlert = async (alertId: number) => {
     try {
-      await axios.post(`/api/predictions/alerts/${alertId}/acknowledge`);
+      const storedUser = localStorage.getItem("user");
+      const userId = storedUser ? JSON.parse(storedUser).id : null;
+      await apiClient.post(`/api/predictions/alerts/${alertId}/acknowledge`, {
+        user_id: userId,
+      });
       setAlerts(alerts.map(a => a.id === alertId ? { ...a, is_acknowledged: true } : a));
       setDetailsOpen(false);
     } catch (err: any) {

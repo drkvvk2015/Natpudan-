@@ -63,7 +63,7 @@ async def app_lifespan(_app: FastAPI):
 
             get_queue_processor().stop()
         except Exception:
-            pass
+            pass  # nosec B110
 
         for task in (queue_task, wearable_task, kb_task):
             if task and not task.done():

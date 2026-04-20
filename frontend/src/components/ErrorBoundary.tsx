@@ -1,5 +1,6 @@
 import React from 'react';
 import './ErrorBoundary.css';
+import apiClient from '../services/apiClient';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -22,7 +23,7 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
 
   componentDidCatch(error: any, info: any) {
     console.error('UI ErrorBoundary caught error:', error, info);
-    
+
     this.setState(prevState => ({
       error,
       errorCount: prevState.errorCount + 1,
@@ -51,7 +52,7 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
   private autoRetry = () => {
     this.setState({ autoRetrying: true });
     const delay = Math.min(1000 * Math.pow(2, this.state.errorCount), 10000);
-    
+
     this.retryTimeout = setTimeout(() => {
       console.log('Auto-retrying after error...');
       this.setState({ hasError: false, error: null, autoRetrying: false });
@@ -60,16 +61,12 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
 
   private logErrorToBackend = async (error: any, info: any) => {
     try {
-      await fetch('/api/error-correction/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: error?.message || 'Unknown error',
-          stack: error?.stack,
-          componentStack: info?.componentStack,
-          timestamp: new Date().toISOString(),
-          url: window.location.href,
-        }),
+      await apiClient.post('/api/error-correction/log', {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack,
+        componentStack: info?.componentStack,
+        timestamp: new Date().toISOString(),
+        url: window.location.href,
       });
     } catch (logError) {
       console.warn('Failed to log error to backend:', logError);
@@ -79,12 +76,12 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
   render() {
     if (this.state.hasError) {
       const { error, autoRetrying, errorCount } = this.state;
-      
+
       return (
         <div className="error-boundary-root">
           <div className="error-boundary-card">
             <h2 className="error-boundary-title">[WARNING] Something went wrong</h2>
-            
+
             {autoRetrying && (
               <div className="error-boundary-banner retry">
                 🔄 Auto-retry in progress... (Attempt {errorCount}/3)
@@ -102,15 +99,15 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
             </pre>
 
             <div className="error-boundary-actions">
-              <button 
+              <button
                 onClick={() => this.setState({ hasError: false, error: null, errorCount: 0 })}
                 disabled={autoRetrying}
                 className={`error-boundary-button primary${autoRetrying ? ' disabled' : ''}`}
               >
                 🔄 Try Again
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => window.location.reload()}
                 disabled={autoRetrying}
                 className={`error-boundary-button secondary${autoRetrying ? ' disabled' : ''}`}

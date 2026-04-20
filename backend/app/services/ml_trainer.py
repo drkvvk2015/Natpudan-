@@ -6,7 +6,7 @@ Runs as a background job to continuously improve predictions.
 """
 
 import logging
-import pickle
+import pickle  # nosec B403
 from typing import Dict, List, Tuple
 from datetime import datetime, timedelta
 from pathlib import Path

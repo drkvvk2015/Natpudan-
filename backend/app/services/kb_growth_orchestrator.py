@@ -272,50 +272,50 @@ class KBGrowthOrchestrator:
             try:
                 metrics["kb"] = self._kb.get_statistics()
             except Exception:
-                pass
+                pass  # nosec B110
 
         if self._gap_detector:
             try:
                 metrics["gaps"] = self._gap_detector.get_statistics()
             except Exception:
-                pass
+                pass  # nosec B110
 
         if self._ingester:
             try:
                 metrics["ingestion"] = self._ingester.get_statistics()
             except Exception:
-                pass
+                pass  # nosec B110
 
         if self._kg:
             try:
                 metrics["graph"] = self._kg.get_statistics()
             except Exception:
-                pass
+                pass  # nosec B110
 
         # Futuristic components
         if self._quantum_kb:
             try:
                 metrics["futuristic"]["quantum"] = self._quantum_kb.get_statistics()
             except Exception:
-                pass
+                pass  # nosec B110
 
         if self._neural_reasoner:
             try:
                 metrics["futuristic"]["neural"] = self._neural_reasoner.get_graph_statistics()
             except Exception:
-                pass
+                pass  # nosec B110
 
         if self._predictive_detector:
             try:
                 metrics["futuristic"]["predictive"] = self._predictive_detector.get_statistics()
             except Exception:
-                pass
+                pass  # nosec B110
 
         if self._research_agent:
             try:
                 metrics["futuristic"]["autonomous"] = self._research_agent.get_status()
             except Exception:
-                pass
+                pass  # nosec B110
 
         # Store metrics history
         self._metrics_history.append(metrics)

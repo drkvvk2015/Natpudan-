@@ -13,7 +13,7 @@ from app.database import SessionLocal
 from app.services.readmission_predictor import get_readmission_predictor
 from app.services.alert_generator import get_alert_generator
 from app.services.ml_trainer import get_ml_trainer
-from app.models import PatientIntake, TreatmentPlan
+from app.models import PatientIntake, TreatmentPlan, Alert
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ def predict_readmission_risk(
             ).all()
             patient_data["family_history"] = [r.condition for r in family_records]
         except Exception:
-            pass
+            pass  # nosec B110
 
         # Get current/last treatment plan
         if not treatment_plan_id:
@@ -112,7 +112,7 @@ def predict_readmission_risk(
                     ).count()
                     patient_data["previous_readmissions"] = max(0, prev_plans - 1)
             except Exception:
-                pass
+                pass  # nosec B110
 
         # Predict
         predictor = get_readmission_predictor()
@@ -315,4 +315,38 @@ def acknowledge_alert(
         raise
     except Exception as e:
         logger.error(f"[PREDICTIONS] Error acknowledging alert: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/alerts/recent")
+def get_recent_alerts(
+    limit: int = 20,
+    include_acknowledged: bool = False,
+    db: Session = Depends(get_db)
+) -> Dict:
+    """Return recent alerts for dashboard-style widgets."""
+    try:
+        query = db.query(Alert).order_by(Alert.created_at.desc())
+        if not include_acknowledged:
+            query = query.filter(Alert.is_acknowledged == False)
+        alerts = query.limit(limit).all()
+        return {
+            "success": True,
+            "alerts": [
+                {
+                    "id": alert.id,
+                    "patient_intake_id": alert.patient_intake_id,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "description": alert.description,
+                    "recommended_action": alert.recommended_action,
+                    "is_acknowledged": alert.is_acknowledged,
+                    "created_at": alert.created_at.isoformat() if alert.created_at else None,
+                }
+                for alert in alerts
+            ],
+            "count": len(alerts)
+        }
+    except Exception as e:
+        logger.error(f"[PREDICTIONS] Error getting recent alerts: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

@@ -1,5 +1,7 @@
 """Ambient Transcriber Service - Real-time WebSocket audio transcription"""
 import logging
+import tempfile
+import os
 logger = logging.getLogger(__name__)
 _ambient_transcriber = None
 
@@ -7,14 +9,20 @@ class AmbientTranscriber:
     def __init__(self):
         from app.services.voice_transcriber import get_voice_transcriber
         self.transcriber = get_voice_transcriber()
-    
+
     async def process_audio_stream(self, audio_chunks: list, buffer_timeout_seconds: float = 2.0):
         try:
             buffered_audio = b"".join(audio_chunks)
             if not buffered_audio:
                 return {"partial_transcript": "", "entities": [], "confidence": 0.0}
-            
-            result = self.transcriber.transcribe_audio("/tmp/ambient_audio.wav")
+
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp.write(buffered_audio)
+                tmp_path = tmp.name
+            try:
+                result = self.transcriber.transcribe_audio(tmp_path)
+            finally:
+                os.unlink(tmp_path)
             if result.get("success"):
                 transcription = result.get("raw_transcription", "")
                 entities = self.transcriber.extract_medical_entities(transcription)
