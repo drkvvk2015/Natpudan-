@@ -24,6 +24,7 @@
     "build:ios": "npm run build:web && npx cap sync ios && cd ios/App && xcodebuild -workspace App.xcworkspace -scheme App -configuration Release archive",
     "build:windows": "npm run build:web && electron-builder --windows",
     "build:linux": "npm run build:web && electron-builder --linux",
+    "build:linux:windows": "npm run build:web && electron-builder --linux dir",
     "build:all": "npm run build:web && npm run build:android && npm run build:windows && npm run build:linux",
     "preview": "vite preview --port 3000",
     "electron:dev": "NODE_ENV=development electron .",
@@ -81,7 +82,7 @@
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "@vitejs/plugin-react": "^4.3.1",
-    "electron": "^39.2.0",
+    "electron": "39.8.8",
     "electron-builder": "^26.8.1",
     "electron-updater": "^6.1.7",
     "eslint": "^8.57.0",
@@ -95,6 +96,7 @@
   "build": {
     "appId": "com.natpudan.medical",
     "productName": "Natpudan AI",
+    "electronVersion": "39.8.8",
     "files": [
       "dist/**/*",
       "electron-main.js",
@@ -142,3 +144,4 @@
     }
   }
 }
+

@@ -103,7 +103,13 @@ function Build-Windows {
 # Function to build Linux
 function Build-Linux {
     Write-Host "Building Linux packages..." -ForegroundColor Yellow
-    npm run build:linux
+    if ($IsWindows -or $env:OS -eq "Windows_NT") {
+        Write-Host "Windows host detected: building Linux unpacked app directory (no AppImage packaging)" -ForegroundColor Yellow
+        npm run build:linux:windows
+    }
+    else {
+        npm run build:linux
+    }
     if ($LASTEXITCODE -eq 0) {
         Write-Host "[OK] Linux build completed successfully" -ForegroundColor Green
         Write-Host "Packages location: release/" -ForegroundColor Cyan
