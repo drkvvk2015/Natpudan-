@@ -9,7 +9,7 @@ import logging
 import pickle  # nosec B403
 import json
 from typing import Dict, List, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 import numpy as np
 from pathlib import Path
 
@@ -211,7 +211,7 @@ class ReadmissionPredictor:
                 "feature_importance": feature_importance,
                 "top_risk_factors": top_risk_factors,
                 "recommended_interventions": interventions,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
         except Exception as e:
             logger.error(f"[READMISSION] Error predicting risk: {e}")
