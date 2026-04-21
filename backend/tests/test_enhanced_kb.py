@@ -1,42 +1,26 @@
-"""Test script for enhanced knowledge base"""
+"""Smoke tests for the enhanced knowledge base."""
 
-import sys
-sys.path.insert(0, 'app')
+from app.services import enhanced_knowledge_base as kb_module
 
-from services.enhanced_knowledge_base import get_knowledge_base
 
-# Initialize knowledge base
-print("[TOOL] Initializing Enhanced Knowledge Base...")
-kb = get_knowledge_base()
+def test_get_knowledge_base_returns_singleton(monkeypatch):
+    monkeypatch.setattr(kb_module, "SENTENCE_TRANSFORMERS_AVAILABLE", False)
+    monkeypatch.setattr(kb_module, "_knowledge_base_instance", None)
 
-# Get statistics
-stats = kb.get_statistics()
-print(f"\n[STATS] Knowledge Base Statistics:")
-print(f"   Sources: {stats['sources']}")
-print(f"   Capabilities: {stats['capabilities']}")
-print(f"   Source Details: {stats['source_details']}")
+    first = kb_module.get_knowledge_base()
+    second = kb_module.get_knowledge_base()
 
-# Test searches
-test_queries = [
-    "high blood pressure symptoms",
-    "diabetes treatment",
-    "asthma emergency",
-    "headache",
-    "chest pain"
-]
+    assert first is second
+    assert first.get_statistics()["sources"] >= 1
 
-print(f"\n[SEARCH] Testing Knowledge Base Searches:\n")
-for query in test_queries:
-    print(f"Query: '{query}'")
-    results = kb.search(query, top_k=2)
-    print(f"Found {len(results)} results\n")
-    
-    for i, result in enumerate(results, 1):
-        print(f"  {i}. Source: {result['source']}")
-        print(f"     Score: {result['score']:.2f}")
-        print(f"     ICD-10: {result.get('icd10', 'N/A')}")
-        print(f"     Preview: {result['text'][:150]}...")
-        print()
-    print("-" * 80 + "\n")
 
-print("[OK] Knowledge Base Test Complete!")
+def test_enhanced_knowledge_base_search_returns_results(monkeypatch, tmp_path):
+    monkeypatch.setattr(kb_module, "SENTENCE_TRANSFORMERS_AVAILABLE", False)
+
+    kb = kb_module.EnhancedKnowledgeBase(storage_dir=str(tmp_path / "kb"))
+
+    results = kb.search("high blood pressure symptoms", top_k=2)
+
+    assert results
+    assert any(result.get("icd10") == "I10" for result in results)
+    assert all(result.get("score", 0) > 0 for result in results)

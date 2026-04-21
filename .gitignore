@@ -84,6 +84,7 @@ natpudan.db
 # Debug files
 debug_*
 test_output_*
+APP_REVIEW_DETAILS.txt
 # Large build artifacts
 frontend/release/
 backend/data/knowledge_base/*.pdf

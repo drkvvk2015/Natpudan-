@@ -76,10 +76,10 @@ def _seed_demo_wearable_data(db: Session, patient_id: int, device_type: str) -> 
     for days_back in range(6, -1, -1):
         measurement_date = now - timedelta(days=days_back)
         samples = [
-            ("heart_rate", random.randint(68, 92), "bpm"),
-            ("steps", random.randint(4200, 11500), "steps"),
-            ("sleep_hours", round(random.uniform(5.8, 8.4), 1), "hours"),
-            ("oxygen_saturation", random.randint(95, 99), "%"),
+            ("heart_rate", random.randint(68, 92), "bpm"),  # nosec B311 - demo seed data only
+            ("steps", random.randint(4200, 11500), "steps"),  # nosec B311 - demo seed data only
+            ("sleep_hours", round(random.uniform(5.8, 8.4), 1), "hours"),  # nosec B311 - demo seed data only
+            ("oxygen_saturation", random.randint(95, 99), "%"),  # nosec B311 - demo seed data only
         ]
         for category, value, unit in samples:
             record = WearableDeviceData(
@@ -202,8 +202,8 @@ async def sync_now(patient_intake_id: int | None = None, db: Session = Depends(g
             user_id=1,
             device_type="fitbit",
             device_user_id=f"demo-fitbit-{patient.id}",
-            access_token="demo-token",
-            refresh_token="demo-refresh",
+            access_token="demo-token",  # nosec B106 - demo-only placeholder token
+            refresh_token="demo-refresh",  # nosec B106 - demo-only placeholder token
             auto_sync_enabled=True,
         )
         db.add(demo_auth)
@@ -215,10 +215,10 @@ async def sync_now(patient_intake_id: int | None = None, db: Session = Depends(g
     for device in devices:
         device.last_sync_at = datetime.utcnow()
         sample_entries = [
-            {"data_category": "heart_rate", "value": random.randint(68, 92), "unit": "bpm", "measurement_date": datetime.utcnow()},
-            {"data_category": "steps", "value": random.randint(3500, 12000), "unit": "steps", "measurement_date": datetime.utcnow()},
-            {"data_category": "sleep_hours", "value": round(random.uniform(5.8, 8.4), 1), "unit": "hours", "measurement_date": datetime.utcnow()},
-            {"data_category": "oxygen_saturation", "value": random.randint(95, 99), "unit": "%", "measurement_date": datetime.utcnow()},
+            {"data_category": "heart_rate", "value": random.randint(68, 92), "unit": "bpm", "measurement_date": datetime.utcnow()},  # nosec B311 - demo sample data only
+            {"data_category": "steps", "value": random.randint(3500, 12000), "unit": "steps", "measurement_date": datetime.utcnow()},  # nosec B311 - demo sample data only
+            {"data_category": "sleep_hours", "value": round(random.uniform(5.8, 8.4), 1), "unit": "hours", "measurement_date": datetime.utcnow()},  # nosec B311 - demo sample data only
+            {"data_category": "oxygen_saturation", "value": random.randint(95, 99), "unit": "%", "measurement_date": datetime.utcnow()},  # nosec B311 - demo sample data only
         ]
         result = await sync_service.import_wearable_data(db, patient.id, device.device_type, sample_entries)
         imported += int(result.get("imported_count", 0))

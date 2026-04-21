@@ -533,6 +533,7 @@ async def request_password_reset(
             logger.warning("Password reset email not sent (email provider not configured).")
             logger.info(f"[DEV ONLY] Password reset link for {user.email}: {reset_link}")
 
+        # Security fix: Never return the token in the API response
         return {"message": "If the email exists, a password reset link will be sent."}
     except Exception as e:
         logger.error(f"Password reset error for {request.email}: {str(e)}", exc_info=True)

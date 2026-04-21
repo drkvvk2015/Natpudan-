@@ -14,6 +14,8 @@ def get_router_specs() -> List[Tuple[str, str, str]]:
         ("app.api.chat_new", "router", "chat"),
         ("app.api.discharge", "router", "discharge"),
         ("app.api.treatment", "router", "treatment"),
+        ("app.api.medical", "router", "medical"),
+        ("app.api.upload", "router", "upload"),
         ("app.api.timeline", "router", "timeline"),
         ("app.api.analytics", "router", "analytics"),
         ("app.api.fhir", "router", "fhir"),
@@ -44,7 +46,9 @@ def register_api_routers(api_router: APIRouter) -> None:
         ("app.api.auth_new", "router", {}, {}),
         ("app.api.chat_new", "router", {}, {}),
         ("app.api.discharge", "router", {}, {}),
-        ("app.api.treatment", "router", {"prefix": "/treatment"}, {"tags": ["treatment"]}),
+        ("app.api.treatment", "router", {}, {}), # Prefix in router itself
+        ("app.api.medical", "router", {}, {}),   # Prefix in router itself
+        ("app.api.upload", "router", {}, {}),    # Prefix in router itself
         ("app.api.timeline", "router", {"prefix": "/timeline"}, {"tags": ["timeline"]}),
         ("app.api.analytics", "router", {"prefix": "/analytics"}, {"tags": ["analytics"]}),
         ("app.api.fhir", "router", {"prefix": "/fhir"}, {"tags": ["fhir"]}),

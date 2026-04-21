@@ -34,6 +34,18 @@ LOW_RISK_THRESHOLD = 0.30
 MODERATE_RISK_THRESHOLD = 0.50
 HIGH_RISK_THRESHOLD = 0.70
 
+# Confidence estimation parameters
+CONFIDENCE_BASE = 0.55
+CONFIDENCE_RICHNESS_WEIGHT = 0.25
+CONFIDENCE_BOUNDARY_WEIGHT = 0.20
+
+# Feature importance and risk factor thresholds
+PREVIOUS_READMISSION_SIGNIFICANCE = 0.01
+COMORBIDITY_COUNT_SIGNIFICANCE = 0.3
+DISEASE_PRESENT_SIGNIFICANCE = 0.5
+POLYPHARMACY_SIGNIFICANCE = 0.4
+ADVANCED_AGE_CUTOFF = 75
+
 # Global service instance
 _readmission_predictor = None
 _model_lock = None
@@ -261,7 +273,7 @@ class ReadmissionPredictor:
         boundary_distance = abs(risk_score - 0.5) * 2
 
         # Keep confidence conservative for fallback scenarios
-        return 0.55 + (0.25 * feature_coverage) + (0.20 * boundary_distance)
+        return CONFIDENCE_BASE + (CONFIDENCE_RICHNESS_WEIGHT * feature_coverage) + (CONFIDENCE_BOUNDARY_WEIGHT * boundary_distance)
 
     def _calculate_feature_importance(self, features_dict: Dict, risk_score: float) -> Dict:
         """Calculate feature importance scores"""
@@ -281,28 +293,28 @@ class ReadmissionPredictor:
         risk_factors = []
 
         # Check each high-value feature
-        if features_dict.get('previous_readmissions', 0) > 0.01:
+        if features_dict.get('previous_readmissions', 0) > PREVIOUS_READMISSION_SIGNIFICANCE:
             count = int(patient_data.get('previous_readmissions', 0))
             risk_factors.append(f"Previous {count} readmission(s) (Strong predictor)")
 
-        if features_dict.get('comorbidity_count', 0) > 0.3:
+        if features_dict.get('comorbidity_count', 0) > COMORBIDITY_COUNT_SIGNIFICANCE:
             risk_factors.append("Multiple comorbidities")
 
-        if features_dict.get('has_diabetes', 0) > 0.5:
+        if features_dict.get('has_diabetes', 0) > DISEASE_PRESENT_SIGNIFICANCE:
             risk_factors.append("Diabetes")
 
-        if features_dict.get('has_heart_disease', 0) > 0.5:
+        if features_dict.get('has_heart_disease', 0) > DISEASE_PRESENT_SIGNIFICANCE:
             risk_factors.append("Cardiac disease")
 
-        if features_dict.get('has_hypertension', 0) > 0.5:
+        if features_dict.get('has_hypertension', 0) > DISEASE_PRESENT_SIGNIFICANCE:
             risk_factors.append("Hypertension")
 
-        if features_dict.get('medication_count', 0) > 0.4:
+        if features_dict.get('medication_count', 0) > POLYPHARMACY_SIGNIFICANCE:
             risk_factors.append("Polypharmacy (multiple medications)")
 
         age = int(patient_data.get('age', 60)) if patient_data.get('age') else 60
-        if age > 75:
-            risk_factors.append("Advanced age (>75 years)")
+        if age > ADVANCED_AGE_CUTOFF:
+            risk_factors.append(f"Advanced age (>{ADVANCED_AGE_CUTOFF} years)")
 
         return risk_factors[:5]  # Return top 5
 
@@ -310,13 +322,13 @@ class ReadmissionPredictor:
         """Generate recommended interventions based on risk profile"""
         interventions = []
 
-        if risk_score >= 0.7:
+        if risk_score >= HIGH_RISK_THRESHOLD:
             interventions.append("🔴 URGENT: Schedule 3-day post-discharge follow-up call")
             interventions.append("Assign case manager for discharge planning")
             interventions.append("Consider home health services")
             interventions.append("Arrange transportation assistance if needed")
 
-        elif risk_score >= 0.5:
+        elif risk_score >= MODERATE_RISK_THRESHOLD:
             interventions.append("🟡 Schedule 7-day post-discharge follow-up")
             interventions.append("Provide clear discharge instructions")
             interventions.append("Arrange pharmacy consultation if on >5 medications")

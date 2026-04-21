@@ -1,11 +1,20 @@
 """Application configuration with environment-based settings."""
 
+import json
 import os
-from pathlib import Path
-from typing import List, Optional
 from functools import lru_cache
+from pathlib import Path
+from typing import Annotated, List, Optional
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+]
 
 
 def get_project_root() -> Path:
@@ -39,10 +48,7 @@ class Settings(BaseSettings):
     )  # 24 hours
 
     # CORS
-    CORS_ORIGINS: List[str] = os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000",
-    ).split(",")
+    CORS_ORIGINS: Annotated[List[str], NoDecode] = DEFAULT_CORS_ORIGINS.copy()
 
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./natpudan.db")
@@ -74,15 +80,45 @@ class Settings(BaseSettings):
     KB_DIR: Path = DATA_DIR / "knowledge_base"
     LOGS_DIR: Path = BASE_DIR / "logs"
 
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        """Accept either JSON arrays or comma-separated origins from env files."""
+        if value is None:
+            return DEFAULT_CORS_ORIGINS.copy()
+
+        if isinstance(value, str):
+            raw_value = value.strip()
+            if not raw_value:
+                return DEFAULT_CORS_ORIGINS.copy()
+
+            if raw_value.startswith("["):
+                try:
+                    parsed = json.loads(raw_value)
+                except json.JSONDecodeError:
+                    parsed = None
+                else:
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+
+            return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+
+        if isinstance(value, (list, tuple, set)):
+            return [str(item).strip() for item in value if str(item).strip()]
+
+        return value
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Validate SECRET_KEY
         if not self.SECRET_KEY:
             if self.is_production:
-                raise ValueError("SECRET_KEY must be set in production")
-            # Generate for development
-            import secrets
-            self.SECRET_KEY = secrets.token_urlsafe(32)
+                raise ValueError("SECRET_KEY must be set in production via environment variable")
+            # For development, use a stable fallback if not provided to avoid session invalidation
+            self.SECRET_KEY = os.getenv("SECRET_KEY", "dev_secret_key_change_me_in_production_1234567890")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning("SECRET_KEY not found in environment. Using development fallback.")
 
     def get_final_secret_key(self) -> str:
         """Get the JWT secret key, falling back to SECRET_KEY."""

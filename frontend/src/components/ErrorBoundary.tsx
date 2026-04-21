@@ -1,128 +1,95 @@
-import React from 'react';
-import './ErrorBoundary.css';
-import apiClient from '../services/apiClient';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Box, Typography, Button, Paper } from '@mui/material';
+import { WarningAmber as WarningIcon } from '@mui/icons-material';
 
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error?: any;
-  errorCount: number;
-  autoRetrying: boolean;
+interface Props {
+  children: ReactNode;
 }
 
-export class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBoundaryState> {
-  private retryTimeout: ReturnType<typeof setTimeout> | null = null;
+interface State {
+  hasError: boolean;
+  error: Error | null;
+}
 
-  constructor(props: React.PropsWithChildren) {
-    super(props);
-    this.state = { hasError: false, errorCount: 0, autoRetrying: false };
-  }
-
-  static getDerivedStateFromError(error: any): Partial<ErrorBoundaryState> {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: any, info: any) {
-    console.error('UI ErrorBoundary caught error:', error, info);
-
-    this.setState(prevState => ({
-      error,
-      errorCount: prevState.errorCount + 1,
-    }));
-
-    // Auto-retry for network errors
-    if (this.isNetworkError(error) && this.state.errorCount < 3) {
-      this.autoRetry();
-    }
-
-    // Log to backend auto-correction system
-    this.logErrorToBackend(error, info);
-  }
-
-  componentWillUnmount() {
-    if (this.retryTimeout) {
-      clearTimeout(this.retryTimeout);
-    }
-  }
-
-  private isNetworkError(error: any): boolean {
-    const msg = (error?.message || '').toLowerCase();
-    return msg.includes('network') || msg.includes('fetch') || msg.includes('timeout') || msg.includes('connection');
-  }
-
-  private autoRetry = () => {
-    this.setState({ autoRetrying: true });
-    const delay = Math.min(1000 * Math.pow(2, this.state.errorCount), 10000);
-
-    this.retryTimeout = setTimeout(() => {
-      console.log('Auto-retrying after error...');
-      this.setState({ hasError: false, error: null, autoRetrying: false });
-    }, delay);
+class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false,
+    error: null,
   };
 
-  private logErrorToBackend = async (error: any, info: any) => {
-    try {
-      await apiClient.post('/api/error-correction/log', {
-        message: error?.message || 'Unknown error',
-        stack: error?.stack,
-        componentStack: info?.componentStack,
-        timestamp: new Date().toISOString(),
-        url: window.location.href,
-      });
-    } catch (logError) {
-      console.warn('Failed to log error to backend:', logError);
-    }
+  public static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Uncaught error:', error, errorInfo);
+    // Optionally log to an external service here
+  }
+
+  private handleReset = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.href = '/';
   };
 
-  render() {
+  public render() {
     if (this.state.hasError) {
-      const { error, autoRetrying, errorCount } = this.state;
-
       return (
-        <div className="error-boundary-root">
-          <div className="error-boundary-card">
-            <h2 className="error-boundary-title">[WARNING] Something went wrong</h2>
-
-            {autoRetrying && (
-              <div className="error-boundary-banner retry">
-                🔄 Auto-retry in progress... (Attempt {errorCount}/3)
-              </div>
-            )}
-
-            {this.isNetworkError(error) && !autoRetrying && (
-              <div className="error-boundary-banner network">
-                [WARNING] Network connection issue. Check if backend server is running.
-              </div>
-            )}
-
-            <pre className="error-boundary-message">
-              {String(error?.message || 'Unknown error')}
-            </pre>
-
-            <div className="error-boundary-actions">
-              <button
-                onClick={() => this.setState({ hasError: false, error: null, errorCount: 0 })}
-                disabled={autoRetrying}
-                className={`error-boundary-button primary${autoRetrying ? ' disabled' : ''}`}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '80vh',
+            p: 3,
+          }}
+        >
+          <Paper
+            elevation={3}
+            sx={{
+              p: 4,
+              maxWidth: 500,
+              textAlign: 'center',
+              borderRadius: 2,
+              borderTop: '5px solid #f44336',
+            }}
+          >
+            <WarningIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
+            <Typography variant="h5" gutterBottom fontWeight={700}>
+              Oops! Something went wrong.
+            </Typography>
+            <Typography color="text.secondary" paragraph>
+              The application encountered an unexpected error. Don't worry, your data is safe.
+            </Typography>
+            {this.state.error && (
+              <Box
+                sx={{
+                  bgcolor: 'grey.100',
+                  p: 2,
+                  borderRadius: 1,
+                  mb: 3,
+                  textAlign: 'left',
+                  overflow: 'auto',
+                  maxHeight: 100,
+                }}
               >
-                🔄 Try Again
-              </button>
-
-              <button
-                onClick={() => window.location.reload()}
-                disabled={autoRetrying}
-                className={`error-boundary-button secondary${autoRetrying ? ' disabled' : ''}`}
-              >
-                🔃 Reload Page
-              </button>
-            </div>
-
-            <p className="error-boundary-footer">
-              [OK] Error logged to auto-correction system
-            </p>
-          </div>
-        </div>
+                <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                  {this.state.error.toString()}
+                </Typography>
+              </Box>
+            )}
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={this.handleReset}
+              sx={{ px: 4, py: 1 }}
+            >
+              Reload Application
+            </Button>
+          </Paper>
+        </Box>
       );
     }
+
     return this.props.children;
   }
 }
